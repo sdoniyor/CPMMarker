@@ -16,10 +16,7 @@ export default function App() {
         <Route path="/market" element={<Market />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/wheel" element={<Wheel />} />
-        
-        <div style={{ color: "white", fontSize: 30 }}>
-          APP WORKS
-        </div>
+      
       </Routes>
     </BrowserRouter>
   );
