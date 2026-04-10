@@ -2,11 +2,9 @@
   "name": "cpm",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "server": "node server/server.js",
-    "client": "vite",
     "client": "vite",
     "all": "concurrently \"npm run server\" \"npm run dev\"",
     "lint": "eslint .",
