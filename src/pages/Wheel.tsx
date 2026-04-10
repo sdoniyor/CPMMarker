@@ -218,10 +218,9 @@
 
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 
-// ЗАМЕНИ НА РЕАЛЬНЫЙ URL ТВОЕГО API
 const API = "https://cpmmarker.onrender.com";
 
 export default function Wheel() {
@@ -229,8 +228,10 @@ export default function Wheel() {
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<any>(null);
+  
+  // Используем ref для хранения текущего угла, чтобы расчет всегда шел вперед
+  const currentRotationRef = useRef(0);
 
-  // Безопасное получение пользователя
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
 
@@ -244,15 +245,12 @@ export default function Wheel() {
       const data = await res.json();
       setItems(data);
     } catch (error) {
-      console.error("Ошибка загрузки колеса:", error);
+      console.error("Ошибка загрузки:", error);
     }
   };
 
   const spin = async () => {
-    if (spinning || items.length === 0 || !user) {
-      if (!user) alert("Пожалуйста, войдите в аккаунт!");
-      return;
-    }
+    if (spinning || items.length === 0 || !user) return;
 
     setSpinning(true);
     setResult(null);
@@ -265,30 +263,27 @@ export default function Wheel() {
       });
 
       const data = await res.json();
-      
-      if (!res.ok) throw new Error(data.error || "Ошибка сервера");
-
       const index = data.index; 
       const sectorAngle = 360 / items.length;
 
-      // РАСЧЕТ УГЛА
-      // 1. Берем текущий угол (чтобы не прыгало назад)
-      // 2. Добавляем 5-8 полных оборотов для эффекта
-      // 3. Вычитаем (index * sectorAngle), чтобы нужный сектор оказался под стрелкой
-      const extraRounds = 360 * 8;
-      const stopAt = 360 - (index * sectorAngle);
-      const target = rotation + extraRounds + (stopAt - (rotation % 360));
+      // --- ЛОГИКА АНИМАЦИИ ---
+      // Делаем минимум 5 полных оборотов (1800 град) + докручиваем до нужного сектора
+      const extraDegrees = 1800; 
+      const stopAt = 360 - (index * sectorAngle); 
+      
+      // Чтобы колесо всегда крутилось ВПЕРЕД, прибавляем к текущему значению
+      const newRotation = currentRotationRef.current + extraDegrees + (stopAt - (currentRotationRef.current % 360));
+      
+      currentRotationRef.current = newRotation;
+      setRotation(newRotation);
 
-      setRotation(target);
-
-      // Ждем окончания анимации (4.2 сек)
       setTimeout(() => {
-        setResult(data.win); // Убедись, что в data.win есть поле title
+        setResult(data.win);
         setSpinning(false);
       }, 4200); 
-    } catch (error: any) {
-      console.error("Ошибка при вращении:", error);
-      alert(error.message || "Произошла ошибка");
+
+    } catch (error) {
+      console.error("Ошибка:", error);
       setSpinning(false);
     }
   };
@@ -297,123 +292,64 @@ export default function Wheel() {
     <div className="min-h-screen bg-[#05070d] text-white overflow-hidden relative font-sans">
       <Navbar />
 
-      {/* ФОНОВОЕ СВЕЧЕНИЕ */}
-      <div className="absolute w-[800px] h-[800px] bg-yellow-600/10 blur-[180px] -top-40 -left-40 rounded-full z-0" />
-      <div className="absolute w-[600px] h-[600px] bg-blue-600/5 blur-[150px] bottom-0 right-0 rounded-full z-0" />
-
       <div className="text-center pt-16 relative z-10">
-        <h1 className="text-yellow-400 text-4xl font-black tracking-[0.5em] drop-shadow-[0_0_15px_rgba(234,179,8,0.4)]">
-          WHEEL OF FORTUNE
-        </h1>
-        <div className="flex items-center justify-center gap-4 mt-2">
-          <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-white/20" />
-          <p className="text-white/40 text-xs uppercase tracking-widest">
-            Spin & Win Exclusive Rewards
-          </p>
-          <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-white/20" />
-        </div>
+        <h1 className="text-yellow-400 text-4xl font-black tracking-[0.5em]">WHEEL OF FORTUNE</h1>
       </div>
 
       <div className="flex justify-center mt-12 relative z-10">
         {/* УКАЗАТЕЛЬ (СТРЕЛКА) */}
         <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 z-50">
-          <div 
-            className="w-10 h-10 bg-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.8)]" 
-            style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}
-          />
+          <div className="w-10 h-10 bg-yellow-500" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }} />
         </div>
 
         <div className="relative w-[450px] h-[450px]">
-          
-          {/* ДЕКОРАТИВНЫЕ ТОЧКИ */}
-          {[...Array(12)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-yellow-500/40 rounded-full z-20"
-              style={{
-                top: '50%',
-                left: '50%',
-                transform: `rotate(${i * 30}deg) translateY(-235px) translateX(-50%)`,
-              }}
-            />
-          ))}
-
           {/* КОЛЕСО */}
           <div
-            className="w-full h-full rounded-full border-[12px] border-[#1a1d24] relative overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)] bg-[#0a0c12]"
+            className="w-full h-full rounded-full border-[12px] border-[#1a1d24] relative overflow-hidden bg-[#0a0c12]"
             style={{ 
               transform: `rotate(${rotation}deg)`,
-              transition: 'transform 4.2s cubic-bezier(0.15, 0, 0.15, 1)',
-              outline: '2px solid rgba(234,179,8,0.2)'
+              transition: 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)', // Убедись, что это здесь!
+              willChange: 'transform' // Подсказка браузеру для плавной анимации
             }}
           >
             {items.map((item, i) => {
               const sectorAngle = 360 / items.length;
               const angle = sectorAngle * i;
-
               return (
                 <div
                   key={item.id}
-                  className="absolute inset-0 flex justify-center origin-center"
+                  className="absolute inset-0 flex justify-center"
                   style={{ transform: `rotate(${angle}deg)` }}
                 >
-                  {/* Линия разделителя */}
-                  <div className="absolute w-[1px] h-1/2 bg-yellow-500/10 origin-bottom bottom-1/2" />
-
-                  {/* Контент сектора */}
-                  <div 
-                    className="flex flex-col items-center pt-8"
-                    style={{ transform: `rotate(${0}deg)` }} // Элементы крутятся вместе с колесом
-                  >
-                    {item.image_url && (
-                      <img
-                        src={item.image_url}
-                        alt=""
-                        className="w-14 h-14 object-contain mb-2"
-                      />
-                    )}
-                    <p className="text-[10px] font-bold text-white/70 uppercase text-center max-w-[70px] leading-tight">
-                      {item.title}
-                    </p>
+                  <div className="absolute w-[1px] h-1/2 bg-yellow-500/20 origin-bottom bottom-1/2" />
+                  <div className="flex flex-col items-center pt-10">
+                    {item.image_url && <img src={item.image_url} className="w-12 h-12 mb-2 object-contain" />}
+                    <p className="text-[10px] font-bold uppercase">{item.title}</p>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* ЦЕНТРАЛЬНАЯ КНОПКА */}
+          {/* КНОПКА */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40">
-            <div className="absolute inset-[-10px] rounded-full bg-[#05070d] shadow-2xl" />
             <button
               onClick={spin}
               disabled={spinning}
-              className={`
-                relative w-28 h-28 rounded-full 
-                bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-700
-                text-black font-extrabold text-xl
-                shadow-[0_0_40px_rgba(234,179,8,0.4)]
-                transition-all duration-300 active:scale-90
-                ${spinning ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:shadow-yellow-500/60'}
-                flex flex-col items-center justify-center
-              `}
+              className="w-24 h-24 rounded-full bg-yellow-500 text-black font-black shadow-2xl active:scale-95 transition-transform disabled:opacity-50"
             >
-              <span className="leading-none">{spinning ? "..." : "SPIN"}</span>
-              {!spinning && <span className="text-[9px] mt-1 opacity-80 font-bold">LUCKY</span>}
+              {spinning ? "..." : "SPIN"}
             </button>
           </div>
         </div>
       </div>
 
       {/* РЕЗУЛЬТАТ */}
-      <div className="h-32 flex items-center justify-center mt-10 relative z-10">
+      <div className="h-32 flex items-center justify-center mt-10">
         {result && !spinning && (
-          <div className="text-center animate-bounce">
-            <p className="text-yellow-500 text-xs font-bold tracking-[0.3em] uppercase mb-2">
-              You Won!
-            </p>
-            <h2 className="text-white text-4xl font-black drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-              {result.title}
-            </h2>
+          <div className="text-center transition-opacity duration-500 opacity-100">
+            <p className="text-yellow-500 text-sm font-bold tracking-widest">ВЫ ВЫИГРАЛИ:</p>
+            <h2 className="text-white text-5xl font-black">{result.title}</h2>
           </div>
         )}
       </div>
