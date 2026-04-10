@@ -229,7 +229,7 @@ export default function Wheel() {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<any>(null);
   
-  // Используем ref для хранения текущего угла, чтобы расчет всегда шел вперед
+  // Храним текущий угол вне стейта для точности расчетов
   const currentRotationRef = useRef(0);
 
   const userStr = localStorage.getItem("user");
@@ -263,24 +263,26 @@ export default function Wheel() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error("Ошибка сервера");
+
       const index = data.index; 
       const sectorAngle = 360 / items.length;
 
-      // --- ЛОГИКА АНИМАЦИИ ---
-      // Делаем минимум 5 полных оборотов (1800 град) + докручиваем до нужного сектора
-      const extraDegrees = 1800; 
+      // --- ЛОГИКА ВРАЩЕНИЯ ---
+      const spins = 8; // Количество полных кругов
       const stopAt = 360 - (index * sectorAngle); 
       
-      // Чтобы колесо всегда крутилось ВПЕРЕД, прибавляем к текущему значению
-      const newRotation = currentRotationRef.current + extraDegrees + (stopAt - (currentRotationRef.current % 360));
+      // Вычисляем новый угол так, чтобы он всегда был больше предыдущего
+      const newRotation = currentRotationRef.current + (360 * spins) + (stopAt - (currentRotationRef.current % 360));
       
       currentRotationRef.current = newRotation;
       setRotation(newRotation);
 
+      // Ждем завершения крутки
       setTimeout(() => {
         setResult(data.win);
         setSpinning(false);
-      }, 4200); 
+      }, 4000); 
 
     } catch (error) {
       console.error("Ошибка:", error);
@@ -293,23 +295,29 @@ export default function Wheel() {
       <Navbar />
 
       <div className="text-center pt-16 relative z-10">
-        <h1 className="text-yellow-400 text-4xl font-black tracking-[0.5em]">WHEEL OF FORTUNE</h1>
+        <h1 className="text-yellow-400 text-4xl font-black tracking-[0.5em] drop-shadow-md">
+          WHEEL OF FORTUNE
+        </h1>
       </div>
 
       <div className="flex justify-center mt-12 relative z-10">
-        {/* УКАЗАТЕЛЬ (СТРЕЛКА) */}
-        <div className="absolute top-[-20px] left-1/2 -translate-x-1/2 z-50">
-          <div className="w-10 h-10 bg-yellow-500" style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }} />
+        {/* УКАЗАТЕЛЬ */}
+        <div className="absolute top-[-25px] left-1/2 -translate-x-1/2 z-50">
+          <div 
+            className="w-10 h-10 bg-yellow-500 shadow-xl" 
+            style={{ clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)' }}
+          />
         </div>
 
         <div className="relative w-[450px] h-[450px]">
           {/* КОЛЕСО */}
           <div
-            className="w-full h-full rounded-full border-[12px] border-[#1a1d24] relative overflow-hidden bg-[#0a0c12]"
+            className="w-full h-full rounded-full border-[10px] border-[#1a1d24] relative overflow-hidden bg-[#0a0c12] shadow-2xl"
             style={{ 
               transform: `rotate(${rotation}deg)`,
-              transition: 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)', // Убедись, что это здесь!
-              willChange: 'transform' // Подсказка браузеру для плавной анимации
+              transition: 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)',
+              willChange: 'transform',
+              backfaceVisibility: 'hidden' // Исправляет мерцание в Safari/Chrome
             }}
           >
             {items.map((item, i) => {
@@ -321,22 +329,39 @@ export default function Wheel() {
                   className="absolute inset-0 flex justify-center"
                   style={{ transform: `rotate(${angle}deg)` }}
                 >
-                  <div className="absolute w-[1px] h-1/2 bg-yellow-500/20 origin-bottom bottom-1/2" />
+                  {/* Линия сектора */}
+                  <div className="absolute w-[1px] h-1/2 bg-yellow-500/10 origin-bottom bottom-1/2" />
+                  
+                  {/* Иконка и текст */}
                   <div className="flex flex-col items-center pt-10">
-                    {item.image_url && <img src={item.image_url} className="w-12 h-12 mb-2 object-contain" />}
-                    <p className="text-[10px] font-bold uppercase">{item.title}</p>
+                    {item.image_url && (
+                      <img 
+                        src={item.image_url} 
+                        className="w-12 h-12 mb-2 object-contain" 
+                        alt="" 
+                      />
+                    )}
+                    <p className="text-[10px] font-bold uppercase tracking-tighter opacity-80">
+                      {item.title}
+                    </p>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* КНОПКА */}
+          {/* ЦЕНТРАЛЬНАЯ КНОПКА */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40">
             <button
               onClick={spin}
               disabled={spinning}
-              className="w-24 h-24 rounded-full bg-yellow-500 text-black font-black shadow-2xl active:scale-95 transition-transform disabled:opacity-50"
+              className={`
+                w-24 h-24 rounded-full font-black text-xl
+                bg-gradient-to-br from-yellow-400 to-yellow-600 text-black
+                shadow-[0_0_30px_rgba(234,179,8,0.4)]
+                transition-transform active:scale-90
+                ${spinning ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}
+              `}
             >
               {spinning ? "..." : "SPIN"}
             </button>
@@ -344,12 +369,14 @@ export default function Wheel() {
         </div>
       </div>
 
-      {/* РЕЗУЛЬТАТ */}
-      <div className="h-32 flex items-center justify-center mt-10">
+      {/* ОТОБРАЖЕНИЕ ВЫИГРЫША */}
+      <div className="h-40 flex items-center justify-center mt-10 relative z-10">
         {result && !spinning && (
-          <div className="text-center transition-opacity duration-500 opacity-100">
-            <p className="text-yellow-500 text-sm font-bold tracking-widest">ВЫ ВЫИГРАЛИ:</p>
-            <h2 className="text-white text-5xl font-black">{result.title}</h2>
+          <div className="text-center animate-in fade-in zoom-in duration-500">
+            <p className="text-yellow-500 font-bold tracking-[0.2em] text-sm uppercase">You Won!</p>
+            <h2 className="text-white text-5xl font-black mt-2 drop-shadow-lg">
+              {result.title}
+            </h2>
           </div>
         )}
       </div>
