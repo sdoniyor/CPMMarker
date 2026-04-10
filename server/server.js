@@ -182,6 +182,70 @@ app.post("/buy", async (req, res) => {
   }
 });
 
+/* ================= WHEEL ================= */
+app.get("/wheel", async (req, res) => {
+  try {
+    const result = await safeQuery("SELECT * FROM wheel_items");
+    res.json(result.rows || []);
+  } catch (err) {
+    res.status(500).json({ error: "wheel error" });
+  }
+});
+
+app.post("/wheel/spin", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const result = await safeQuery("SELECT * FROM wheel_items");
+    const items = result.rows;
+
+    if (!items.length) {
+      return res.status(400).json({ error: "wheel empty" });
+    }
+
+    let total = items.reduce((s, i) => s + i.chance, 0);
+    let r = Math.random() * total;
+
+    let win = items[0];
+
+    for (let i = 0; i < items.length; i++) {
+      r -= items[i].chance;
+      if (r <= 0) {
+        win = items[i];
+        break;
+      }
+    }
+
+    // reward logic
+    if (win.type === "money") {
+      await safeQuery(
+        "UPDATE users SET money = money + $1 WHERE id=$2",
+        [win.value, userId]
+      );
+    }
+
+    if (win.type === "car") {
+      await safeQuery(
+        "UPDATE cars SET user_id=$1 WHERE id=$2",
+        [userId, win.value]
+      );
+    }
+
+    if (win.type === "promo") {
+      await safeQuery(
+        "UPDATE users SET level = level + 1 WHERE id=$1",
+        [userId]
+      );
+    }
+
+    res.json({ success: true, win });
+
+  } catch (err) {
+    console.log("WHEEL ERROR:", err.message);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
 /* ================= START ================= */
 app.listen(5000, "0.0.0.0", () => {
   console.log("🚀 SERVER RUNNING ON PORT 5000");
