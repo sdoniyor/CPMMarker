@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 
 // ЗАМЕНИ НА РЕАЛЬНЫЙ URL ТВОЕГО API
-const API = "https://unshunnable-fibrinogenically-pia.ngrok-free.dev";
+const API = "https://render.com/docs/troubleshooting-deploys";
 
 export default function Wheel() {
   const [items, setItems] = useState<any[]>([]);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 
-const API = "https://unshunnable-fibrinogenically-pia.ngrok-free.dev";
+const API = "https://render.com/docs/troubleshooting-deploys";
 
 export default function Market() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
