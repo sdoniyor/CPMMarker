@@ -6,6 +6,7 @@ const { Pool } = require("pg");
 
 const app = express();
 
+/* ================= MIDDLEWARE ================= */
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -13,6 +14,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 /* ================= DB (NEON SAFE) ================= */
 const pool = new Pool({
@@ -23,7 +25,7 @@ const pool = new Pool({
   }
 });
 
-/* проверка подключения */
+/* DB CONNECT LOG */
 pool.connect()
   .then(() => console.log("✅ DB CONNECTED"))
   .catch(err => console.log("❌ DB ERROR:", err.message));
@@ -33,13 +35,13 @@ app.get("/", (req, res) => {
   res.json({ status: "Backend working 🚀" });
 });
 
-/* ================= SAFE QUERY WRAPPER ================= */
+/* ================= SAFE QUERY ================= */
 const safeQuery = async (query, params = []) => {
   try {
     return await pool.query(query, params);
   } catch (err) {
     console.log("DB ERROR:", err.message);
-    return { rows: [] }; // ❗ чтобы фронт НЕ падал
+    return { rows: [] };
   }
 };
 
@@ -49,6 +51,10 @@ const safeQuery = async (query, params = []) => {
 app.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
 
     const exists = await safeQuery(
       "SELECT id FROM users WHERE email=$1",
@@ -66,9 +72,13 @@ app.post("/register", async (req, res) => {
       [name, email, password]
     );
 
-    res.json({ success: true, user: result.rows[0] });
+    res.json({
+      success: true,
+      user: result.rows[0] || null
+    });
 
   } catch (err) {
+    console.log("REGISTER ERROR:", err.message);
     res.status(500).json({ error: "server error" });
   }
 });
@@ -78,8 +88,16 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log("LOGIN:", req.body);
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
+
     const result = await safeQuery(
-      "SELECT id, name, email, money, level FROM users WHERE email=$1 AND password=$2",
+      `SELECT id, name, email, money, level
+       FROM users
+       WHERE email=$1 AND password=$2`,
       [email, password]
     );
 
@@ -92,10 +110,11 @@ app.post("/login", async (req, res) => {
     res.json({
       success: true,
       user,
-      token: "fake-token-" + user.id
+      token: "fake-" + user.id
     });
 
   } catch (err) {
+    console.log("LOGIN ERROR:", err.message);
     res.status(500).json({ error: "server error" });
   }
 });
@@ -158,6 +177,7 @@ app.post("/buy", async (req, res) => {
     res.json({ success: true });
 
   } catch (err) {
+    console.log("BUY ERROR:", err.message);
     res.status(500).json({ error: "server error" });
   }
 });
