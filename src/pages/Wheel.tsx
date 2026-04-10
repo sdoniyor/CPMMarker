@@ -259,18 +259,20 @@ export default function Wheel() {
 
     const sector = 360 / items.length;
 
-    const finalRotation =
+    const target =
       rotation +
       360 * 6 +
       (360 - index * sector - sector / 2);
 
-    setRotation(finalRotation);
+    setRotation(target);
 
     setTimeout(() => {
       setResult(data.win);
       setSpinning(false);
     }, 4200);
   };
+
+  const sector = items.length ? 360 / items.length : 0;
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center">
@@ -280,56 +282,55 @@ export default function Wheel() {
         WHEEL OF FORTUNE
       </h1>
 
-      {/* WHEEL */}
+      {/* CONTAINER MUST BE RELATIVE */}
       <div className="relative mt-16 w-[400px] h-[400px]">
 
         {/* POINTER */}
         <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 z-50">
-          <div className="w-0 h-0 border-l-[12px] border-r-[12px] border-b-[25px] border-l-transparent border-r-transparent border-b-yellow-400" />
+          <div className="w-0 h-0 border-l-[12px] border-r-[12px] border-b-[25px]
+            border-l-transparent border-r-transparent border-b-yellow-400"
+          />
         </div>
 
         {/* WHEEL */}
         <div
-          className="w-full h-full rounded-full border-4 border-yellow-500 transition-transform duration-[4200ms]"
+          className="w-full h-full rounded-full border-4 border-yellow-500"
           style={{
             transform: `rotate(${rotation}deg)`,
+            transition: "transform 4.2s cubic-bezier(0.17, 0.67, 0.12, 0.99)",
           }}
         >
-          {items.map((item, i) => {
-            const sector = 360 / items.length;
+          {items.map((item, i) => (
+            <div
+              key={item.id}
+              className="absolute w-full h-full flex items-center justify-center"
+              style={{
+                transform: `rotate(${i * sector}deg)`,
+              }}
+            >
+              {/* line */}
+              <div className="absolute w-[2px] h-1/2 bg-yellow-500/30" />
 
-            return (
+              {/* content */}
               <div
-                key={item.id}
-                className="absolute w-full h-full flex items-start justify-center"
+                className="flex flex-col items-center"
                 style={{
-                  transform: `rotate(${i * sector}deg)`,
+                  transform: `translateY(-140px) rotate(${-i * sector}deg)`,
                 }}
               >
-                {/* LINE */}
-                <div className="absolute w-[2px] h-1/2 bg-yellow-500/30" />
+                {item.image_url && (
+                  <img
+                    src={item.image_url}
+                    className="w-10 h-10 object-contain"
+                  />
+                )}
 
-                {/* CONTENT */}
-                <div
-                  className="mt-10 flex flex-col items-center"
-                  style={{
-                    transform: `rotate(${-i * sector}deg)`,
-                  }}
-                >
-                  {item.image_url && (
-                    <img
-                      src={item.image_url}
-                      className="w-10 h-10 object-contain"
-                    />
-                  )}
-
-                  <p className="text-[10px] text-white">
-                    {item.title}
-                  </p>
-                </div>
+                <p className="text-[10px] font-bold">
+                  {item.title}
+                </p>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         {/* BUTTON */}
