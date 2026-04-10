@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = "https://render.com/docs/troubleshooting-deploys";
+const API = "https://cpmmarker.onrender.com";
 
 export default function Profile() {
   const navigate = useNavigate();

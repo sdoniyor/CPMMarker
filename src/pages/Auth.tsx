@@ -17,7 +17,7 @@ export default function Auth() {
     const body = isRegister ? { name, email, password } : { email, password };
 
     try {
-      const res = await fetch(`https://render.com/docs/troubleshooting-deploys${endpoint}`, {
+      const res = await fetch(`https://cpmmarker.onrender.com${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

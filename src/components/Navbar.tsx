@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API = "https://unshunnable-fibrinogenically-pia.ngrok-free.dev";
+const API = "https://cpmmarker.onrender.com";
 
 export default function Navbar() {
   const navigate = useNavigate();

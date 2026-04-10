@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 
-const API = "https://render.com/docs/troubleshooting-deploys";
+const API = "https://cpmmarker.onrender.com";
 
 export default function Market() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
