@@ -218,6 +218,7 @@
 
 
 
+
 import { useEffect, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 
@@ -225,13 +226,12 @@ const API = "https://cpmmarker.onrender.com";
 
 export default function Wheel() {
   const [items, setItems] = useState<any[]>([]);
-  const [rotation, setRotation] = useState(0);
+  const [pointerRotation, setPointerRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
 
-  const tickSound = useRef<HTMLAudioElement | null>(null);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const tickSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     loadWheel();
@@ -244,7 +244,6 @@ export default function Wheel() {
     setItems(data);
   };
 
-  // 🎧 fake ticking sound during spin
   const playTick = () => {
     if (!tickSound.current) return;
     tickSound.current.currentTime = 0;
@@ -256,7 +255,6 @@ export default function Wheel() {
 
     setSpinning(true);
     setResult(null);
-    setHighlightIndex(null);
 
     try {
       const res = await fetch(`${API}/wheel/spin`, {
@@ -266,30 +264,28 @@ export default function Wheel() {
       });
 
       const data = await res.json();
-
       const index = data.index;
+
       const sectorAngle = 360 / items.length;
 
+      // 🎯 сколько оборотов стрелка сделает
       const fullSpins = 6 * 360;
-      const stopAngle = index * sectorAngle + sectorAngle / 2;
-      const targetRotation = fullSpins + (360 - stopAngle);
 
-      // 🎯 animation start
-      setRotation((prev) => prev + targetRotation);
+      // 🎯 куда должна остановиться стрелка
+      const targetAngle =
+        fullSpins + index * sectorAngle + sectorAngle / 2;
 
-      // 🔊 ticking simulation
-      let ticks = 20;
+      // 🔊 ticking animation
+      let steps = 25;
       let i = 0;
 
       const interval = setInterval(() => {
         playTick();
         i++;
+        if (i >= steps) clearInterval(interval);
+      }, 150);
 
-        if (i >= ticks) {
-          clearInterval(interval);
-          setHighlightIndex(index);
-        }
-      }, 200);
+      setPointerRotation((prev) => prev + targetAngle);
 
       setTimeout(() => {
         setResult(data.win);
@@ -302,106 +298,84 @@ export default function Wheel() {
     }
   };
 
+  const sectorAngle = 360 / items.length;
+
   return (
-    <div className="min-h-screen bg-[#05070d] text-white font-sans">
+    <div className="min-h-screen bg-[#05070d] text-white">
       <Navbar />
 
       {/* TITLE */}
       <div className="text-center pt-10">
-        <h1 className="text-yellow-400 text-4xl font-black tracking-widest">
+        <h1 className="text-yellow-400 text-4xl font-black">
           WHEEL OF FORTUNE
         </h1>
       </div>
 
-      {/* WHEEL */}
-      <div className="flex justify-center mt-10 relative">
+      {/* WHEEL CONTAINER */}
+      <div className="flex justify-center mt-12 relative">
 
-        {/* POINTER */}
-        <div className="absolute top-[-20px] z-50 text-yellow-400 text-3xl">
-          ▼
-        </div>
+        {/* WHEEL (СТАТИЧНОЕ) */}
+        <div className="w-[360px] h-[360px] rounded-full border-[10px] border-[#1a1d24] relative overflow-hidden">
 
-        <div className="relative w-[360px] h-[360px]">
+          {items.map((item, i) => {
+            const angle = sectorAngle * i;
 
-          {/* WHEEL */}
-          <div
-            className="w-full h-full rounded-full border-[10px] border-[#1a1d24]"
-            style={{
-              transform: `rotate(${rotation}deg)`,
-              transition: "transform 4s cubic-bezier(0.15, 0, 0.15, 1)",
-              willChange: "transform"
-            }}
-          >
-            {items.map((item, i) => {
-              const angle = (360 / items.length) * i;
+            return (
+              <div
+                key={item.id}
+                className="absolute w-full h-full flex items-center justify-center"
+                style={{ transform: `rotate(${angle}deg)` }}
+              >
+                <div className="absolute w-[2px] h-1/2 bg-yellow-500/20" />
 
-              const isWin = highlightIndex === i;
-
-              return (
                 <div
-                  key={item.id}
-                  className="absolute w-full h-full flex items-center justify-center"
-                  style={{ transform: `rotate(${angle}deg)` }}
+                  className="flex flex-col items-center"
+                  style={{
+                    transform: `translateY(-120px) rotate(${-angle}deg)`,
+                  }}
                 >
-                  {/* divider */}
-                  <div className="absolute w-[2px] h-1/2 bg-yellow-500/20" />
-
-                  {/* sector content */}
-                  <div
-                    className={`flex flex-col items-center transition-all duration-300 ${
-                      isWin ? "scale-125 drop-shadow-[0_0_20px_gold]" : ""
-                    }`}
-                    style={{
-                      transform: `translateY(-120px) rotate(${-angle - rotation}deg)`,
-                    }}
-                  >
-                    {item.image_url && (
-                      <img
-                        src={item.image_url}
-                        className="w-12 h-12 object-contain mb-1"
-                      />
-                    )}
-
-                    <p className="text-[10px] text-white/70 font-bold">
-                      {item.title}
-                    </p>
-
-                    {/* glow effect */}
-                    {isWin && (
-                      <div className="absolute w-20 h-20 bg-yellow-400/30 blur-xl rounded-full" />
-                    )}
-                  </div>
+                  {item.image_url && (
+                    <img src={item.image_url} className="w-12 h-12" />
+                  )}
+                  <p className="text-[10px] text-white/70">
+                    {item.title}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
+        </div>
 
-          {/* BUTTON */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              onClick={spin}
-              disabled={spinning}
-              className="w-20 h-20 rounded-full bg-yellow-500 text-black font-black
-              shadow-[0_0_40px_rgba(234,179,8,0.6)]"
-            >
-              {spinning ? "..." : "SPIN"}
-            </button>
+        {/* POINTER (КРУТИТСЯ ВОКРУГ) */}
+        <div
+          className="absolute w-[420px] h-[420px] flex items-center justify-center transition-transform duration-[4200ms] ease-in-out"
+          style={{
+            transform: `rotate(${pointerRotation}deg)`,
+          }}
+        >
+          <div className="absolute top-0 text-yellow-400 text-3xl">
+            ▼
           </div>
         </div>
+      </div>
+
+      {/* BUTTON */}
+      <div className="flex justify-center mt-10">
+        <button
+          onClick={spin}
+          disabled={spinning}
+          className="w-24 h-24 rounded-full bg-yellow-500 text-black font-black"
+        >
+          {spinning ? "..." : "SPIN"}
+        </button>
       </div>
 
       {/* RESULT */}
       <div className="text-center mt-8">
         {result && (
           <div className="animate-bounce">
-            <p className="text-yellow-400 font-bold">
-              🎉 CONGRATULATIONS
-            </p>
-
-            <p className="text-3xl font-black mt-2">
-              {result.title}
-            </p>
-
+            <p className="text-yellow-400">🎉 YOU WON:</p>
+            <p className="text-3xl font-black">{result.title}</p>
             <p className="text-white/40 text-sm">
               {result.type} • {result.value}
             </p>
