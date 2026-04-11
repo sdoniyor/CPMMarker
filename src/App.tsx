@@ -3,6 +3,7 @@ import Auth from "./pages/Auth";
 import Market from "./pages/Market";
 import Profile from "./pages/Profile";
 import Wheel from "./pages/Wheel";
+import CarDetail from "./pages/CarDetail";
 
 export default function App() {
   return (
@@ -16,7 +17,7 @@ export default function App() {
         <Route path="/market" element={<Market />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/wheel" element={<Wheel />} />
-      
+        <Route path="/car/:id" element={<CarDetail />} />
       </Routes>
     </BrowserRouter>
   );
