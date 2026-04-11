@@ -278,35 +278,52 @@ export default function CarDetail() {
   const [selectedWheels, setSelectedWheels] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
 
+  /* ================= USER DATA ================= */
   const loadUser = async () => {
     const local = JSON.parse(localStorage.getItem("user") || "{}");
     if (!local?.id) return;
-    const res = await fetch(`${API}/profile/${local.id}`);
-    const data = await res.json();
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data));
+
+    try {
+      const res = await fetch(`${API}/profile/${local.id}`);
+      const data = await res.json();
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    } catch (err) {
+      console.error("User load error:", err);
+    }
   };
 
+  /* ================= CAR DATA ================= */
   const loadCar = async () => {
-    const res = await fetch(`${API}/cars`);
-    const data = await res.json();
-    setCar(data.find((c: any) => c.id == id));
+    try {
+      const res = await fetch(`${API}/cars`);
+      const data = await res.json();
+      setCar(data.find((c: any) => c.id == id));
+    } catch (err) {
+      console.error("Car load error:", err);
+    }
   };
 
+  /* ================= CONFIGS DATA ================= */
   const loadConfigs = async () => {
-    const res = await fetch(`${API}/configs`);
-    const data = await res.json();
-    setConfigs(data);
-    setSelectedHp(data.power?.[0] || null);
-    setSelectedTuning(data.tuning?.[0] || null);
-    setSelectedWheels(data.wheels?.[0] || null);
+    try {
+      const res = await fetch(`${API}/configs`);
+      const data = await res.json();
+      setConfigs(data);
+
+      setSelectedHp(data.power?.[0] || null);
+      setSelectedTuning(data.tuning?.[0] || null);
+      setSelectedWheels(data.wheels?.[0] || null);
+    } catch (err) {
+      console.error("Configs load error:", err);
+    }
   };
 
   useEffect(() => {
     loadCar();
     loadConfigs();
     loadUser();
-  }, []);
+  }, [id]);
 
   if (!car || !configs.power) {
     return (
@@ -316,6 +333,7 @@ export default function CarDetail() {
     );
   }
 
+  /* ================= PRICE CALCULATION ================= */
   const base = Number(car.price || 0);
   const hp = Number(selectedHp?.price || 0);
   const tuning = Number(selectedTuning?.price || 0);
@@ -324,9 +342,13 @@ export default function CarDetail() {
 
   let discount = 0;
   let discountCars: number[] = [];
+
   try {
     discount = Number(user?.discount || 0);
-    discountCars = typeof user?.discount_cars === "string" ? JSON.parse(user.discount_cars) : user?.discount_cars || [];
+    discountCars =
+      typeof user?.discount_cars === "string"
+        ? JSON.parse(user.discount_cars)
+        : user?.discount_cars || [];
   } catch {
     discount = 0;
     discountCars = [];
@@ -336,14 +358,28 @@ export default function CarDetail() {
   const discountedBase = discount > 0 && hasDiscount ? base - (base * discount) / 100 : base;
   const totalPrice = Math.round(discountedBase + configTotal);
 
+  /* ================= BUY ACTION ================= */
   const buyCar = async () => {
-    const configIds = [selectedHp?.id, selectedTuning?.id, selectedWheels?.id].filter(Boolean);
+    if (!user?.id) return alert("Login first");
+
+    const configIds = [
+      selectedHp?.id,
+      selectedTuning?.id,
+      selectedWheels?.id,
+    ].filter(Boolean);
+
     const res = await fetch(`${API}/buy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, carId: car.id, configIds }),
+      body: JSON.stringify({
+        userId: user.id,
+        carId: car.id,
+        configIds,
+      }),
     });
+
     const data = await res.json();
+
     if (data.success) {
       alert(`Bought for $${data.paid}`);
       navigate("/market");
@@ -353,114 +389,124 @@ export default function CarDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0c10] text-white font-sans overflow-x-hidden relative">
-      <Navbar />
+    <div className="min-h-screen bg-[#050608] text-white font-sans overflow-x-hidden relative">
+      
+      {/* NAVBAR LAYER */}
+      <div className="relative z-[100]">
+        <Navbar />
+      </div>
 
-      {/* ФОНОВЫЕ ЭФФЕКТЫ ДЛЯ ГЛУБИНЫ */}
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,#1a1d26_0%,#050608_100%)] pointer-events-none" />
-      <div className="absolute top-1/4 left-0 w-64 h-64 bg-yellow-500/10 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-0 w-64 h-64 bg-blue-500/10 blur-[120px] pointer-events-none" />
+      {/* BACKGROUND DECORATIONS */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_50%,#1a1d26_0%,#050608_100%)] pointer-events-none z-0" />
+      <div className="absolute top-20 left-0 w-96 h-96 bg-yellow-500/5 blur-[120px] pointer-events-none" />
 
       <div className="relative z-10 max-w-[1500px] mx-auto p-4 lg:p-8">
         
-        {/* ВЕРХНЯЯ ПАНЕЛЬ С НАЗВАНИЕМ */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
-          <div>
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-6">
+          <div className="animate-in slide-in-from-left duration-500">
             <button
               onClick={() => navigate("/market")}
-              className="mb-4 flex items-center gap-2 text-[10px] font-black italic uppercase tracking-widest text-white/40 hover:text-yellow-500 transition-colors"
+              className="mb-4 flex items-center gap-2 text-[10px] font-black italic uppercase tracking-[0.2em] text-white/30 hover:text-yellow-400 transition-colors"
             >
-              <span className="text-lg">←</span> Назад в маркет
+              <span className="text-lg">←</span> BACK TO MARKET
             </button>
-            <h1 className="text-5xl md:text-6xl font-black italic tracking-tighter uppercase leading-none">
+            <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase leading-none filter drop-shadow-2xl">
               {car.brand} <span className="text-yellow-500">{car.name}</span>
             </h1>
           </div>
           
-          <div className="bg-white/5 backdrop-blur-md px-8 py-4 rounded-2xl border border-white/10 text-right min-w-[200px]">
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Итоговая цена</p>
-            <p className="text-4xl font-black italic text-yellow-400">${totalPrice.toLocaleString()}</p>
+          <div className="bg-neutral-900/60 backdrop-blur-xl px-10 py-5 rounded-[2rem] border border-white/10 text-right shadow-2xl animate-in slide-in-from-right duration-500">
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.3em] mb-1">Total Configuration</p>
+            <p className="text-5xl font-black italic text-yellow-400 tracking-tighter">
+              ${totalPrice.toLocaleString()}
+            </p>
           </div>
         </div>
 
-        {/* ГРИД ИНТЕРФЕЙСА */}
-        <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr_350px] gap-8 items-start">
+        {/* MAIN INTERFACE GRID */}
+        <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr_350px] gap-8 items-start mt-6">
 
-          {/* ЛЕВАЯ КОЛОНКА: ХАРАКТЕРИСТИКИ */}
-          <div className="space-y-6 animate-in slide-in-from-left duration-500">
-            <div className="bg-gradient-to-br from-neutral-800/80 to-black p-6 rounded-[2rem] border border-white/10 shadow-2xl">
-              <h3 className="text-yellow-500 font-black italic mb-6 uppercase tracking-widest text-xs flex items-center gap-2">
-                <div className="w-6 h-[2px] bg-yellow-500"></div> Характеристики
+          {/* LEFT: SPECS */}
+          <div className="space-y-6 animate-in slide-in-from-left duration-700">
+            <div className="bg-gradient-to-br from-neutral-800/50 to-black p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-6xl font-black italic uppercase pointer-events-none">
+                {car.brand}
+              </div>
+              <h3 className="text-yellow-500 font-black italic mb-8 uppercase tracking-[0.2em] text-xs flex items-center gap-3">
+                <div className="w-8 h-[2px] bg-yellow-500"></div> PERFORMANCE
               </h3>
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {[
-                  { label: "ДВИГАТЕЛЬ", value: car.dvigatel },
-                  { label: "МОЩНОСТЬ", value: `${car.power} HP` },
-                  { label: "СКОРОСТЬ", value: `${car.speed} KM/H` },
-                  { label: "ПРИВОД", value: "AWD / RWD" }
+                  { label: "ENGINE TYPE", value: car.dvigatel },
+                  { label: "HORSE POWER", value: `${car.power} HP` },
+                  { label: "MAX SPEED", value: `${car.speed} KM/H` },
+                  { label: "DRIVE TYPE", value: "AWD SYSTEM" }
                 ].map((spec, i) => (
                   <div key={i} className="flex justify-between items-end border-b border-white/5 pb-2">
-                    <span className="text-[9px] font-black text-white/30 tracking-widest">{spec.label}</span>
-                    <span className="font-black italic text-lg tracking-tight">{spec.value}</span>
+                    <span className="text-[9px] font-black text-white/20 tracking-widest uppercase">{spec.label}</span>
+                    <span className="font-black italic text-xl tracking-tight text-white/90">{spec.value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {hasDiscount && (
-              <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-2xl">
-                <p className="text-green-400 font-black italic text-[10px] uppercase tracking-tighter text-center">
-                  Персональная скидка активна: -{discount}%
+              <div className="bg-green-500/10 border border-green-500/20 px-6 py-3 rounded-2xl backdrop-blur-md">
+                <p className="text-green-400 font-black italic text-[10px] uppercase tracking-widest text-center">
+                   PROMO APPLIED: -{discount}% DISCOUNT
                 </p>
               </div>
             )}
           </div>
 
-          {/* ЦЕНТРАЛЬНАЯ ЧАСТЬ: АВТОМОБИЛЬ */}
-          <div className="relative flex flex-col items-center justify-center min-h-[450px] animate-in zoom-in duration-700">
-            {/* Световое пятно под машиной */}
-            <div className="absolute bottom-10 w-[90%] h-[15%] bg-yellow-500/20 blur-[100px] rounded-full pointer-events-none" />
+          {/* CENTER: CAR VIEW */}
+          <div className="relative flex flex-col items-center justify-center min-h-[500px] animate-in zoom-in duration-1000">
+            {/* Ground Glow */}
+            <div className="absolute bottom-20 w-[85%] h-[20%] bg-yellow-500/10 blur-[120px] rounded-full pointer-events-none" />
             
             <img
               src={car.image_url}
-              className="w-full h-auto max-w-[750px] object-contain drop-shadow-[0_40px_60px_rgba(0,0,0,0.9)] transform transition-transform duration-500 hover:scale-105"
+              className="w-full h-auto max-w-[800px] object-contain drop-shadow-[0_50px_60px_rgba(0,0,0,0.9)] transition-all duration-700 hover:scale-110"
               alt={car.name}
             />
             
-            <div className="mt-10 flex gap-3">
-               <div className="px-4 py-1 bg-white/5 rounded-full border border-white/10 text-[9px] font-bold text-white/40 italic uppercase tracking-widest">High Poly Model</div>
-               <div className="px-4 py-1 bg-white/5 rounded-full border border-white/10 text-[9px] font-bold text-white/40 italic uppercase tracking-widest">PBR Materials</div>
+            {/* HUD Decoration */}
+            <div className="mt-12 flex gap-4 opacity-30">
+               <div className="w-2 h-2 bg-white rotate-45"></div>
+               <div className="w-2 h-2 bg-yellow-500 rotate-45"></div>
+               <div className="w-2 h-2 bg-white rotate-45"></div>
             </div>
           </div>
 
-          {/* ПРАВАЯ КОЛОНКА: ТЮНИНГ */}
-          <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            <div className="bg-neutral-900/50 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 max-h-[700px] overflow-y-auto custom-scrollbar">
+          {/* RIGHT: CONFIGURATOR */}
+          <div className="space-y-4 animate-in slide-in-from-right duration-700">
+            <div className="bg-neutral-900/40 backdrop-blur-2xl p-8 rounded-[3rem] border border-white/10 max-h-[750px] overflow-y-auto custom-scrollbar shadow-inner">
               
-              {/* СЕКЦИИ ТЮНИНГА */}
+              {/* CONFIG SECTIONS */}
               {[
-                { label: "Мощность", items: configs.power, state: selectedHp, setter: setSelectedHp },
-                { label: "Тюнинг", items: configs.tuning, state: selectedTuning, setter: setSelectedTuning },
-                { label: "Диски", items: configs.wheels, state: selectedWheels, setter: setSelectedWheels }
+                { label: "Engine Stages", items: configs.power, state: selectedHp, setter: setSelectedHp },
+                { label: "Body Kits", items: configs.tuning, state: selectedTuning, setter: setSelectedTuning },
+                { label: "Rims & Wheels", items: configs.wheels, state: selectedWheels, setter: setSelectedWheels }
               ].map((section, idx) => (
-                <div key={idx} className="mb-8">
-                  <p className="text-[10px] font-black text-yellow-500 mb-4 uppercase tracking-[0.2em] italic flex items-center gap-2">
+                <div key={idx} className="mb-10 last:mb-6">
+                  <p className="text-[10px] font-black text-yellow-500 mb-5 uppercase tracking-[0.3em] italic flex items-center gap-2">
                     <span className="w-2 h-2 bg-yellow-500 rotate-45"></span> {section.label}
                   </p>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {section.items.map((c: any) => (
                       <button
                         key={c.id}
                         onClick={() => section.setter(c)}
-                        className={`w-full flex justify-between items-center p-4 rounded-2xl border transition-all duration-300 ${
+                        className={`w-full flex justify-between items-center p-5 rounded-[1.25rem] border transition-all duration-300 ${
                           section.state?.id === c.id
-                            ? "bg-yellow-500 border-yellow-400 text-black shadow-[0_10px_20px_rgba(234,179,8,0.3)] scale-[1.02]"
-                            : "bg-white/5 border-white/5 hover:border-white/20 text-white"
+                            ? "bg-yellow-500 border-yellow-400 text-black shadow-[0_15px_30px_rgba(234,179,8,0.2)] scale-[1.03]"
+                            : "bg-white/5 border-white/5 hover:bg-white/10 text-white/70"
                         }`}
                       >
-                        <span className="text-[11px] font-black italic uppercase">{c.name}</span>
-                        <span className={`text-[10px] font-bold ${section.state?.id === c.id ? "text-black/60" : "text-yellow-500"}`}>
-                          +${c.price}
+                        <span className="text-xs font-black italic uppercase tracking-tighter">{c.name}</span>
+                        <span className={`text-[11px] font-black ${section.state?.id === c.id ? "text-black/50" : "text-yellow-500"}`}>
+                          +${c.price.toLocaleString()}
                         </span>
                       </button>
                     ))}
@@ -470,9 +516,9 @@ export default function CarDetail() {
 
               <button
                 onClick={buyCar}
-                className="w-full py-5 bg-gradient-to-r from-yellow-400 to-orange-500 text-black font-black italic uppercase tracking-tighter rounded-3xl hover:shadow-[0_0_40px_rgba(234,179,8,0.5)] transition-all active:scale-95 text-xl border-b-4 border-orange-700"
+                className="w-full py-6 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-600 text-black font-black italic uppercase tracking-tighter rounded-[1.5rem] hover:shadow-[0_0_50px_rgba(234,179,8,0.4)] transition-all active:scale-95 text-2xl border-b-4 border-black/20"
               >
-                КУПИТЬ АВТО
+                CONFIRM ORDER
               </button>
             </div>
           </div>
@@ -483,8 +529,16 @@ export default function CarDetail() {
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 20px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #facc15; }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-in {
+          animation: fadeIn 0.5s ease-out fill-mode-forwards;
+        }
       `}} />
     </div>
   );
