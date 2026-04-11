@@ -328,31 +328,25 @@ app.get("/", (req, res) => {
 
 /* ================= REGISTER ================= */
 app.post("/register", async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
+  const { name, email, password } = req.body;
 
-    const exists = await safeQuery(
-      "SELECT id FROM users WHERE email=$1",
-      [email]
-    );
+  const exists = await safeQuery(
+    "SELECT id FROM users WHERE email=$1",
+    [email]
+  );
 
-    if (exists.rows.length > 0) {
-      return res.status(400).json({ error: "User exists" });
-    }
-
-    const result = await safeQuery(
-      `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
-       VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
-       RETURNING *`,
-      [name, email, password]
-    );
-
-    res.json({ success: true, user: result.rows[0] });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "server error" });
+  if (exists.rows.length > 0) {
+    return res.status(400).json({ error: "User exists" });
   }
+
+  const result = await safeQuery(
+    `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
+     VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
+     RETURNING *`,
+    [name, email, password]
+  );
+
+  res.json({ success: true, user: result.rows[0] });
 });
 
 /* ================= LOGIN ================= */
@@ -415,12 +409,28 @@ app.get("/cars", async (req, res) => {
   res.json(result.rows);
 });
 
-/* ================= BUY (NO CONFIG SYSTEM) ================= */
+/* ================= CONFIGS (если добавишь таблицу) ================= */
+app.get("/configs", async (req, res) => {
+  const result = await safeQuery(
+    "SELECT * FROM global_car_configs ORDER BY id ASC"
+  );
+
+  res.json(result.rows);
+});
+
+/* ================= BUY ================= */
 app.post("/buy", async (req, res) => {
   const { userId, carId } = req.body;
 
-  const user = (await safeQuery("SELECT * FROM users WHERE id=$1", [userId])).rows[0];
-  const car = (await safeQuery("SELECT * FROM cars WHERE id=$1", [carId])).rows[0];
+  const user = (await safeQuery(
+    "SELECT * FROM users WHERE id=$1",
+    [userId]
+  )).rows[0];
+
+  const car = (await safeQuery(
+    "SELECT * FROM cars WHERE id=$1",
+    [carId]
+  )).rows[0];
 
   if (!user || !car) {
     return res.status(404).json({ error: "not found" });
@@ -428,7 +438,7 @@ app.post("/buy", async (req, res) => {
 
   let price = car.price;
 
-  // discount system
+  /* ================= DISCOUNT ================= */
   if (user.discount && user.discount_cars) {
     const allowed = user.discount_cars;
 
@@ -464,14 +474,19 @@ app.post("/buy", async (req, res) => {
 
 /* ================= WHEEL ================= */
 app.get("/wheel", async (req, res) => {
-  const result = await safeQuery("SELECT * FROM wheel_items ORDER BY id ASC");
+  const result = await safeQuery(
+    "SELECT * FROM wheel_items ORDER BY id ASC"
+  );
+
   res.json(result.rows);
 });
 
 app.post("/wheel/spin", async (req, res) => {
   const { userId } = req.body;
 
-  if (!userId) return res.status(400).json({ error: "no user" });
+  if (!userId) {
+    return res.status(400).json({ error: "no user" });
+  }
 
   const items = (await safeQuery("SELECT * FROM wheel_items")).rows;
 
@@ -534,6 +549,7 @@ app.post("/promo/redeem", async (req, res) => {
     return res.status(400).json({ error: "already used" });
   }
 
+  /* spin promo */
   if (promo.type === "spin") {
     await safeQuery(
       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -541,6 +557,7 @@ app.post("/promo/redeem", async (req, res) => {
     );
   }
 
+  /* discount promo */
   if (promo.type === "discount") {
     await safeQuery(
       `UPDATE users 

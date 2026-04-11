@@ -151,7 +151,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -163,33 +162,35 @@ export default function CarDetail() {
   const navigate = useNavigate();
 
   const [car, setCar] = useState<any>(null);
-  const [configs, setConfigs] = useState<any>(null);
+  const [configs, setConfigs] = useState<any[]>([]);
 
   const [selectedHp, setSelectedHp] = useState("");
   const [selectedTuning, setSelectedTuning] = useState("");
-  const [selectedWheel, setSelectedWheel] = useState("");
+  const [selectedWheels, setSelectedWheels] = useState("");
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [totalPrice, setTotalPrice] = useState(0);
 
   /* ================= LOAD CAR ================= */
   const loadCar = async () => {
     const res = await fetch(`${API}/cars`);
     const data = await res.json();
-
     const found = data.find((c: any) => c.id == id);
     setCar(found);
   };
 
-  /* ================= LOAD GLOBAL CONFIGS ================= */
+  /* ================= LOAD CONFIGS ================= */
   const loadConfigs = async () => {
     const res = await fetch(`${API}/configs`);
     const data = await res.json();
-
     setConfigs(data);
 
-    setSelectedHp(data.power?.[0]?.name || "");
-    setSelectedTuning(data.tuning?.[0]?.name || "");
-    setSelectedWheel(data.wheel?.[0]?.name || "");
+    const hp = data.find((c: any) => c.type === "hp");
+    const tuning = data.find((c: any) => c.type === "tuning");
+    const wheels = data.find((c: any) => c.type === "wheels");
+
+    if (hp) setSelectedHp(hp.name);
+    if (tuning) setSelectedTuning(tuning.name);
+    if (wheels) setSelectedWheels(wheels.name);
   };
 
   useEffect(() => {
@@ -197,138 +198,141 @@ export default function CarDetail() {
     loadConfigs();
   }, []);
 
-  if (!car || !configs) {
+  /* ================= CALCULATE PRICE ================= */
+  useEffect(() => {
+    if (!car) return;
+
+    let price = Number(car.price);
+
+    const getPrice = (type: string, name: string) => {
+      const item = configs.find(
+        (c) => c.type === type && c.name === name
+      );
+      return item ? Number(item.price) : 0;
+    };
+
+    price += getPrice("hp", selectedHp);
+    price += getPrice("tuning", selectedTuning);
+    price += getPrice("wheels", selectedWheels);
+
+    setTotalPrice(price);
+  }, [selectedHp, selectedTuning, selectedWheels, configs, car]);
+
+  /* ================= BUY ================= */
+  const buyCar = async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    const res = await fetch(`${API}/buy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: user.id,
+        carId: car.id
+      })
+    });
+
+    const data = await res.json();
+
+    alert(data.success ? `Bought for $${data.paid}` : data.error);
+  };
+
+  if (!car) {
     return <div className="text-white p-10">Loading...</div>;
   }
 
-  /* ================= PRICE CALC ================= */
-  const getPrice = () => {
-    const findPrice = (arr: any[], name: string) =>
-      arr?.find((i) => i.name === name)?.price || 0;
-
-    let price =
-      car.price +
-      findPrice(configs.power, selectedHp) +
-      findPrice(configs.tuning, selectedTuning) +
-      findPrice(configs.wheel, selectedWheel);
-
-    if (user?.discount) {
-      price -= (price * user.discount) / 100;
-    }
-
-    return price;
-  };
-
-  /* ================= UI BLOCK ================= */
-  const Block = ({ title, list, value, setValue }: any) => (
-    <div className="mb-5">
-      <p className="text-xs text-white/40 mb-2 uppercase">{title}</p>
+  /* ================= UI ================= */
+  const Option = ({ title, type, selected, setSelected }: any) => (
+    <div className="mb-4">
+      <p className="text-xs text-white/40 mb-2">{title}</p>
 
       <div className="flex flex-wrap gap-2">
-        {list?.map((i: any) => (
-          <button
-            key={i.id}
-            onClick={() => setValue(i.name)}
-            className={`px-3 py-1 rounded-md text-xs transition ${
-              value === i.name
-                ? "bg-yellow-500 text-black shadow-[0_0_10px_rgba(234,179,8,0.6)]"
-                : "bg-white/5 text-white/70 hover:bg-white/10"
-            }`}
-          >
-            {i.name} (+{i.price})
-          </button>
-        ))}
+        {configs
+          .filter((c) => c.type === type)
+          .map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setSelected(opt.name)}
+              className={`px-3 py-1 rounded text-xs ${
+                selected === opt.name
+                  ? "bg-yellow-500 text-black"
+                  : "bg-white/10 text-white"
+              }`}
+            >
+              {opt.name} (+{opt.price})
+            </button>
+          ))}
       </div>
     </div>
   );
 
   return (
     <div className="min-h-screen bg-[#05070d] text-white">
-
       <Navbar />
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6">
 
         {/* BACK */}
         <button
           onClick={() => navigate("/market")}
-          className="mb-6 text-white/60 hover:text-yellow-400 text-sm"
+          className="text-white/60 mb-4"
         >
-          ← BACK
+          ← Back
         </button>
 
         {/* TITLE */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-yellow-400 tracking-widest">
-            {car.name}
-          </h1>
-          <p className="text-white/60 uppercase">{car.brand}</p>
-        </div>
+        <h1 className="text-3xl text-yellow-400 font-bold">
+          {car.name}
+        </h1>
+        <p className="text-white/60">{car.brand}</p>
 
-        {/* GRID */}
-        <div className="grid grid-cols-[280px_1fr_280px] gap-6">
+        <div className="grid grid-cols-3 gap-6 mt-6">
 
-          {/* LEFT */}
-          <div className="bg-white/5 p-5 rounded-xl border border-white/10">
-            <h2 className="text-xs text-white/40 mb-3">STATS</h2>
+          {/* LEFT CONFIG */}
+          <div className="bg-white/5 p-4 rounded">
 
-            <p>⚙️ Engine: {car.dvigatel}</p>
-            <p>🔥 Power: {car.power}</p>
-            <p>🏎 Speed: {car.speed}</p>
-            <p>💰 Base: ${car.price}</p>
-          </div>
-
-          {/* CENTER */}
-          <div className="flex items-center justify-center">
-            <img
-              src={car.image_url}
-              className="max-h-[400px] object-contain drop-shadow-2xl"
-            />
-          </div>
-
-          {/* RIGHT */}
-          <div className="bg-white/5 p-5 rounded-xl border border-white/10">
-
-            <h2 className="text-xs text-white/40 mb-4">CONFIG</h2>
-
-            {/* POWER */}
-            <Block
+            <Option
               title="POWER"
-              list={configs.power}
-              value={selectedHp}
-              setValue={setSelectedHp}
+              type="hp"
+              selected={selectedHp}
+              setSelected={setSelectedHp}
             />
 
-            {/* TUNING */}
-            <Block
+            <Option
               title="TUNING"
-              list={configs.tuning}
-              value={selectedTuning}
-              setValue={setSelectedTuning}
+              type="tuning"
+              selected={selectedTuning}
+              setSelected={setSelectedTuning}
             />
 
-            {/* WHEELS */}
-            <Block
+            <Option
               title="WHEELS"
-              list={configs.wheel}
-              value={selectedWheel}
-              setValue={setSelectedWheel}
+              type="wheels"
+              selected={selectedWheels}
+              setSelected={setSelectedWheels}
             />
 
             {/* PRICE */}
-            <div className="mt-4 text-xl text-yellow-400">
-              TOTAL: ${getPrice()}
+            <div className="mt-4 text-yellow-400 font-bold">
+              TOTAL: ${totalPrice}
             </div>
 
-            {/* BUY */}
-            <button className="mt-4 w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition">
+            <button
+              onClick={buyCar}
+              className="mt-4 w-full bg-yellow-500 text-black py-2 rounded font-bold"
+            >
               BUY CAR
             </button>
+          </div>
 
+          {/* IMAGE */}
+          <div className="col-span-2 flex justify-center items-center">
+            <img
+              src={car.image_url}
+              className="max-h-[400px]"
+            />
           </div>
 
         </div>
-
       </div>
     </div>
   );
