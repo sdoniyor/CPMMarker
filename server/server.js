@@ -565,31 +565,50 @@ app.post("/promo/redeem", async (req, res) => {
       return res.status(400).json({ error: "missing data" });
     }
 
-    if (code !== "FREECASE2026") {
+    const promoRes = await safeQuery(
+      "SELECT * FROM promo_codes WHERE code=$1",
+      [code]
+    );
+
+    const promo = promoRes.rows[0];
+
+    if (!promo) {
       return res.status(400).json({ error: "invalid promo" });
     }
 
-    const user = await safeQuery(
-      "SELECT used_promo FROM users WHERE id=$1",
-      [userId]
-    );
-
-    if (!user.rows[0]) {
-      return res.status(404).json({ error: "user not found" });
-    }
-
-    if (user.rows[0].used_promo) {
+    if (promo.used_by.includes(userId)) {
       return res.status(400).json({ error: "already used" });
     }
 
+    // 🎰 SPIN PROMO
+    if (promo.type === "spin") {
+      await safeQuery(
+        "UPDATE users SET used_promo=true WHERE id=$1",
+        [userId]
+      );
+    }
+
+    // 💰 DISCOUNT PROMO (ТОЛЬКО ДЛЯ ОПРЕДЕЛЁННЫХ МАШИН)
+    if (promo.type === "discount") {
+      await safeQuery(
+        `UPDATE users 
+         SET discount=$1, discount_cars=$2
+         WHERE id=$3`,
+        [promo.value, promo.car_ids, userId]
+      );
+    }
+
+    // записываем использование
     await safeQuery(
-      "UPDATE users SET used_promo=true WHERE id=$1",
-      [userId]
+      "UPDATE promo_codes SET used_by = array_append(used_by, $1) WHERE code=$2",
+      [userId, code]
     );
 
     res.json({
       success: true,
-      message: "promo activated"
+      type: promo.type,
+      value: promo.value,
+      cars: promo.car_ids
     });
 
   } catch (err) {
