@@ -159,7 +159,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -177,7 +176,20 @@ export default function CarDetail() {
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
   const [selectedWheels, setSelectedWheels] = useState<any>(null);
 
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [user, setUser] = useState<any>(null);
+
+  /* ================= LOAD USER ================= */
+  const loadUser = async () => {
+    const local = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (!local?.id) return;
+
+    const res = await fetch(`${API}/profile/${local.id}`);
+    const data = await res.json();
+
+    setUser(data);
+    localStorage.setItem("user", JSON.stringify(data));
+  };
 
   const loadCar = async () => {
     const res = await fetch(`${API}/cars`);
@@ -191,38 +203,45 @@ export default function CarDetail() {
 
     setConfigs(data);
 
-    setSelectedHp(data.power?.[0]);
-    setSelectedTuning(data.tuning?.[0]);
-    setSelectedWheels(data.wheels?.[0]);
+    setSelectedHp(data.power?.[0] || null);
+    setSelectedTuning(data.tuning?.[0] || null);
+    setSelectedWheels(data.wheels?.[0] || null);
   };
 
   useEffect(() => {
     loadCar();
     loadConfigs();
+    loadUser();
   }, []);
 
   if (!car || !configs.power) {
     return <div className="text-white p-10">Loading...</div>;
   }
 
-  const configIds = [
-    selectedHp?.id,
-    selectedTuning?.id,
-    selectedWheels?.id,
-  ].filter(Boolean);
+  /* ================= SAFE NUMBERS ================= */
+  const hpPrice = Number(selectedHp?.price || 0);
+  const tuningPrice = Number(selectedTuning?.price || 0);
+  const wheelsPrice = Number(selectedWheels?.price || 0);
 
-  const configPrice =
-    (selectedHp?.price || 0) +
-    (selectedTuning?.price || 0) +
-    (selectedWheels?.price || 0);
+  const basePrice = Number(car.price || 0);
 
-  let totalPrice = Number(car.price) + configPrice;
+  let totalPrice = basePrice + hpPrice + tuningPrice + wheelsPrice;
 
-  if (user.discount > 0) {
-    totalPrice = totalPrice - (totalPrice * user.discount) / 100;
+  /* ================= DISCOUNT (FIXED) ================= */
+  const discount = Number(user?.discount || 0);
+
+  if (discount > 0) {
+    totalPrice = totalPrice - (totalPrice * discount) / 100;
   }
 
+  /* ================= BUY ================= */
   const buyCar = async () => {
+    const configIds = [
+      selectedHp?.id,
+      selectedTuning?.id,
+      selectedWheels?.id,
+    ].filter(Boolean);
+
     const res = await fetch(`${API}/buy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -244,42 +263,60 @@ export default function CarDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05070d] text-white">
+    <div className="min-h-screen bg-gradient-to-b from-black via-[#05070d] to-black text-white">
       <Navbar />
 
       <div className="max-w-7xl mx-auto p-6">
 
-        <h1 className="text-4xl text-yellow-400 font-bold text-center">
-          {car.name}
-        </h1>
+        {/* TITLE */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-extrabold text-yellow-400 tracking-widest">
+            {car.name}
+          </h1>
+          <p className="text-white/60 uppercase">{car.brand}</p>
+        </div>
 
-        <div className="grid grid-cols-[280px_1fr_280px] gap-6 mt-6">
+        {/* GRID */}
+        <div className="grid grid-cols-[280px_1fr_280px] gap-6">
 
           {/* LEFT */}
-          <div className="bg-white/5 p-5 rounded-xl">
-            <p>Base: ${car.price}</p>
-            <p>Config: ${configPrice}</p>
-            <p className="text-yellow-400 font-bold mt-3">
-              TOTAL: ${totalPrice}
-            </p>
+          <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
+            <p className="text-white/60">Base: ${basePrice}</p>
+            <p className="text-white/60">Config: ${hpPrice + tuningPrice + wheelsPrice}</p>
+
+            {discount > 0 && (
+              <p className="text-green-400 text-sm">
+                Discount: -{discount}%
+              </p>
+            )}
+
+            <div className="mt-4 text-yellow-400 font-bold text-xl">
+              TOTAL: ${Math.floor(totalPrice)}
+            </div>
           </div>
 
           {/* CENTER */}
-          <div className="flex justify-center">
-            <img src={car.image_url} className="h-[400px]" />
+          <div className="flex items-center justify-center bg-white/5 rounded-2xl border border-white/10 p-4">
+            <img
+              src={car.image_url}
+              className="max-h-[400px] drop-shadow-2xl"
+            />
           </div>
 
           {/* RIGHT */}
-          <div className="bg-white/5 p-5 rounded-xl space-y-4">
+          <div className="bg-white/5 p-5 rounded-2xl border border-white/10 space-y-4">
 
+            {/* POWER */}
             <div>
-              <p className="text-sm mb-2">POWER</p>
+              <p className="text-xs text-white/40 mb-2">POWER</p>
               {configs.power.map((c: any) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedHp(c)}
-                  className={`block w-full p-2 mb-1 ${
-                    selectedHp?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"
+                  className={`w-full p-2 mb-2 rounded ${
+                    selectedHp?.id === c.id
+                      ? "bg-yellow-500 text-black"
+                      : "bg-white/10"
                   }`}
                 >
                   {c.name} +${c.price}
@@ -287,14 +324,17 @@ export default function CarDetail() {
               ))}
             </div>
 
+            {/* TUNING */}
             <div>
-              <p className="text-sm mb-2">TUNING</p>
+              <p className="text-xs text-white/40 mb-2">TUNING</p>
               {configs.tuning.map((c: any) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedTuning(c)}
-                  className={`block w-full p-2 mb-1 ${
-                    selectedTuning?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"
+                  className={`w-full p-2 mb-2 rounded ${
+                    selectedTuning?.id === c.id
+                      ? "bg-yellow-500 text-black"
+                      : "bg-white/10"
                   }`}
                 >
                   {c.name} +${c.price}
@@ -302,14 +342,17 @@ export default function CarDetail() {
               ))}
             </div>
 
+            {/* WHEELS */}
             <div>
-              <p className="text-sm mb-2">WHEELS</p>
+              <p className="text-xs text-white/40 mb-2">WHEELS</p>
               {configs.wheels.map((c: any) => (
                 <button
                   key={c.id}
                   onClick={() => setSelectedWheels(c)}
-                  className={`block w-full p-2 mb-1 ${
-                    selectedWheels?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"
+                  className={`w-full p-2 mb-2 rounded ${
+                    selectedWheels?.id === c.id
+                      ? "bg-yellow-500 text-black"
+                      : "bg-white/10"
                   }`}
                 >
                   {c.name} +${c.price}
@@ -319,9 +362,9 @@ export default function CarDetail() {
 
             <button
               onClick={buyCar}
-              className="w-full bg-yellow-500 text-black font-bold py-3 rounded"
+              className="w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400"
             >
-              BUY
+              BUY CAR
             </button>
 
           </div>
