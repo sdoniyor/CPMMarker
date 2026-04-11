@@ -99,7 +99,7 @@ const API = "https://cpmmarker.onrender.com";
 
 export default function Navbar() {
   const navigate = useNavigate();
-  const location = useLocation(); // Для подсветки активной страницы
+  const location = useLocation();
 
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
   const [user, setUser] = useState<any>(localUser);
@@ -116,7 +116,7 @@ export default function Navbar() {
       }
     };
     loadUser();
-  }, [location.pathname]); // Обновляем данные при переходах
+  }, [location.pathname]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -128,10 +128,10 @@ export default function Navbar() {
       {/* LEFT: LOGO */}
       <div 
         onClick={() => navigate("/market")}
-        className="flex items-center gap-2 group cursor-pointer"
+        className="flex items-center gap-3 group cursor-pointer"
       >
         <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center 
-          shadow-[0_0_20px_rgba(234,179,8,0.3)] group-hover:rotate-12 transition-transform">
+          shadow-[0_0_20px_rgba(234,179,8,0.3)] group-hover:rotate-12 transition-transform duration-300">
           <span className="text-black font-black italic text-xl">C</span>
         </div>
         <div className="flex flex-col leading-none">
@@ -142,25 +142,18 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* CENTER: MENU */}
-      <div className="hidden md:flex items-center gap-1">
-        {[
-          { name: "MARKET", path: "/market" },
-          { name: "GARAGE", path: "/garage" },
-          { name: "ROULETTE", path: "/wheel" },
-        ].map((item) => (
-          <button
-            key={item.path}
-            onClick={() => navigate(item.path)}
-            className={`px-6 py-2 rounded-full text-[11px] font-black italic tracking-widest transition-all
-              ${isActive(item.path) 
-                ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.4)]" 
-                : "text-white/40 hover:text-white hover:bg-white/5"
-              }`}
-          >
-            {item.name}
-          </button>
-        ))}
+      {/* CENTER: MENU (Только Market) */}
+      <div className="hidden md:flex items-center">
+        <button
+          onClick={() => navigate("/market")}
+          className={`px-8 py-2 rounded-full text-[11px] font-black italic tracking-widest transition-all
+            ${isActive("/market") 
+              ? "bg-yellow-500 text-black shadow-[0_0_25px_rgba(234,179,8,0.4)]" 
+              : "text-white/40 hover:text-white hover:bg-white/5"
+            }`}
+        >
+          MARKET
+        </button>
       </div>
 
       {/* RIGHT: PROFILE & BALANCE */}
@@ -168,7 +161,7 @@ export default function Navbar() {
         
         {/* BALANCE */}
         <div className="hidden sm:flex flex-col items-end">
-          <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Available Balance</span>
+          <span className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Balance</span>
           <span className="text-lg font-black italic text-yellow-400 leading-none">
             ${user?.money?.toLocaleString() || "0"}
           </span>
@@ -179,11 +172,10 @@ export default function Navbar() {
         {/* PROFILE CARD */}
         <div 
           onClick={() => navigate("/profile")}
-          className="flex items-center gap-4 bg-white/5 hover:bg-white/10 p-1 pr-4 rounded-2xl border border-white/5 cursor-pointer transition-all"
+          className="flex items-center gap-4 bg-white/5 hover:bg-white/10 p-1 pr-4 rounded-2xl border border-white/5 cursor-pointer transition-all group"
         >
-          {/* AVATAR BOX */}
-          <div className="relative group">
-            <div className="absolute inset-0 bg-yellow-500 blur-md opacity-20 group-hover:opacity-50 transition-opacity" />
+          <div className="relative">
+            <div className="absolute inset-0 bg-yellow-500 blur-md opacity-0 group-hover:opacity-30 transition-opacity" />
             <div className="w-10 h-10 rounded-xl overflow-hidden border border-white/10 relative z-10">
               {user?.avatar ? (
                 <img src={user.avatar} className="w-full h-full object-cover" alt="avatar" />
@@ -196,8 +188,8 @@ export default function Navbar() {
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[10px] font-black italic text-yellow-500 uppercase leading-none">Member</span>
-            <span className="text-xs font-bold text-white truncate max-w-[80px]">
+            <span className="text-[10px] font-black italic text-yellow-500 uppercase leading-none">Player</span>
+            <span className="text-xs font-bold text-white truncate max-w-[90px]">
               {user?.name || "Guest"}
             </span>
           </div>
