@@ -456,12 +456,12 @@ app.post("/buy", async (req, res) => {
 });
 
 /* ================= WHEEL (GET ITEMS) ================= */
+/* ================= WHEEL ================= */
 app.get("/wheel", async (req, res) => {
-  const result = await safeQuery("SELECT * FROM wheel_items");
+  const result = await safeQuery("SELECT * FROM wheel_items ORDER BY id ASC");
   res.json(result.rows);
 });
 
-/* ================= WHEEL SPIN ================= */
 app.post("/wheel/spin", async (req, res) => {
   try {
     const { userId } = req.body;
@@ -477,22 +477,21 @@ app.post("/wheel/spin", async (req, res) => {
       return res.status(400).json({ error: "wheel empty" });
     }
 
+    // 🎯 RNG (weighted)
     let total = items.reduce((s, i) => s + Number(i.chance || 0), 0);
     let r = Math.random() * total;
 
-    let winIndex = 0;
     let win = items[0];
 
     for (let i = 0; i < items.length; i++) {
       r -= Number(items[i].chance || 0);
       if (r <= 0) {
         win = items[i];
-        winIndex = i;
         break;
       }
     }
 
-    // rewards
+    // 💰 rewards
     if (win.type === "money") {
       await safeQuery(
         "UPDATE users SET money = money + $1 WHERE id=$2",
@@ -514,9 +513,9 @@ app.post("/wheel/spin", async (req, res) => {
       );
     }
 
-    res.json({
+    return res.json({
       success: true,
-      index: winIndex,
+      winId: win.id,   // 🔥 ВАЖНО
       win
     });
 
