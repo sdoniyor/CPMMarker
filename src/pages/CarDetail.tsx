@@ -60,19 +60,22 @@
 //   }
 
 //   /* ================= PRICES ================= */
-//   const basePrice = Number(car.price || 0);
 
-//   const hpPrice = Number(selectedHp?.price || 0);
-//   const tuningPrice = Number(selectedTuning?.price || 0);
-//   const wheelsPrice = Number(selectedWheels?.price || 0);
+//   const base = Number(car.price || 0);
 
-//   let totalPrice = basePrice + hpPrice + tuningPrice + wheelsPrice;
+//   const hp = Number(selectedHp?.price || 0);
+//   const tuning = Number(selectedTuning?.price || 0);
+//   const wheels = Number(selectedWheels?.price || 0);
+
+//   const configTotal = hp + tuning + wheels;
 
 //   const discount = Number(user?.discount || 0);
 
-//   if (discount > 0) {
-//     totalPrice -= (totalPrice * discount) / 100;
-//   }
+//   // 🔥 DISCOUNT ONLY FOR BASE PRICE
+//   const discountedBase =
+//     discount > 0 ? base - (base * discount) / 100 : base;
+
+//   const totalPrice = Math.round(discountedBase + configTotal);
 
 //   /* ================= BUY ================= */
 //   const buyCar = async () => {
@@ -108,65 +111,58 @@
 
 //       <div className="max-w-7xl mx-auto p-6">
 
-//         {/* BACK BUTTON */}
+//         {/* BACK */}
 //         <button
 //           onClick={() => navigate("/market")}
-//           className="mb-6 text-white/60 hover:text-yellow-400 transition"
+//           className="mb-6 text-white/60 hover:text-yellow-400"
 //         >
-//           ← Back to market
+//           ← Back
 //         </button>
 
 //         {/* TITLE */}
 //         <div className="text-center mb-6">
-//           <h1 className="text-4xl font-extrabold text-yellow-400 tracking-widest">
-//             {car.name}{" "}
-//             {car.premium && <span className="text-yellow-300">👑</span>}
+//           <h1 className="text-4xl font-bold text-yellow-400">
+//             {car.name} {car.premium && "👑"}
 //           </h1>
-
 //           <p className="text-white/60">{car.brand}</p>
 //         </div>
 
 //         {/* GRID */}
 //         <div className="grid grid-cols-[280px_1fr_280px] gap-6">
 
-//           {/* LEFT INFO */}
-//           <div className="bg-white/5 p-5 rounded-2xl border border-white/10 space-y-3">
+//           {/* LEFT */}
+//           <div className="bg-white/5 p-5 rounded-xl border border-white/10 space-y-2">
+//             <p>Brand: {car.brand}</p>
+//             <p>Engine: {car.dvigatel}</p>
+//             <p>Power: {car.power}</p>
+//             <p>Speed: {car.speed}</p>
 
-//             <h2 className="text-xs text-white/40">CAR INFO</h2>
+//             <div className="border-t border-white/10 pt-3">
+//               <p className="text-white/60">Base: ${base}</p>
 
-//             <p>🏷 Brand: {car.brand}</p>
-//             <p>⚙ Engine: {car.dvigatel}</p>
-//             <p>🔥 Power: {car.power}</p>
-//             <p>🏎 Speed: {car.speed}</p>
+//               {discount > 0 && (
+//                 <p className="text-green-400">
+//                   Discount: -{discount}%
+//                 </p>
+//               )}
 
-//             <div className="pt-2 border-t border-white/10">
-//               <p className="text-white/60">Base price</p>
-//               <p className="text-white font-bold">${basePrice}</p>
-//             </div>
-
-//             {discount > 0 && (
-//               <p className="text-green-400">
-//                 Discount: -{discount}%
+//               <p className="text-yellow-400 font-bold text-xl mt-2">
+//                 TOTAL: ${totalPrice}
 //               </p>
-//             )}
-
-//             <div className="text-yellow-400 font-bold text-xl">
-//               TOTAL: ${Math.floor(totalPrice)}
 //             </div>
 //           </div>
 
-//           {/* CENTER IMAGE */}
-//           <div className="flex items-center justify-center bg-white/5 rounded-2xl border border-white/10 p-4">
+//           {/* CENTER */}
+//           <div className="flex items-center justify-center bg-white/5 rounded-xl border border-white/10 p-4">
 //             <img
 //               src={car.image_url}
 //               className="max-h-[420px] drop-shadow-2xl"
 //             />
 //           </div>
 
-//           {/* RIGHT CONFIG */}
-//           <div className="bg-white/5 p-5 rounded-2xl border border-white/10 space-y-4">
+//           {/* RIGHT */}
+//           <div className="bg-white/5 p-5 rounded-xl space-y-4">
 
-//             {/* POWER */}
 //             <div>
 //               <p className="text-xs text-white/40 mb-2">POWER</p>
 //               {configs.power.map((c: any) => (
@@ -184,7 +180,6 @@
 //               ))}
 //             </div>
 
-//             {/* TUNING */}
 //             <div>
 //               <p className="text-xs text-white/40 mb-2">TUNING</p>
 //               {configs.tuning.map((c: any) => (
@@ -202,7 +197,6 @@
 //               ))}
 //             </div>
 
-//             {/* WHEELS */}
 //             <div>
 //               <p className="text-xs text-white/40 mb-2">WHEELS</p>
 //               {configs.wheels.map((c: any) => (
@@ -220,10 +214,9 @@
 //               ))}
 //             </div>
 
-//             {/* BUY */}
 //             <button
 //               onClick={buyCar}
-//               className="w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition"
+//               className="w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400"
 //             >
 //               BUY CAR
 //             </button>
@@ -234,6 +227,9 @@
 //     </div>
 //   );
 // }
+
+
+
 
 
 
@@ -297,7 +293,7 @@ export default function CarDetail() {
     return <div className="text-white p-10">Loading...</div>;
   }
 
-  /* ================= PRICES ================= */
+  /* ================= PRICE ================= */
 
   const base = Number(car.price || 0);
 
@@ -307,11 +303,29 @@ export default function CarDetail() {
 
   const configTotal = hp + tuning + wheels;
 
-  const discount = Number(user?.discount || 0);
+  /* ================= DISCOUNT FIX ================= */
 
-  // 🔥 DISCOUNT ONLY FOR BASE PRICE
+  let discount = 0;
+  let discountCars: number[] = [];
+
+  try {
+    discount = Number(user?.discount || 0);
+
+    discountCars =
+      typeof user?.discount_cars === "string"
+        ? JSON.parse(user.discount_cars)
+        : user?.discount_cars || [];
+  } catch {
+    discount = 0;
+    discountCars = [];
+  }
+
+  const hasDiscount = discountCars.includes(Number(car.id));
+
   const discountedBase =
-    discount > 0 ? base - (base * discount) / 100 : base;
+    discount > 0 && hasDiscount
+      ? base - (base * discount) / 100
+      : base;
 
   const totalPrice = Math.round(discountedBase + configTotal);
 
@@ -378,7 +392,7 @@ export default function CarDetail() {
             <div className="border-t border-white/10 pt-3">
               <p className="text-white/60">Base: ${base}</p>
 
-              {discount > 0 && (
+              {hasDiscount && discount > 0 && (
                 <p className="text-green-400">
                   Discount: -{discount}%
                 </p>

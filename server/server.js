@@ -52,7 +52,7 @@
 
 //   const result = await safeQuery(
 //     `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
-//      VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
+//      VALUES ($1,$2,$3,1000,1,false,0,'[]',NULL)
 //      RETURNING *`,
 //     [name, email, password]
 //   );
@@ -120,8 +120,7 @@
 //   res.json(result.rows);
 // });
 
-// /* ================= CONFIGS (если добавишь таблицу) ================= */
-// /* ================= GLOBAL CONFIGS ================= */
+// /* ================= CONFIGS ================= */
 // app.get("/configs", async (req, res) => {
 //   const result = await safeQuery(
 //     "SELECT * FROM global_car_configs ORDER BY type, id"
@@ -142,9 +141,9 @@
 //   res.json(grouped);
 // });
 
-// /* ================= BUY ================= */
+// /* ================= BUY (FIXED DISCOUNT) ================= */
 // app.post("/buy", async (req, res) => {
-//   const { userId, carId } = req.body;
+//   const { userId, carId, configIds } = req.body;
 
 //   const user = (await safeQuery(
 //     "SELECT * FROM users WHERE id=$1",
@@ -160,20 +159,23 @@
 //     return res.status(404).json({ error: "not found" });
 //   }
 
-//   let price = car.price;
+//   // configs price
+//   let configPrice = 0;
 
-//   /* ================= DISCOUNT ================= */
-//   if (user.discount && user.discount_cars) {
-//     const allowed = user.discount_cars;
+//   if (Array.isArray(configIds) && configIds.length > 0) {
+//     const configs = await safeQuery(
+//       "SELECT * FROM global_car_configs WHERE id = ANY($1)",
+//       [configIds]
+//     );
 
-//     const can =
-//       Array.isArray(allowed)
-//         ? allowed.includes(car.id)
-//         : String(allowed).includes(String(car.id));
+//     configPrice = configs.rows.reduce((sum, c) => sum + Number(c.price || 0), 0);
+//   }
 
-//     if (can) {
-//       price = price - (price * user.discount) / 100;
-//     }
+//   let price = Number(car.price) + configPrice;
+
+//   // 🔥 FIX DISCOUNT LOGIC
+//   if (user.discount && Number(user.discount) > 0) {
+//     price = price - (price * Number(user.discount)) / 100;
 //   }
 
 //   if (user.money < price) {
@@ -254,7 +256,7 @@
 //   });
 // });
 
-// /* ================= PROMO ================= */
+// /* ================= PROMO (FIXED) ================= */
 // app.post("/promo/redeem", async (req, res) => {
 //   const { userId, code } = req.body;
 
@@ -273,7 +275,7 @@
 //     return res.status(400).json({ error: "already used" });
 //   }
 
-//   /* spin promo */
+//   /* spin */
 //   if (promo.type === "spin") {
 //     await safeQuery(
 //       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -281,13 +283,18 @@
 //     );
 //   }
 
-//   /* discount promo */
+//   /* discount FIXED JSON */
 //   if (promo.type === "discount") {
 //     await safeQuery(
 //       `UPDATE users 
-//        SET discount=$1, discount_cars=$2
+//        SET discount=$1,
+//            discount_cars=$2
 //        WHERE id=$3`,
-//       [promo.value, promo.car_ids, userId]
+//       [
+//         promo.value,
+//         JSON.stringify(promo.car_ids || []),
+//         userId
+//       ]
 //     );
 //   }
 
@@ -307,6 +314,7 @@
 // app.listen(5000, "0.0.0.0", () => {
 //   console.log("🚀 SERVER RUNNING ON PORT 5000");
 // });
+
 
 
 
@@ -453,9 +461,9 @@ app.get("/configs", async (req, res) => {
   res.json(grouped);
 });
 
-/* ================= BUY (FIXED DISCOUNT) ================= */
+/* ================= BUY (FIXED FINAL VERSION) ================= */
 app.post("/buy", async (req, res) => {
-  const { userId, carId, configIds } = req.body;
+  const { userId, carId, configIds = [] } = req.body;
 
   const user = (await safeQuery(
     "SELECT * FROM users WHERE id=$1",
@@ -471,7 +479,7 @@ app.post("/buy", async (req, res) => {
     return res.status(404).json({ error: "not found" });
   }
 
-  // configs price
+  /* ================= CONFIG PRICE ================= */
   let configPrice = 0;
 
   if (Array.isArray(configIds) && configIds.length > 0) {
@@ -480,23 +488,36 @@ app.post("/buy", async (req, res) => {
       [configIds]
     );
 
-    configPrice = configs.rows.reduce((sum, c) => sum + Number(c.price || 0), 0);
+    configPrice = configs.rows.reduce(
+      (sum, c) => sum + Number(c.price || 0),
+      0
+    );
   }
 
-  let price = Number(car.price) + configPrice;
+  /* ================= BASE PRICE ================= */
+  let basePrice = Number(car.price);
 
-  // 🔥 FIX DISCOUNT LOGIC
-  if (user.discount && Number(user.discount) > 0) {
-    price = price - (price * Number(user.discount)) / 100;
+  /* ================= DISCOUNT (ONLY CAR) ================= */
+  let finalBasePrice = basePrice;
+
+  const discount = Number(user.discount || 0);
+
+  if (discount > 0) {
+    finalBasePrice = basePrice - (basePrice * discount) / 100;
   }
 
-  if (user.money < price) {
+  /* ================= TOTAL ================= */
+  const totalPrice = finalBasePrice + configPrice;
+
+  /* ================= MONEY CHECK ================= */
+  if (user.money < totalPrice) {
     return res.status(400).json({ error: "not enough money" });
   }
 
+  /* ================= UPDATE ================= */
   await safeQuery(
     "UPDATE users SET money = money - $1 WHERE id=$2",
-    [price, userId]
+    [totalPrice, userId]
   );
 
   await safeQuery(
@@ -506,7 +527,10 @@ app.post("/buy", async (req, res) => {
 
   res.json({
     success: true,
-    paid: price
+    paid: totalPrice,
+    base: basePrice,
+    config: configPrice,
+    discount
   });
 });
 
@@ -562,13 +586,10 @@ app.post("/wheel/spin", async (req, res) => {
     );
   }
 
-  res.json({
-    success: true,
-    win
-  });
+  res.json({ success: true, win });
 });
 
-/* ================= PROMO (FIXED) ================= */
+/* ================= PROMO (FIXED FINAL) ================= */
 app.post("/promo/redeem", async (req, res) => {
   const { userId, code } = req.body;
 
@@ -595,7 +616,7 @@ app.post("/promo/redeem", async (req, res) => {
     );
   }
 
-  /* discount FIXED JSON */
+  /* discount FIX */
   if (promo.type === "discount") {
     await safeQuery(
       `UPDATE users 
@@ -603,7 +624,7 @@ app.post("/promo/redeem", async (req, res) => {
            discount_cars=$2
        WHERE id=$3`,
       [
-        promo.value,
+        Number(promo.value),
         JSON.stringify(promo.car_ids || []),
         userId
       ]
