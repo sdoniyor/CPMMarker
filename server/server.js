@@ -1,8 +1,10 @@
+
 // require("dotenv").config();
 
 // const express = require("express");
 // const cors = require("cors");
 // const { Pool } = require("pg");
+// const multer = require("multer");
 
 // const app = express();
 
@@ -14,6 +16,9 @@
 // }));
 
 // app.use(express.json());
+
+// /* ================= FILE UPLOAD ================= */
+// const upload = multer({ storage: multer.memoryStorage() });
 
 // /* ================= DB ================= */
 // const pool = new Pool({
@@ -51,8 +56,8 @@
 //     }
 
 //     const result = await safeQuery(
-//       `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars)
-//        VALUES ($1,$2,$3,1000,1,false,0,NULL)
+//       `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
+//        VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
 //        RETURNING *`,
 //       [name, email, password]
 //     );
@@ -96,24 +101,45 @@
 //   res.json(result.rows[0] || {});
 // });
 
+// /* ================= AVATAR UPLOAD ================= */
+// app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
+//   try {
+//     const { userId } = req.body;
+
+//     if (!userId || !req.file) {
+//       return res.status(400).json({ error: "missing data" });
+//     }
+
+//     const base64 =
+//       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+
+//     await safeQuery(
+//       "UPDATE users SET avatar=$1 WHERE id=$2",
+//       [base64, userId]
+//     );
+
+//     res.json({ success: true, avatar: base64 });
+
+//   } catch (err) {
+//     res.status(500).json({ error: "avatar error" });
+//   }
+// });
+
 // /* ================= CARS ================= */
 // app.get("/cars", async (req, res) => {
-//   const result = await safeQuery(`
-//     SELECT * FROM cars WHERE user_id IS NULL
-//   `);
+//   const result = await safeQuery(
+//     "SELECT * FROM cars WHERE user_id IS NULL"
+//   );
 
 //   res.json(result.rows);
 // });
 
-// /* ================= BUY (WITH DISCOUNT SUPPORT) ================= */
+// /* ================= BUY (DISCOUNT) ================= */
 // app.post("/buy", async (req, res) => {
 //   const { userId, carId } = req.body;
 
-//   const userRes = await safeQuery("SELECT * FROM users WHERE id=$1", [userId]);
-//   const carRes = await safeQuery("SELECT * FROM cars WHERE id=$1", [carId]);
-
-//   const user = userRes.rows[0];
-//   const car = carRes.rows[0];
+//   const user = (await safeQuery("SELECT * FROM users WHERE id=$1", [userId])).rows[0];
+//   const car = (await safeQuery("SELECT * FROM cars WHERE id=$1", [carId])).rows[0];
 
 //   if (!user || !car) {
 //     return res.status(404).json({ error: "not found" });
@@ -121,15 +147,14 @@
 
 //   let price = car.price;
 
-//   // 💰 DISCOUNT SYSTEM
 //   if (user.discount && user.discount_cars) {
-//     const allowedCars = user.discount_cars; // array or string
-//     const canDiscount =
-//       Array.isArray(allowedCars)
-//         ? allowedCars.includes(car.id)
-//         : String(allowedCars).includes(String(car.id));
+//     const allowed = user.discount_cars;
+//     const can =
+//       Array.isArray(allowed)
+//         ? allowed.includes(car.id)
+//         : String(allowed).includes(String(car.id));
 
-//     if (canDiscount) {
+//     if (can) {
 //       price = price - (price * user.discount) / 100;
 //     }
 //   }
@@ -160,16 +185,9 @@
 // app.post("/wheel/spin", async (req, res) => {
 //   const { userId } = req.body;
 
-//   if (!userId) {
-//     return res.status(400).json({ error: "no user" });
-//   }
+//   if (!userId) return res.status(400).json({ error: "no user" });
 
-//   const itemsRes = await safeQuery("SELECT * FROM wheel_items");
-//   const items = itemsRes.rows;
-
-//   if (!items.length) {
-//     return res.status(400).json({ error: "empty wheel" });
-//   }
+//   const items = (await safeQuery("SELECT * FROM wheel_items")).rows;
 
 //   let total = items.reduce((s, i) => s + Number(i.chance || 0), 0);
 //   let r = Math.random() * total;
@@ -184,7 +202,6 @@
 //     }
 //   }
 
-//   // rewards
 //   if (win.type === "money") {
 //     await safeQuery(
 //       "UPDATE users SET money = money + $1 WHERE id=$2",
@@ -217,25 +234,22 @@
 // app.post("/promo/redeem", async (req, res) => {
 //   const { userId, code } = req.body;
 
-//   const promoRes = await safeQuery(
+//   const promo = (await safeQuery(
 //     "SELECT * FROM promo_codes WHERE code=$1",
 //     [code]
-//   );
-
-//   const promo = promoRes.rows[0];
+//   )).rows[0];
 
 //   if (!promo) {
 //     return res.status(400).json({ error: "invalid promo" });
 //   }
 
-//   // 👇 used_by FIX SAFE
 //   const usedBy = promo.used_by || [];
 
 //   if (usedBy.includes(userId)) {
 //     return res.status(400).json({ error: "already used" });
 //   }
 
-//   // ================= SPIN PROMO (1 TIME ONLY) =================
+//   // 🎰 spin promo (1 time)
 //   if (promo.type === "spin") {
 //     await safeQuery(
 //       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -243,7 +257,7 @@
 //     );
 //   }
 
-//   // ================= DISCOUNT PROMO =================
+//   // 💰 discount promo (cars)
 //   if (promo.type === "discount") {
 //     await safeQuery(
 //       `UPDATE users 
@@ -253,7 +267,6 @@
 //     );
 //   }
 
-//   // mark used
 //   await safeQuery(
 //     "UPDATE promo_codes SET used_by = array_append(COALESCE(used_by, '{}'), $1) WHERE code=$2",
 //     [userId, code]
@@ -262,8 +275,7 @@
 //   res.json({
 //     success: true,
 //     type: promo.type,
-//     value: promo.value,
-//     cars: promo.car_ids
+//     value: promo.value
 //   });
 // });
 
@@ -271,6 +283,12 @@
 // app.listen(5000, "0.0.0.0", () => {
 //   console.log("🚀 SERVER RUNNING ON PORT 5000");
 // });
+
+
+
+
+
+
 
 
 
@@ -290,7 +308,8 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 /* ================= FILE UPLOAD ================= */
 const upload = multer({ storage: multer.memoryStorage() });
@@ -301,7 +320,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-/* ================= SAFE QUERY ================= */
 const safeQuery = async (query, params = []) => {
   try {
     return await pool.query(query, params);
@@ -340,6 +358,7 @@ app.post("/register", async (req, res) => {
     res.json({ success: true, user: result.rows[0] });
 
   } catch (e) {
+    console.log(e);
     res.status(500).json({ error: "server error" });
   }
 });
@@ -376,7 +395,7 @@ app.get("/profile/:id", async (req, res) => {
   res.json(result.rows[0] || {});
 });
 
-/* ================= AVATAR UPLOAD ================= */
+/* ================= AVATAR UPLOAD (FIXED) ================= */
 app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
   try {
     const { userId } = req.body;
@@ -388,14 +407,18 @@ app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
     const base64 =
       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
 
-    await safeQuery(
-      "UPDATE users SET avatar=$1 WHERE id=$2",
+    const result = await safeQuery(
+      "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
       [base64, userId]
     );
 
-    res.json({ success: true, avatar: base64 });
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
 
   } catch (err) {
+    console.log(err);
     res.status(500).json({ error: "avatar error" });
   }
 });
@@ -409,7 +432,7 @@ app.get("/cars", async (req, res) => {
   res.json(result.rows);
 });
 
-/* ================= BUY (DISCOUNT) ================= */
+/* ================= BUY ================= */
 app.post("/buy", async (req, res) => {
   const { userId, carId } = req.body;
 
@@ -424,6 +447,7 @@ app.post("/buy", async (req, res) => {
 
   if (user.discount && user.discount_cars) {
     const allowed = user.discount_cars;
+
     const can =
       Array.isArray(allowed)
         ? allowed.includes(car.id)
@@ -505,7 +529,7 @@ app.post("/wheel/spin", async (req, res) => {
   });
 });
 
-/* ================= PROMO SYSTEM ================= */
+/* ================= PROMO ================= */
 app.post("/promo/redeem", async (req, res) => {
   const { userId, code } = req.body;
 
@@ -524,7 +548,6 @@ app.post("/promo/redeem", async (req, res) => {
     return res.status(400).json({ error: "already used" });
   }
 
-  // 🎰 spin promo (1 time)
   if (promo.type === "spin") {
     await safeQuery(
       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -532,7 +555,6 @@ app.post("/promo/redeem", async (req, res) => {
     );
   }
 
-  // 💰 discount promo (cars)
   if (promo.type === "discount") {
     await safeQuery(
       `UPDATE users 
