@@ -120,7 +120,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -129,6 +128,9 @@ const API = "https://cpmmarker.onrender.com";
 
 export default function Market() {
   const [cars, setCars] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [onlyPremium, setOnlyPremium] = useState(false);
+
   const navigate = useNavigate();
 
   const loadCars = async () => {
@@ -139,7 +141,6 @@ export default function Market() {
       if (Array.isArray(data)) {
         setCars(data);
       } else {
-        console.log("Cars error", data);
         setCars([]);
       }
     } catch (err) {
@@ -150,6 +151,17 @@ export default function Market() {
   useEffect(() => {
     loadCars();
   }, []);
+
+  // 🔍 фильтрация
+  const filteredCars = cars.filter((car) => {
+    const matchSearch =
+      car.name.toLowerCase().includes(search.toLowerCase()) ||
+      car.brand.toLowerCase().includes(search.toLowerCase());
+
+    const matchPremium = onlyPremium ? car.premium : true;
+
+    return matchSearch && matchPremium;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-[#050a10] to-black text-white">
@@ -162,10 +174,35 @@ export default function Market() {
           CAR MARKET
         </h1>
 
+        {/* 🔍 SEARCH + FILTER */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+
+          {/* SEARCH */}
+          <input
+            placeholder="Search car..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-4 py-2 rounded-lg bg-black/40 border border-white/10 w-full md:w-[300px]"
+          />
+
+          {/* PREMIUM FILTER */}
+          <button
+            onClick={() => setOnlyPremium(!onlyPremium)}
+            className={`px-4 py-2 rounded-lg border transition ${
+              onlyPremium
+                ? "bg-yellow-500 text-black border-yellow-400"
+                : "bg-white/5 border-white/10 text-white"
+            }`}
+          >
+            👑 Premium
+          </button>
+
+        </div>
+
         {/* GRID */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-          {cars.map((car: any) => (
+          {filteredCars.map((car: any) => (
             <div
               key={car.id}
               onClick={() => navigate(`/car/${car.id}`)}
@@ -174,10 +211,17 @@ export default function Market() {
               shadow-[0_0_30px_rgba(0,0,0,0.5)] hover:scale-[1.02]"
             >
 
+              {/* 👑 PREMIUM ICON */}
+              {car.premium && (
+                <div className="absolute top-2 right-2 text-yellow-400 text-xl z-10">
+                  👑
+                </div>
+              )}
+
               {/* IMAGE */}
               <div className="h-44 overflow-hidden">
                 <img
-                  src={car.image}
+                  src={car.image_url}
                   className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                 />
               </div>
@@ -204,6 +248,14 @@ export default function Market() {
           ))}
 
         </div>
+
+        {/* EMPTY */}
+        {filteredCars.length === 0 && (
+          <p className="text-white/50 mt-10 text-center">
+            No cars found...
+          </p>
+        )}
+
       </div>
     </div>
   );
