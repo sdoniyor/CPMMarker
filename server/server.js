@@ -131,9 +131,19 @@ app.get("/profile/:id", async (req, res) => {
 
 /* ================= CARS ================= */
 app.get("/cars", async (req, res) => {
-  const result = await safeQuery(
-    "SELECT * FROM cars WHERE user_id IS NULL"
-  );
+  try {
+    const result = await pool.query(`
+      SELECT id, name, brand, dvigatel, power, speed, price, image_url
+      FROM cars
+      WHERE user_id IS NULL
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "server error" });
+  }
+});
 
   res.json(result.rows || []);
 });
