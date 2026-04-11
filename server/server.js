@@ -133,7 +133,7 @@ app.get("/profile/:id", async (req, res) => {
 app.get("/cars", async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, name, brand, dvigatel, power, speed, price, image_url
+      SELECT id, name, brand, dvigatel, power, speed, price, image_url, premium
       FROM cars
       WHERE user_id IS NULL
     `);
@@ -143,9 +143,6 @@ app.get("/cars", async (req, res) => {
     console.log(err);
     res.status(500).json({ error: "server error" });
   }
-});
-
-  res.json(result.rows || []);
 });
 
 /* ================= GARAGE ================= */
