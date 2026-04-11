@@ -4,7 +4,6 @@
 // const express = require("express");
 // const cors = require("cors");
 // const { Pool } = require("pg");
-// const multer = require("multer");
 
 // const app = express();
 
@@ -15,11 +14,9 @@
 //   allowedHeaders: ["Content-Type", "Authorization"]
 // }));
 
-// app.use(express.json({ limit: "10mb" }));
-// app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// /* ================= FILE UPLOAD ================= */
-// const upload = multer({ storage: multer.memoryStorage() });
+// // ⚠️ ВАЖНО ДЛЯ ФОТО
+// app.use(express.json({ limit: "15mb" }));
+// app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // /* ================= DB ================= */
 // const pool = new Pool({
@@ -27,6 +24,7 @@
 //   ssl: { rejectUnauthorized: false }
 // });
 
+// /* ================= SAFE QUERY ================= */
 // const safeQuery = async (query, params = []) => {
 //   try {
 //     return await pool.query(query, params);
@@ -64,8 +62,8 @@
 
 //     res.json({ success: true, user: result.rows[0] });
 
-//   } catch (e) {
-//     console.log(e);
+//   } catch (err) {
+//     console.log(err);
 //     res.status(500).json({ error: "server error" });
 //   }
 // });
@@ -102,21 +100,18 @@
 //   res.json(result.rows[0] || {});
 // });
 
-// /* ================= AVATAR UPLOAD (FIXED) ================= */
-// app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
+// /* ================= AVATAR (BASE64 FIX) ================= */
+// app.post("/update-avatar", async (req, res) => {
 //   try {
-//     const { userId } = req.body;
+//     const { userId, avatar } = req.body;
 
-//     if (!userId || !req.file) {
+//     if (!userId || !avatar) {
 //       return res.status(400).json({ error: "missing data" });
 //     }
 
-//     const base64 =
-//       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-
 //     const result = await safeQuery(
 //       "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-//       [base64, userId]
+//       [avatar, userId]
 //     );
 
 //     res.json({
@@ -293,13 +288,6 @@
 
 
 
-
-
-
-
-
-
-
 require("dotenv").config();
 
 const express = require("express");
@@ -315,7 +303,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// ⚠️ ВАЖНО ДЛЯ ФОТО
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
@@ -325,7 +312,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-/* ================= SAFE QUERY ================= */
 const safeQuery = async (query, params = []) => {
   try {
     return await pool.query(query, params);
@@ -401,29 +387,23 @@ app.get("/profile/:id", async (req, res) => {
   res.json(result.rows[0] || {});
 });
 
-/* ================= AVATAR (BASE64 FIX) ================= */
+/* ================= AVATAR ================= */
 app.post("/update-avatar", async (req, res) => {
-  try {
-    const { userId, avatar } = req.body;
+  const { userId, avatar } = req.body;
 
-    if (!userId || !avatar) {
-      return res.status(400).json({ error: "missing data" });
-    }
-
-    const result = await safeQuery(
-      "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-      [avatar, userId]
-    );
-
-    res.json({
-      success: true,
-      user: result.rows[0]
-    });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "avatar error" });
+  if (!userId || !avatar) {
+    return res.status(400).json({ error: "missing data" });
   }
+
+  const result = await safeQuery(
+    "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
+    [avatar, userId]
+  );
+
+  res.json({
+    success: true,
+    user: result.rows[0]
+  });
 });
 
 /* ================= CARS ================= */
@@ -435,7 +415,7 @@ app.get("/cars", async (req, res) => {
   res.json(result.rows);
 });
 
-/* ================= BUY ================= */
+/* ================= BUY (NO CONFIG SYSTEM) ================= */
 app.post("/buy", async (req, res) => {
   const { userId, carId } = req.body;
 
@@ -448,6 +428,7 @@ app.post("/buy", async (req, res) => {
 
   let price = car.price;
 
+  // discount system
   if (user.discount && user.discount_cars) {
     const allowed = user.discount_cars;
 
@@ -475,7 +456,10 @@ app.post("/buy", async (req, res) => {
     [userId, carId]
   );
 
-  res.json({ success: true, paid: price });
+  res.json({
+    success: true,
+    paid: price
+  });
 });
 
 /* ================= WHEEL ================= */
@@ -527,7 +511,6 @@ app.post("/wheel/spin", async (req, res) => {
 
   res.json({
     success: true,
-    winId: win.id,
     win
   });
 });
