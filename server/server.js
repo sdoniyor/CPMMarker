@@ -410,12 +410,25 @@ app.get("/cars", async (req, res) => {
 });
 
 /* ================= CONFIGS (если добавишь таблицу) ================= */
+/* ================= GLOBAL CONFIGS ================= */
 app.get("/configs", async (req, res) => {
   const result = await safeQuery(
-    "SELECT * FROM global_car_configs ORDER BY id ASC"
+    "SELECT * FROM global_car_configs ORDER BY type, id"
   );
 
-  res.json(result.rows);
+  const grouped = {
+    power: [],
+    tuning: [],
+    wheels: []
+  };
+
+  result.rows.forEach((item) => {
+    if (grouped[item.type]) {
+      grouped[item.type].push(item);
+    }
+  });
+
+  res.json(grouped);
 });
 
 /* ================= BUY ================= */
