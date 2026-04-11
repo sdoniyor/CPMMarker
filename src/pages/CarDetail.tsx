@@ -10,30 +10,14 @@ export default function CarDetail() {
 
   const [car, setCar] = useState<any>(null);
 
-  // Состояния для конфигуратора (выбранные опции)
-  const [selectedHp, setSelectedHp] = useState<string>("300hp");
-  const [selectedTuning, setSelectedTuning] = useState<string>("Kolodka xrom");
-  const [selectedDiska, setSelectedDiska] = useState<string>("Standart");
+  const [selectedHp, setSelectedHp] = useState("300HP");
+  const [selectedTuning, setSelectedTuning] = useState("Standart");
+  const [selectedDiska, setSelectedDiska] = useState("Standart");
 
   const loadCar = async () => {
     const res = await fetch(`${API}/cars`);
     const data = await res.json();
-
     const found = data.find((c: any) => c.id == id);
-    // Для примера добавим недостающие поля, если их нет в API
-    if (found) {
-        if (!found.fullSpecs) found.fullSpecs = {
-            motor: found.engine || "4.4L Twin Turbo",
-            power: "300hp",
-            acceleration: "1.2s",
-            maxSpeed: "440 kmh",
-            design: "Venom vinil"
-        };
-        if (!found.priceInMingSom) found.priceInMingSom = 60000;
-        if (!found.bottomTuning) found.bottomTuning = "Fara va Kolodka xrom qilingan";
-        if (!found.sound) found.sound = "Popkorn vixlop";
-        if (!found.rating) found.rating = "10/10";
-    }
     setCar(found);
   };
 
@@ -45,27 +29,25 @@ export default function CarDetail() {
     return <div className="text-white p-10">Loading...</div>;
   }
 
-  // Вспомогательные компоненты для характеристик и конфигуратора
-  const SpecItem = ({ icon, label, value }: { icon: string, label: string, value: string }) => (
-    <div className="flex items-center gap-3 text-white/80 text-base">
-      <span className="text-lg">{icon}</span>
-      <span className="font-light">{label}</span>
-      <span className="text-white font-medium ml-1">{value}</span>
+  const SpecItem = ({ icon, label, value }: any) => (
+    <div className="flex justify-between text-sm text-white/70 border-b border-white/5 pb-2">
+      <span>{icon} {label}</span>
+      <span className="text-white">{value}</span>
     </div>
   );
 
-  const ConfigOption = ({ label, options, selected, onSelect }: { label: string, options: string[], selected: string, onSelect: (opt: string) => void }) => (
-    <div className="mb-4">
-      <p className="text-xs text-white/60 mb-1.5">{label}</p>
-      <div className="flex gap-2">
-        {options.map(opt => (
+  const ConfigOption = ({ label, options, selected, onSelect }: any) => (
+    <div className="mb-5">
+      <p className="text-xs text-white/40 mb-2 uppercase">{label}</p>
+      <div className="flex gap-2 flex-wrap">
+        {options.map((opt: string) => (
           <button
             key={opt}
             onClick={() => onSelect(opt)}
-            className={`px-3 py-1.5 border rounded-md text-sm transition-all duration-150 ${
+            className={`px-3 py-1 rounded-md text-xs transition ${
               selected === opt
-                ? 'bg-blue-600/20 border-blue-500 text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-                : 'bg-zinc-800 border-zinc-700 text-white/70 hover:border-zinc-500'
+                ? "bg-yellow-500 text-black shadow-[0_0_10px_rgba(234,179,8,0.6)]"
+                : "bg-white/5 text-white/70 hover:bg-white/10"
             }`}
           >
             {opt}
@@ -76,103 +58,86 @@ export default function CarDetail() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-white font-sans">
+    <div className="min-h-screen bg-[#05070d] text-white">
 
       <Navbar />
 
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto p-6">
 
         {/* BACK */}
         <button
           onClick={() => navigate("/market")}
-          className="mb-8 text-white hover:text-white/80 flex items-center gap-2 text-sm"
+          className="mb-6 text-white/60 hover:text-yellow-400 text-sm"
         >
-          ← BACK TO MARKET
+          ← BACK
         </button>
 
-        {/* MAIN TITLE & SUBTITLE */}
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-black text-white tracking-tight">
+        {/* TITLE */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-extrabold text-yellow-400 tracking-widest">
             {car.name}
           </h1>
-          <p className="text-lg text-white/80 font-light mt-1 uppercase tracking-wider">
-            {car.brand || car.brandAndModelSub || "M Power Edition"}
-          </p>
+          <p className="text-white/60 uppercase">{car.brand}</p>
         </div>
 
-        {/* MAIN CONTAINER: CHARACTERISTICS + CAR + CONFIGURATOR */}
-        <div className="grid grid-cols-[300px_1fr_300px] gap-8 items-start">
+        {/* GRID */}
+        <div className="grid grid-cols-[280px_1fr_280px] gap-6">
 
-          {/* LEFT: CHARACTERISTICS */}
-          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 space-y-4 shadow-xl">
-            <h2 className="text-white/50 text-sm mb-5 font-light">CHARACTERISTICS</h2>
-            <SpecItem icon="🏁" label="Brend:" value={car.brand} />
-            <SpecItem icon="⚙️" label="Dvigatel:" value={car.fullSpecs?.motor || car.engine} />
-            <SpecItem icon="🔥" label="Ot kuchi (HP):" value={car.fullSpecs?.power || car.power} />
-            <SpecItem icon="🚀" label="0-100 km/h:" value={car.fullSpecs?.acceleration || car.speed} />
-            <SpecItem icon="🏎" label="Maksimal tezlik:" value={car.fullSpecs?.maxSpeed || "N/A"} />
-            <SpecItem icon="🎨" label="Dizayn:" value={car.fullSpecs?.design || "Standard"} />
+          {/* LEFT */}
+          <div className="bg-white/5 p-5 rounded-xl border border-white/10 space-y-3">
+            <h2 className="text-xs text-white/40 mb-3">STATS</h2>
+
+            <SpecItem icon="⚙️" label="Engine" value={car.dvigatel} />
+            <SpecItem icon="🔥" label="Power" value={car.power} />
+            <SpecItem icon="🏎" label="Speed" value={car.speed} />
+            <SpecItem icon="💰" label="Price" value={`$${car.price}`} />
           </div>
 
-          {/* CENTER: CAR IMAGE & SHADOW */}
+          {/* CENTER */}
           <div className="flex flex-col items-center">
-            <div className="relative w-full aspect-[16/10] max-h-[500px] flex items-center justify-center p-6 bg-white/5 rounded-3xl border border-white/5 shadow-2xl overflow-hidden mb-6">
-                <img
-                    src={car.image}
-                    className="object-contain w-full h-full drop-shadow-[0_15px_35px_rgba(0,0,0,0.8)]"
-                    alt={car.name}
-                />
+
+            <div className="w-full h-[400px] bg-white/5 rounded-2xl border border-white/10 flex items-center justify-center shadow-2xl">
+              <img
+                src={car.image_url}
+                className="max-h-full object-contain drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
+              />
             </div>
-             {/* BOTTOM STRIP INFO */}
-            <div className="w-full flex justify-center gap-10 text-white/70 text-sm mt-2 font-light border-t border-white/10 pt-4">
-                <span>🔧 Tuning: {car.bottomTuning}</span>
-                <span>🔊 Ovozi: {car.sound}</span>
-                <span>⭐ Reyting: {car.rating}</span>
-            </div>
+
           </div>
 
-          {/* RIGHT: CONFIGURATOR & BUY BUTTON */}
-          <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5 shadow-xl">
-            <h2 className="text-white/50 text-sm mb-5 font-light">TANLASH VA SOZLACH:</h2>
+          {/* RIGHT */}
+          <div className="bg-white/5 p-5 rounded-xl border border-white/10">
 
+            <h2 className="text-xs text-white/40 mb-4">CONFIG</h2>
+
+            {/* HP */}
             <ConfigOption
-                label=""
-                options={["630HP", "300HP"]}
-                selected={selectedHp}
-                onSelect={setSelectedHp}
+              label="POWER"
+              options={["630HP", "300HP"]}
+              selected={selectedHp}
+              onSelect={setSelectedHp}
             />
 
+            {/* TUNING */}
             <ConfigOption
-                label="Tuning: [Kolodka xrom qilingan] [Fara]"
-                options={["Kolodka xrom", "Fara XROM"]}
-                selected={selectedTuning}
-                onSelect={setSelectedTuning}
+              label="TUNING"
+              options={["Standart", "Kolodka xrom", "Fara XROM"]}
+              selected={selectedTuning}
+              onSelect={setSelectedTuning}
             />
 
+            {/* DISKA */}
             <ConfigOption
-                label="Diska:"
-                options={["Standart", "Diska XROM"]}
-                selected={selectedDiska}
-                onSelect={setSelectedDiska}
+              label="WHEELS"
+              options={["Standart", "Diska XROM"]}
+              selected={selectedDiska}
+              onSelect={setSelectedDiska}
             />
 
-            {/* BUY BUTTON AND INFO */}
-            <div className="mt-10 border border-white/5 bg-zinc-800 rounded-xl overflow-hidden p-3 shadow-inner">
-                <button
-                    className="w-full bg-[#1db954] text-white font-bold text-xl py-3 rounded-lg hover:bg-[#1ed760] transition-colors shadow-[0_4px_10px_rgba(29,185,84,0.3)] uppercase"
-                >
-                    SOTIB OLISH
-                </button>
-                <div className="mt-3 text-xs text-white/70 space-y-1.5 font-light">
-                    <div className="flex items-center gap-1.5">
-                        <span className="text-xs bg-lime-900/30 text-lime-400 border border-lime-800 px-1.5 py-0.5 rounded-md font-mono">SOTIB OLISH</span>
-                        💰 Narxi: {car.priceInMingSom?.toLocaleString()} ming som
-                    </div>
-                    <div>
-                        🔒 Qanday ochiladi: Serverda tashlab beriladi
-                    </div>
-                </div>
-            </div>
+            {/* BUY */}
+            <button className="mt-6 w-full py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition shadow-[0_0_15px_rgba(234,179,8,0.5)]">
+              BUY CAR
+            </button>
 
           </div>
 
