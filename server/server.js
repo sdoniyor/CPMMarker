@@ -16,7 +16,7 @@
 // app.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
 
-// /* ================= DB (NEON SAFE) ================= */
+// /* ================= DB ================= */
 // const pool = new Pool({
 //   connectionString: process.env.DATABASE_URL,
 //   ssl: {
@@ -25,15 +25,9 @@
 //   }
 // });
 
-// /* DB CONNECT LOG */
 // pool.connect()
 //   .then(() => console.log("✅ DB CONNECTED"))
 //   .catch(err => console.log("❌ DB ERROR:", err.message));
-
-// /* ================= HEALTH ================= */
-// app.get("/", (req, res) => {
-//   res.json({ status: "Backend working 🚀" });
-// });
 
 // /* ================= SAFE QUERY ================= */
 // const safeQuery = async (query, params = []) => {
@@ -44,6 +38,11 @@
 //     return { rows: [] };
 //   }
 // };
+
+// /* ================= HEALTH ================= */
+// app.get("/", (req, res) => {
+//   res.json({ status: "Backend working 🚀" });
+// });
 
 // /* ================= AUTH ================= */
 
@@ -72,10 +71,7 @@
 //       [name, email, password]
 //     );
 
-//     res.json({
-//       success: true,
-//       user: result.rows[0] || null
-//     });
+//     res.json({ success: true, user: result.rows[0] });
 
 //   } catch (err) {
 //     console.log("REGISTER ERROR:", err.message);
@@ -87,8 +83,6 @@
 // app.post("/login", async (req, res) => {
 //   try {
 //     const { email, password } = req.body;
-
-//     console.log("LOGIN:", req.body);
 
 //     if (!email || !password) {
 //       return res.status(400).json({ error: "Missing fields" });
@@ -152,7 +146,7 @@
 //     [req.params.userId]
 //   );
 
-//   res.json(result.rows || []);
+//   res.json(result.rows);
 // });
 
 // /* ================= BUY ================= */
@@ -189,7 +183,13 @@
 //   }
 // });
 
+// /* ================= WHEEL (GET ITEMS) ================= */
 // /* ================= WHEEL ================= */
+// app.get("/wheel", async (req, res) => {
+//   const result = await safeQuery("SELECT * FROM wheel_items ORDER BY id ASC");
+//   res.json(result.rows);
+// });
+
 // app.post("/wheel/spin", async (req, res) => {
 //   try {
 //     const { userId } = req.body;
@@ -205,32 +205,29 @@
 //       return res.status(400).json({ error: "wheel empty" });
 //     }
 
+//     // 🎯 RNG (weighted)
 //     let total = items.reduce((s, i) => s + Number(i.chance || 0), 0);
 //     let r = Math.random() * total;
 
 //     let win = items[0];
-//     let winIndex = 0; // ✅ ВОТ ЧТО У ТЕБЯ НЕ ХВАТАЛО
 
 //     for (let i = 0; i < items.length; i++) {
 //       r -= Number(items[i].chance || 0);
 //       if (r <= 0) {
 //         win = items[i];
-//         winIndex = i;
 //         break;
 //       }
 //     }
 
-//     console.log("WIN:", win, "INDEX:", winIndex);
-
-//     // 💰 награды безопасно
-//     if (win.type === "money" && win.value) {
+//     // 💰 rewards
+//     if (win.type === "money") {
 //       await safeQuery(
 //         "UPDATE users SET money = money + $1 WHERE id=$2",
 //         [win.value, userId]
 //       );
 //     }
 
-//     if (win.type === "car" && win.value) {
+//     if (win.type === "car") {
 //       await safeQuery(
 //         "UPDATE cars SET user_id=$1 WHERE id=$2",
 //         [userId, win.value]
@@ -244,16 +241,57 @@
 //       );
 //     }
 
-//     // ✅ теперь всё ок
-//     res.json({
+//     return res.json({
 //       success: true,
-//       index: winIndex,
+//       winId: win.id,   // 🔥 ВАЖНО
 //       win
 //     });
 
 //   } catch (err) {
-//     console.log("WHEEL ERROR FULL:", err);
-//     res.status(500).json({ error: err.message });
+//     console.log("WHEEL ERROR:", err.message);
+//     res.status(500).json({ error: "server error" });
+//   }
+// });
+
+// /* ================= PROMO ================= */
+// app.post("/promo/redeem", async (req, res) => {
+//   try {
+//     const { userId, code } = req.body;
+
+//     if (!userId || !code) {
+//       return res.status(400).json({ error: "missing data" });
+//     }
+
+//     if (code !== "FREECASE2026") {
+//       return res.status(400).json({ error: "invalid promo" });
+//     }
+
+//     const user = await safeQuery(
+//       "SELECT used_promo FROM users WHERE id=$1",
+//       [userId]
+//     );
+
+//     if (!user.rows[0]) {
+//       return res.status(404).json({ error: "user not found" });
+//     }
+
+//     if (user.rows[0].used_promo) {
+//       return res.status(400).json({ error: "already used" });
+//     }
+
+//     await safeQuery(
+//       "UPDATE users SET used_promo=true WHERE id=$1",
+//       [userId]
+//     );
+
+//     res.json({
+//       success: true,
+//       message: "promo activated"
+//     });
+
+//   } catch (e) {
+//     console.log("PROMO ERROR:", e.message);
+//     res.status(500).json({ error: "server error" });
 //   }
 // });
 
@@ -261,10 +299,6 @@
 // app.listen(5000, "0.0.0.0", () => {
 //   console.log("🚀 SERVER RUNNING ON PORT 5000");
 // });
-
-
-
-
 
 
 
@@ -291,10 +325,7 @@ app.use(express.urlencoded({ extended: true }));
 /* ================= DB ================= */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    require: true,
-    rejectUnauthorized: false
-  }
+  ssl: { rejectUnauthorized: false }
 });
 
 pool.connect()
@@ -337,9 +368,9 @@ app.post("/register", async (req, res) => {
     }
 
     const result = await safeQuery(
-      `INSERT INTO users (name, email, password, money, level)
-       VALUES ($1, $2, $3, 1000, 1)
-       RETURNING id, name, email, money, level`,
+      `INSERT INTO users (name, email, password, money, level, used_promo)
+       VALUES ($1, $2, $3, 1000, 1, false)
+       RETURNING id, name, email, money, level, used_promo`,
       [name, email, password]
     );
 
@@ -361,7 +392,7 @@ app.post("/login", async (req, res) => {
     }
 
     const result = await safeQuery(
-      `SELECT id, name, email, money, level
+      `SELECT id, name, email, money, level, used_promo
        FROM users
        WHERE email=$1 AND password=$2`,
       [email, password]
@@ -388,7 +419,7 @@ app.post("/login", async (req, res) => {
 /* ================= PROFILE ================= */
 app.get("/profile/:id", async (req, res) => {
   const result = await safeQuery(
-    "SELECT id, name, email, avatar, level, money FROM users WHERE id=$1",
+    "SELECT id, name, email, avatar, level, money, used_promo FROM users WHERE id=$1",
     [req.params.id]
   );
 
@@ -455,7 +486,6 @@ app.post("/buy", async (req, res) => {
   }
 });
 
-/* ================= WHEEL (GET ITEMS) ================= */
 /* ================= WHEEL ================= */
 app.get("/wheel", async (req, res) => {
   const result = await safeQuery("SELECT * FROM wheel_items ORDER BY id ASC");
@@ -477,11 +507,10 @@ app.post("/wheel/spin", async (req, res) => {
       return res.status(400).json({ error: "wheel empty" });
     }
 
-    // 🎯 RNG (weighted)
     let total = items.reduce((s, i) => s + Number(i.chance || 0), 0);
     let r = Math.random() * total;
 
-    let win = items[0];
+    let win = null;
 
     for (let i = 0; i < items.length; i++) {
       r -= Number(items[i].chance || 0);
@@ -491,7 +520,9 @@ app.post("/wheel/spin", async (req, res) => {
       }
     }
 
-    // 💰 rewards
+    if (!win) win = items[0];
+
+    // rewards
     if (win.type === "money") {
       await safeQuery(
         "UPDATE users SET money = money + $1 WHERE id=$2",
@@ -513,14 +544,56 @@ app.post("/wheel/spin", async (req, res) => {
       );
     }
 
-    return res.json({
+    res.json({
       success: true,
-      winId: win.id,   // 🔥 ВАЖНО
+      winId: win.id,
       win
     });
 
   } catch (err) {
     console.log("WHEEL ERROR:", err.message);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
+/* ================= PROMO ================= */
+app.post("/promo/redeem", async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({ error: "missing data" });
+    }
+
+    if (code !== "FREECASE2026") {
+      return res.status(400).json({ error: "invalid promo" });
+    }
+
+    const user = await safeQuery(
+      "SELECT used_promo FROM users WHERE id=$1",
+      [userId]
+    );
+
+    if (!user.rows[0]) {
+      return res.status(404).json({ error: "user not found" });
+    }
+
+    if (user.rows[0].used_promo) {
+      return res.status(400).json({ error: "already used" });
+    }
+
+    await safeQuery(
+      "UPDATE users SET used_promo=true WHERE id=$1",
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      message: "promo activated"
+    });
+
+  } catch (err) {
+    console.log("PROMO ERROR:", err.message);
     res.status(500).json({ error: "server error" });
   }
 });
