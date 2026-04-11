@@ -47,12 +47,12 @@ export default function Navbar() {
           MARKET
         </button>
 
-        <div className="w-[1px] h-5 bg-white/20" />
+        {/* <div className="w-[1px] h-5 bg-white/20" />
 
         <button onClick={() => navigate("/wheel")}
           className="hover:text-yellow-400 transition">
           SPIN
-        </button>
+        </button> */}
 
       </div>
 
