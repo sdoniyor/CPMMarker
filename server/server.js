@@ -190,18 +190,13 @@ app.post("/buy", async (req, res) => {
 });
 
 /* ================= WHEEL ================= */
-app.get("/wheel", async (req, res) => {
-  try {
-    const result = await safeQuery("SELECT * FROM wheel_items");
-    res.json(result.rows || []);
-  } catch (err) {
-    res.status(500).json({ error: "wheel error" });
-  }
-});
-
 app.post("/wheel/spin", async (req, res) => {
   try {
     const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "No userId" });
+    }
 
     const result = await safeQuery("SELECT * FROM wheel_items");
     const items = result.rows;
@@ -210,28 +205,32 @@ app.post("/wheel/spin", async (req, res) => {
       return res.status(400).json({ error: "wheel empty" });
     }
 
-    let total = items.reduce((s, i) => s + i.chance, 0);
+    let total = items.reduce((s, i) => s + Number(i.chance || 0), 0);
     let r = Math.random() * total;
 
     let win = items[0];
+    let winIndex = 0; // ✅ ВОТ ЧТО У ТЕБЯ НЕ ХВАТАЛО
 
     for (let i = 0; i < items.length; i++) {
-      r -= items[i].chance;
+      r -= Number(items[i].chance || 0);
       if (r <= 0) {
         win = items[i];
+        winIndex = i;
         break;
       }
     }
 
-    // reward logic
-    if (win.type === "money") {
+    console.log("WIN:", win, "INDEX:", winIndex);
+
+    // 💰 награды безопасно
+    if (win.type === "money" && win.value) {
       await safeQuery(
         "UPDATE users SET money = money + $1 WHERE id=$2",
         [win.value, userId]
       );
     }
 
-    if (win.type === "car") {
+    if (win.type === "car" && win.value) {
       await safeQuery(
         "UPDATE cars SET user_id=$1 WHERE id=$2",
         [userId, win.value]
@@ -245,13 +244,16 @@ app.post("/wheel/spin", async (req, res) => {
       );
     }
 
-    res.json({ success: true,
+    // ✅ теперь всё ок
+    res.json({
+      success: true,
       index: winIndex,
-      win });
+      win
+    });
 
   } catch (err) {
-    console.log("WHEEL ERROR:", err.message);
-    res.status(500).json({ error: "server error" });
+    console.log("WHEEL ERROR FULL:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
