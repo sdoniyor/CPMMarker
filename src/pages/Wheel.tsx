@@ -1,17 +1,15 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 
 const API = "https://cpmmarker.onrender.com";
 
 export default function Roulette() {
   const [items, setItems] = useState<any[]>([]);
+  const [offset, setOffset] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<any>(null);
-  
-  // Реф для прямого доступа к ленте (решает проблему с анимацией)
-  const trackRef = useRef<HTMLDivElement>(null);
 
-  const itemWidth = 160; 
+  const itemWidth = 160;
   const gap = 12;
   const containerWidth = 600;
 
@@ -25,150 +23,135 @@ export default function Roulette() {
     try {
       const res = await fetch(`${API}/wheel`);
       const data = await res.json();
-      setItems(data);
+      setItems(data || []);
     } catch (e) {
-      console.error("Ошибка загрузки данных", e);
+      console.error("Ошибка загрузки:", e);
     }
   };
 
   const spin = async () => {
-    if (spinning || items.length === 0 || !trackRef.current) return;
+    if (spinning || items.length === 0) return;
 
     setSpinning(true);
     setResult(null);
 
-    // 1. Мгновенно сбрасываем рулетку в 0 БЕЗ анимации
-    trackRef.current.style.transition = "none";
-    trackRef.current.style.transform = "translateX(0px)";
-    
-    // ПРИНУДИТЕЛЬНЫЙ REFOW (Магия для браузера)
-    // Эта строчка заставляет браузер "заметить" сброс в ноль
-    trackRef.current.offsetHeight; 
-
     try {
+      // получаем результат
       const res = await fetch(`${API}/wheel/spin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id || 1 }),
+        body: JSON.stringify({ userId: user.id }),
       });
 
       const data = await res.json();
+
+      if (typeof data.index !== "number") {
+        console.error("Неверный индекс:", data);
+        setSpinning(false);
+        return;
+      }
+
       const winIndex = data.index;
 
-      const iterations = 8; 
+      const iterations = 8;
       const fullListWidth = items.length * (itemWidth + gap);
-      
-      const finalOffset = 
-        (iterations * fullListWidth) + 
-        (winIndex * (itemWidth + gap)) - 
-        (containerWidth / 2) + (itemWidth / 2);
 
-      // 2. Запускаем анимацию
-      trackRef.current.style.transition = "transform 5s cubic-bezier(0.15, 0, 0.05, 1)";
-      trackRef.current.style.transform = `translateX(-${finalOffset}px)`;
+      const randomInCard = Math.floor(Math.random() * (itemWidth * 0.8));
+
+      const finalOffset =
+        iterations * fullListWidth +
+        winIndex * (itemWidth + gap) -
+        containerWidth / 2 +
+        itemWidth / 2 +
+        randomInCard;
+
+      // 👉 СБРОС + ГАРАНТИРОВАННЫЙ СТАРТ АНИМАЦИИ
+      setOffset(0);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setOffset(finalOffset);
+        });
+      });
 
       setTimeout(() => {
         setResult(data.win);
         setSpinning(false);
-      }, 5100);
-
+      }, 5000);
     } catch (e) {
+      console.error("Ошибка спина:", e);
       setSpinning(false);
-      alert("Ошибка сервера");
     }
   };
 
-  // Делаем ленту очень длинной
-  const renderItems = Array(25).fill(items).flat();
+  const renderItems = Array(20).fill(items).flat();
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center font-sans">
       <Navbar />
 
-      {/* ФОНОВЫЙ ЭФФЕКТ */}
-      <div className="absolute top-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#1a1a1a_0%,#000_100%)] pointer-events-none" />
+      <div className="z-10 flex flex-col items-center w-full max-w-5xl px-4">
+        <h1 className="text-4xl font-bold mt-10 mb-6">Roulette</h1>
 
-      <div className="relative z-10 flex flex-col items-center mt-20">
-        <h1 className="text-5xl font-black italic text-yellow-500 mb-10 tracking-tighter shadow-yellow-500/20 drop-shadow-lg">
-          ELITE MARKET
-        </h1>
-
-        {/* ОСНОВНОЙ ВИДЖЕТ */}
         <div className="relative">
-          {/* СЕЛЕКТОР (ЛИНИЯ) */}
-          <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 z-50 w-1 h-[200px] bg-yellow-400 shadow-[0_0_20px_#facc15]" />
-          
-          {/* ОКНО ПРОСМОТРА */}
-          <div 
-            className="relative h-[180px] bg-neutral-900/80 backdrop-blur-md border-y-2 border-white/5 overflow-hidden shadow-[inset_0_0_50px_rgba(0,0,0,0.8)]"
-            style={{ width: `${containerWidth}px` }}
-          >
-            {/* ГРАДИЕНТЫ ЗАТЕМНЕНИЯ */}
-            <div className="absolute inset-0 z-40 pointer-events-none bg-gradient-to-r from-black via-transparent to-black opacity-90" />
+          {/* указатель */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full bg-yellow-400 z-50" />
 
-            {/* ТРЕК (ЛЕНТА) */}
+          {/* окно */}
+          <div
+            className="overflow-hidden border border-white/10"
+            style={{ width: containerWidth, height: 200 }}
+          >
             <div
-              ref={trackRef}
-              className="flex items-center h-full"
-              style={{ gap: `${gap}px`, paddingLeft: "10px" }}
+              className="flex items-center h-full transition-transform duration-[5000ms] ease-out"
+              style={{
+                transform: `translateX(-${offset}px)`,
+                gap: `${gap}px`,
+              }}
             >
               {renderItems.map((item, i) => (
                 <div
                   key={i}
-                  className="flex-shrink-0 w-[160px] h-[150px] bg-neutral-800/50 border border-white/10 rounded-2xl flex flex-col items-center justify-center group"
+                  className="flex-shrink-0 bg-neutral-800 rounded-lg flex flex-col items-center justify-center"
+                  style={{ width: itemWidth, height: 160 }}
                 >
-                  <img 
-                    src={item.image_url} 
-                    className="w-28 h-20 object-contain transition-transform group-hover:scale-110 duration-500" 
-                  />
-                  <p className="text-[10px] mt-2 font-black text-gray-400 uppercase tracking-widest">{item.title}</p>
-                  <div className="absolute bottom-0 w-full h-1 bg-yellow-500/20 group-hover:bg-yellow-500/50 transition-colors" />
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt=""
+                      className="w-24 h-16 object-contain"
+                    />
+                  ) : (
+                    <div className="w-24 h-16 bg-gray-600" />
+                  )}
+
+                  <p className="text-xs mt-2">{item.title}</p>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* КНОПКА */}
         <button
           onClick={spin}
           disabled={spinning}
-          className={`mt-12 px-16 py-5 rounded-2xl font-black text-2xl uppercase transition-all duration-300 transform active:scale-90 ${
-            spinning 
-            ? "bg-neutral-700 text-gray-500 cursor-not-allowed" 
-            : "bg-yellow-500 text-black hover:bg-yellow-400 hover:shadow-[0_0_40px_rgba(234,179,8,0.5)] shadow-lg"
-          }`}
+          className="mt-10 px-10 py-3 bg-yellow-400 text-black font-bold rounded"
         >
-          {spinning ? "Rolling..." : "Open Case"}
+          {spinning ? "Rolling..." : "SPIN"}
         </button>
 
-        {/* НИЖНЯЯ СТАТИСТИКА */}
-        <div className="flex gap-10 mt-20 opacity-40 uppercase font-bold text-xs tracking-[0.2em]">
-            <div className="flex flex-col items-center italic"><span>Provably Fair</span></div>
-            <div className="flex flex-col items-center italic"><span>Instant Delivery</span></div>
-            <div className="flex flex-col items-center italic"><span>Secure</span></div>
-        </div>
+        {/* результат */}
+        {result && !spinning && (
+          <div className="mt-8 text-center">
+            <h2 className="text-2xl mb-4">You won:</h2>
+            <img
+              src={result.image_url}
+              className="w-40 mx-auto mb-4"
+            />
+            <p>{result.title}</p>
+          </div>
+        )}
       </div>
-
-      {/* МОДАЛКА ВЫИГРЫША */}
-      {result && !spinning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md animate-in zoom-in duration-300">
-           <div className="text-center">
-              <p className="text-yellow-500 text-xl font-bold mb-4 animate-pulse uppercase tracking-widest">New Win!</p>
-              <h2 className="text-6xl font-black text-white italic mb-10">{result.title}</h2>
-              <div className="relative inline-block">
-                <div className="absolute inset-0 bg-yellow-500 blur-[100px] opacity-20" />
-                <img src={result.image_url} className="w-[500px] relative z-10" />
-              </div>
-              <button 
-                onClick={() => setResult(null)}
-                className="mt-10 px-12 py-4 border-2 border-yellow-500 text-yellow-500 rounded-full font-bold hover:bg-yellow-500 hover:text-black transition-all uppercase"
-              >
-                Close
-              </button>
-           </div>
-        </div>
-      )}
     </div>
   );
 }
