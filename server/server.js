@@ -245,7 +245,9 @@ app.post("/wheel/spin", async (req, res) => {
       );
     }
 
-    res.json({ success: true, win });
+    res.json({ success: true,
+      index: winIndex,
+      win });
 
   } catch (err) {
     console.log("WHEEL ERROR:", err.message);
