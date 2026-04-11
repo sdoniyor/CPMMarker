@@ -28,6 +28,11 @@ export default function Roulette() {
   const spin = async () => {
     if (spinning || items.length === 0) return;
 
+    if (!user?.id) {
+      alert("Ты не залогинен");
+      return;
+    }
+
     setSpinning(true);
     setResult(null);
 
@@ -41,7 +46,7 @@ export default function Roulette() {
 
     console.log("SPIN:", data);
 
-    if (typeof data.index !== "number") {
+    if (!data.success || typeof data.index !== "number") {
       console.error("INDEX ERROR", data);
       setSpinning(false);
       return;
@@ -61,7 +66,7 @@ export default function Roulette() {
       itemWidth / 2 +
       randomOffset;
 
-    // 💥 ФИКС АНИМАЦИИ
+    // 💥 фикс анимации
     setOffset(0);
 
     requestAnimationFrame(() => {
