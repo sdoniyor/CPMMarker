@@ -170,9 +170,9 @@ export default function Market() {
 
       <div className="p-6">
 
-        <h1 className="text-3xl font-extrabold text-yellow-400 tracking-widest mb-6">
+        {/* <h1 className="text-3xl font-extrabold text-yellow-400 tracking-widest mb-6">
           CAR MARKET
-        </h1>
+        </h1> */}
 
         {/* 🔍 SEARCH + FILTER */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
