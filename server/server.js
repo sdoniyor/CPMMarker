@@ -15,7 +15,8 @@
 //   allowedHeaders: ["Content-Type", "Authorization"]
 // }));
 
-// app.use(express.json());
+// app.use(express.json({ limit: "10mb" }));
+// app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // /* ================= FILE UPLOAD ================= */
 // const upload = multer({ storage: multer.memoryStorage() });
@@ -26,7 +27,6 @@
 //   ssl: { rejectUnauthorized: false }
 // });
 
-// /* ================= SAFE QUERY ================= */
 // const safeQuery = async (query, params = []) => {
 //   try {
 //     return await pool.query(query, params);
@@ -65,6 +65,7 @@
 //     res.json({ success: true, user: result.rows[0] });
 
 //   } catch (e) {
+//     console.log(e);
 //     res.status(500).json({ error: "server error" });
 //   }
 // });
@@ -101,7 +102,7 @@
 //   res.json(result.rows[0] || {});
 // });
 
-// /* ================= AVATAR UPLOAD ================= */
+// /* ================= AVATAR UPLOAD (FIXED) ================= */
 // app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
 //   try {
 //     const { userId } = req.body;
@@ -113,14 +114,18 @@
 //     const base64 =
 //       `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
 
-//     await safeQuery(
-//       "UPDATE users SET avatar=$1 WHERE id=$2",
+//     const result = await safeQuery(
+//       "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
 //       [base64, userId]
 //     );
 
-//     res.json({ success: true, avatar: base64 });
+//     res.json({
+//       success: true,
+//       user: result.rows[0]
+//     });
 
 //   } catch (err) {
+//     console.log(err);
 //     res.status(500).json({ error: "avatar error" });
 //   }
 // });
@@ -134,7 +139,7 @@
 //   res.json(result.rows);
 // });
 
-// /* ================= BUY (DISCOUNT) ================= */
+// /* ================= BUY ================= */
 // app.post("/buy", async (req, res) => {
 //   const { userId, carId } = req.body;
 
@@ -149,6 +154,7 @@
 
 //   if (user.discount && user.discount_cars) {
 //     const allowed = user.discount_cars;
+
 //     const can =
 //       Array.isArray(allowed)
 //         ? allowed.includes(car.id)
@@ -230,7 +236,7 @@
 //   });
 // });
 
-// /* ================= PROMO SYSTEM ================= */
+// /* ================= PROMO ================= */
 // app.post("/promo/redeem", async (req, res) => {
 //   const { userId, code } = req.body;
 
@@ -249,7 +255,6 @@
 //     return res.status(400).json({ error: "already used" });
 //   }
 
-//   // 🎰 spin promo (1 time)
 //   if (promo.type === "spin") {
 //     await safeQuery(
 //       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -257,7 +262,6 @@
 //     );
 //   }
 
-//   // 💰 discount promo (cars)
 //   if (promo.type === "discount") {
 //     await safeQuery(
 //       `UPDATE users 
@@ -292,12 +296,15 @@
 
 
 
+
+
+
+
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
-const multer = require("multer");
 
 const app = express();
 
@@ -308,11 +315,9 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-/* ================= FILE UPLOAD ================= */
-const upload = multer({ storage: multer.memoryStorage() });
+// ⚠️ ВАЖНО ДЛЯ ФОТО
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 /* ================= DB ================= */
 const pool = new Pool({
@@ -320,6 +325,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+/* ================= SAFE QUERY ================= */
 const safeQuery = async (query, params = []) => {
   try {
     return await pool.query(query, params);
@@ -357,8 +363,8 @@ app.post("/register", async (req, res) => {
 
     res.json({ success: true, user: result.rows[0] });
 
-  } catch (e) {
-    console.log(e);
+  } catch (err) {
+    console.log(err);
     res.status(500).json({ error: "server error" });
   }
 });
@@ -395,21 +401,18 @@ app.get("/profile/:id", async (req, res) => {
   res.json(result.rows[0] || {});
 });
 
-/* ================= AVATAR UPLOAD (FIXED) ================= */
-app.post("/update-avatar", upload.single("avatar"), async (req, res) => {
+/* ================= AVATAR (BASE64 FIX) ================= */
+app.post("/update-avatar", async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, avatar } = req.body;
 
-    if (!userId || !req.file) {
+    if (!userId || !avatar) {
       return res.status(400).json({ error: "missing data" });
     }
 
-    const base64 =
-      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-
     const result = await safeQuery(
       "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-      [base64, userId]
+      [avatar, userId]
     );
 
     res.json({
