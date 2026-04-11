@@ -14,7 +14,6 @@
 //   allowedHeaders: ["Content-Type", "Authorization"]
 // }));
 
-// // ⚠️ ВАЖНО ДЛЯ ФОТО
 // app.use(express.json({ limit: "15mb" }));
 // app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
@@ -24,7 +23,6 @@
 //   ssl: { rejectUnauthorized: false }
 // });
 
-// /* ================= SAFE QUERY ================= */
 // const safeQuery = async (query, params = []) => {
 //   try {
 //     return await pool.query(query, params);
@@ -41,31 +39,25 @@
 
 // /* ================= REGISTER ================= */
 // app.post("/register", async (req, res) => {
-//   try {
-//     const { name, email, password } = req.body;
+//   const { name, email, password } = req.body;
 
-//     const exists = await safeQuery(
-//       "SELECT id FROM users WHERE email=$1",
-//       [email]
-//     );
+//   const exists = await safeQuery(
+//     "SELECT id FROM users WHERE email=$1",
+//     [email]
+//   );
 
-//     if (exists.rows.length > 0) {
-//       return res.status(400).json({ error: "User exists" });
-//     }
-
-//     const result = await safeQuery(
-//       `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
-//        VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
-//        RETURNING *`,
-//       [name, email, password]
-//     );
-
-//     res.json({ success: true, user: result.rows[0] });
-
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ error: "server error" });
+//   if (exists.rows.length > 0) {
+//     return res.status(400).json({ error: "User exists" });
 //   }
+
+//   const result = await safeQuery(
+//     `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
+//      VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
+//      RETURNING *`,
+//     [name, email, password]
+//   );
+
+//   res.json({ success: true, user: result.rows[0] });
 // });
 
 // /* ================= LOGIN ================= */
@@ -100,29 +92,23 @@
 //   res.json(result.rows[0] || {});
 // });
 
-// /* ================= AVATAR (BASE64 FIX) ================= */
+// /* ================= AVATAR ================= */
 // app.post("/update-avatar", async (req, res) => {
-//   try {
-//     const { userId, avatar } = req.body;
+//   const { userId, avatar } = req.body;
 
-//     if (!userId || !avatar) {
-//       return res.status(400).json({ error: "missing data" });
-//     }
-
-//     const result = await safeQuery(
-//       "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-//       [avatar, userId]
-//     );
-
-//     res.json({
-//       success: true,
-//       user: result.rows[0]
-//     });
-
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ error: "avatar error" });
+//   if (!userId || !avatar) {
+//     return res.status(400).json({ error: "missing data" });
 //   }
+
+//   const result = await safeQuery(
+//     "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
+//     [avatar, userId]
+//   );
+
+//   res.json({
+//     success: true,
+//     user: result.rows[0]
+//   });
 // });
 
 // /* ================= CARS ================= */
@@ -134,12 +120,41 @@
 //   res.json(result.rows);
 // });
 
+// /* ================= CONFIGS (если добавишь таблицу) ================= */
+// /* ================= GLOBAL CONFIGS ================= */
+// app.get("/configs", async (req, res) => {
+//   const result = await safeQuery(
+//     "SELECT * FROM global_car_configs ORDER BY type, id"
+//   );
+
+//   const grouped = {
+//     power: [],
+//     tuning: [],
+//     wheels: []
+//   };
+
+//   result.rows.forEach((item) => {
+//     if (grouped[item.type]) {
+//       grouped[item.type].push(item);
+//     }
+//   });
+
+//   res.json(grouped);
+// });
+
 // /* ================= BUY ================= */
 // app.post("/buy", async (req, res) => {
 //   const { userId, carId } = req.body;
 
-//   const user = (await safeQuery("SELECT * FROM users WHERE id=$1", [userId])).rows[0];
-//   const car = (await safeQuery("SELECT * FROM cars WHERE id=$1", [carId])).rows[0];
+//   const user = (await safeQuery(
+//     "SELECT * FROM users WHERE id=$1",
+//     [userId]
+//   )).rows[0];
+
+//   const car = (await safeQuery(
+//     "SELECT * FROM cars WHERE id=$1",
+//     [carId]
+//   )).rows[0];
 
 //   if (!user || !car) {
 //     return res.status(404).json({ error: "not found" });
@@ -147,6 +162,7 @@
 
 //   let price = car.price;
 
+//   /* ================= DISCOUNT ================= */
 //   if (user.discount && user.discount_cars) {
 //     const allowed = user.discount_cars;
 
@@ -174,19 +190,27 @@
 //     [userId, carId]
 //   );
 
-//   res.json({ success: true, paid: price });
+//   res.json({
+//     success: true,
+//     paid: price
+//   });
 // });
 
 // /* ================= WHEEL ================= */
 // app.get("/wheel", async (req, res) => {
-//   const result = await safeQuery("SELECT * FROM wheel_items ORDER BY id ASC");
+//   const result = await safeQuery(
+//     "SELECT * FROM wheel_items ORDER BY id ASC"
+//   );
+
 //   res.json(result.rows);
 // });
 
 // app.post("/wheel/spin", async (req, res) => {
 //   const { userId } = req.body;
 
-//   if (!userId) return res.status(400).json({ error: "no user" });
+//   if (!userId) {
+//     return res.status(400).json({ error: "no user" });
+//   }
 
 //   const items = (await safeQuery("SELECT * FROM wheel_items")).rows;
 
@@ -226,7 +250,6 @@
 
 //   res.json({
 //     success: true,
-//     winId: win.id,
 //     win
 //   });
 // });
@@ -250,6 +273,7 @@
 //     return res.status(400).json({ error: "already used" });
 //   }
 
+//   /* spin promo */
 //   if (promo.type === "spin") {
 //     await safeQuery(
 //       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -257,6 +281,7 @@
 //     );
 //   }
 
+//   /* discount promo */
 //   if (promo.type === "discount") {
 //     await safeQuery(
 //       `UPDATE users 
@@ -282,8 +307,6 @@
 // app.listen(5000, "0.0.0.0", () => {
 //   console.log("🚀 SERVER RUNNING ON PORT 5000");
 // });
-
-
 
 
 
@@ -341,7 +364,7 @@ app.post("/register", async (req, res) => {
 
   const result = await safeQuery(
     `INSERT INTO users (name, email, password, money, level, used_promo, discount, discount_cars, avatar)
-     VALUES ($1,$2,$3,1000,1,false,0,NULL,NULL)
+     VALUES ($1,$2,$3,1000,1,false,0,'[]',NULL)
      RETURNING *`,
     [name, email, password]
   );
@@ -409,8 +432,7 @@ app.get("/cars", async (req, res) => {
   res.json(result.rows);
 });
 
-/* ================= CONFIGS (если добавишь таблицу) ================= */
-/* ================= GLOBAL CONFIGS ================= */
+/* ================= CONFIGS ================= */
 app.get("/configs", async (req, res) => {
   const result = await safeQuery(
     "SELECT * FROM global_car_configs ORDER BY type, id"
@@ -431,9 +453,9 @@ app.get("/configs", async (req, res) => {
   res.json(grouped);
 });
 
-/* ================= BUY ================= */
+/* ================= BUY (FIXED DISCOUNT) ================= */
 app.post("/buy", async (req, res) => {
-  const { userId, carId } = req.body;
+  const { userId, carId, configIds } = req.body;
 
   const user = (await safeQuery(
     "SELECT * FROM users WHERE id=$1",
@@ -449,20 +471,23 @@ app.post("/buy", async (req, res) => {
     return res.status(404).json({ error: "not found" });
   }
 
-  let price = car.price;
+  // configs price
+  let configPrice = 0;
 
-  /* ================= DISCOUNT ================= */
-  if (user.discount && user.discount_cars) {
-    const allowed = user.discount_cars;
+  if (Array.isArray(configIds) && configIds.length > 0) {
+    const configs = await safeQuery(
+      "SELECT * FROM global_car_configs WHERE id = ANY($1)",
+      [configIds]
+    );
 
-    const can =
-      Array.isArray(allowed)
-        ? allowed.includes(car.id)
-        : String(allowed).includes(String(car.id));
+    configPrice = configs.rows.reduce((sum, c) => sum + Number(c.price || 0), 0);
+  }
 
-    if (can) {
-      price = price - (price * user.discount) / 100;
-    }
+  let price = Number(car.price) + configPrice;
+
+  // 🔥 FIX DISCOUNT LOGIC
+  if (user.discount && Number(user.discount) > 0) {
+    price = price - (price * Number(user.discount)) / 100;
   }
 
   if (user.money < price) {
@@ -543,7 +568,7 @@ app.post("/wheel/spin", async (req, res) => {
   });
 });
 
-/* ================= PROMO ================= */
+/* ================= PROMO (FIXED) ================= */
 app.post("/promo/redeem", async (req, res) => {
   const { userId, code } = req.body;
 
@@ -562,7 +587,7 @@ app.post("/promo/redeem", async (req, res) => {
     return res.status(400).json({ error: "already used" });
   }
 
-  /* spin promo */
+  /* spin */
   if (promo.type === "spin") {
     await safeQuery(
       "UPDATE users SET used_promo=true WHERE id=$1",
@@ -570,13 +595,18 @@ app.post("/promo/redeem", async (req, res) => {
     );
   }
 
-  /* discount promo */
+  /* discount FIXED JSON */
   if (promo.type === "discount") {
     await safeQuery(
       `UPDATE users 
-       SET discount=$1, discount_cars=$2
+       SET discount=$1,
+           discount_cars=$2
        WHERE id=$3`,
-      [promo.value, promo.car_ids, userId]
+      [
+        promo.value,
+        JSON.stringify(promo.car_ids || []),
+        userId
+      ]
     );
   }
 
