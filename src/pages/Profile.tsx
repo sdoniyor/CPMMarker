@@ -9,17 +9,35 @@
 // const getUser = () => {
 //   try {
 //     const raw = localStorage.getItem("user");
-//     if (!raw || raw === "undefined") return {};
+//     if (!raw || raw === "undefined" || raw === "null") return null;
 //     return JSON.parse(raw);
 //   } catch {
-//     return {};
+//     return null;
+//   }
+// };
+
+// /* ================= SAFE FETCH ================= */
+// const safeFetch = async (url: string, options?: any) => {
+//   try {
+//     const res = await fetch(url, options);
+//     const text = await res.text();
+
+//     try {
+//       return JSON.parse(text);
+//     } catch {
+//       console.log("❌ NOT JSON:", text);
+//       return null;
+//     }
+//   } catch (e) {
+//     console.log("FETCH ERROR:", e);
+//     return null;
 //   }
 // };
 
 // export default function Profile() {
 //   const navigate = useNavigate();
 
-//   const userLocal = getUser();
+//   const localUser = getUser();
 
 //   const [user, setUser] = useState<any>(null);
 //   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -27,29 +45,13 @@
 //   const [promoStatus, setPromoStatus] = useState("");
 //   const [loading, setLoading] = useState(false);
 
-//   /* ================= SAFE FETCH ================= */
-//   const safeFetchJSON = async (url: string, options?: any) => {
-//     try {
-//       const res = await fetch(url, options);
-//       const text = await res.text();
-
-//       try {
-//         return JSON.parse(text);
-//       } catch {
-//         console.error("NOT JSON:", text);
-//         return null;
-//       }
-//     } catch (e) {
-//       console.error("FETCH ERROR:", e);
-//       return null;
-//     }
-//   };
-
 //   /* ================= LOAD PROFILE ================= */
 //   const loadProfile = async () => {
-//     if (!userLocal?.id) return;
+//     if (!localUser?.id) return;
 
-//     const data = await safeFetchJSON(`${API}/profile/${userLocal.id}`);
+//     const data = await safeFetch(
+//       `${API}/profile/${localUser.id}`
+//     );
 
 //     if (data) {
 //       setUser(data);
@@ -73,17 +75,17 @@
 
 //   /* ================= AVATAR ================= */
 //   const updateAvatar = async () => {
-//     if (!avatarFile) return;
+//     if (!avatarFile || !localUser?.id) return;
 
 //     setLoading(true);
 
 //     const base64 = await convertBase64(avatarFile);
 
-//     const data = await safeFetchJSON(`${API}/update-avatar`, {
+//     const data = await safeFetch(`${API}/update-avatar`, {
 //       method: "POST",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify({
-//         userId: userLocal.id,
+//         userId: localUser.id,
 //         avatar: base64,
 //       }),
 //     });
@@ -98,21 +100,23 @@
 
 //   /* ================= TELEGRAM ================= */
 //   const connectTelegram = () => {
-//     if (!userLocal?.id) return;
+//     if (!localUser?.id) return;
 
 //     window.open(
-//       `https://t.me/CPMMarket_bot?start=${userLocal.id}`,
+//       `https://t.me/CPMMarket_bot?start=${localUser.id}`,
 //       "_blank"
 //     );
 //   };
 
 //   /* ================= PROMO ================= */
 //   const applyPromo = async () => {
-//     const data = await safeFetchJSON(`${API}/promo/redeem`, {
+//     if (!localUser?.id) return;
+
+//     const data = await safeFetch(`${API}/promo/redeem`, {
 //       method: "POST",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify({
-//         userId: userLocal.id,
+//         userId: localUser.id,
 //         code: promo,
 //       }),
 //     });
@@ -237,6 +241,8 @@
 // }
 
 
+
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -263,7 +269,7 @@ const safeFetch = async (url: string, options?: any) => {
     try {
       return JSON.parse(text);
     } catch {
-      console.log("❌ NOT JSON:", text);
+      console.log("NOT JSON:", text);
       return null;
     }
   } catch (e) {
@@ -287,9 +293,7 @@ export default function Profile() {
   const loadProfile = async () => {
     if (!localUser?.id) return;
 
-    const data = await safeFetch(
-      `${API}/profile/${localUser.id}`
-    );
+    const data = await safeFetch(`${API}/profile/${localUser.id}`);
 
     if (data) {
       setUser(data);
@@ -302,14 +306,13 @@ export default function Profile() {
   }, []);
 
   /* ================= BASE64 ================= */
-  const convertBase64 = (file: File) => {
-    return new Promise<string>((resolve, reject) => {
+  const convertBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
     });
-  };
 
   /* ================= AVATAR ================= */
   const updateAvatar = async () => {
@@ -438,7 +441,12 @@ export default function Profile() {
               <h3 className="font-bold mb-2">Telegram</h3>
 
               {user.telegram_id ? (
-                <p>ID: {user.telegram_id}</p>
+                <div className="text-green-400 font-bold">
+                  ✅ Telegram connected
+                  <p className="text-white/40 text-sm mt-1">
+                    ID: {user.telegram_id}
+                  </p>
+                </div>
               ) : (
                 <button
                   onClick={connectTelegram}

@@ -9,6 +9,7 @@
 
 // const app = express();
 
+// /* ================= MIDDLEWARE ================= */
 // app.use(cors({ origin: "*" }));
 // app.use(express.json({ limit: "10mb" }));
 
@@ -20,7 +21,14 @@
 //     : false,
 // });
 
-// const q = (text, params) => pool.query(text, params);
+// const q = async (text, params) => {
+//   try {
+//     return await pool.query(text, params);
+//   } catch (e) {
+//     console.log("DB ERROR:", e.message);
+//     return { rows: [] };
+//   }
+// };
 
 // /* ================= SAFE JSON ================= */
 // const safeJSON = (val, fallback = []) => {
@@ -73,9 +81,9 @@
 //     const hash = await bcrypt.hash(password, 10);
 
 //     const user = await q(
-//       `INSERT INTO users (name, email, password, level, avatar, discount, discount_cars, used_promo)
-//        VALUES ($1,$2,$3,1,'',0,'[]','[]')
-//        RETURNING id, name, email, level`,
+//       `INSERT INTO users (name, email, password, level, money, avatar, discount, discount_cars, used_promo)
+//        VALUES ($1,$2,$3,1,0,'',0,'[]','[]')
+//        RETURNING id, name, email, level, money, avatar`,
 //       [name, email, hash]
 //     );
 
@@ -90,6 +98,10 @@
 // app.post("/login", async (req, res) => {
 //   try {
 //     const { email, password } = req.body;
+
+//     if (!email || !password) {
+//       return res.status(400).json({ error: "missing fields" });
+//     }
 
 //     const userRes = await q(
 //       "SELECT * FROM users WHERE email=$1",
@@ -117,17 +129,19 @@
 //   }
 // });
 
-// /* ================= PROFILE ================= */
+// /* ================= PROFILE (SAFE ALWAYS JSON) ================= */
 // app.get("/profile/:id", async (req, res) => {
 //   try {
-//     const user = await q(
+//     const userRes = await q(
 //       "SELECT * FROM users WHERE id=$1",
 //       [req.params.id]
 //     );
 
-//     const u = user.rows[0];
+//     const u = userRes.rows[0];
 
-//     if (!u) return res.json({});
+//     if (!u) {
+//       return res.json(null);
+//     }
 
 //     u.discount_cars = safeJSON(u.discount_cars, []);
 //     u.used_promo = safeJSON(u.used_promo, []);
@@ -136,26 +150,61 @@
 
 //     return res.json(u);
 //   } catch (e) {
+//     console.log("PROFILE ERROR:", e.message);
 //     return res.status(500).json({ error: "profile error" });
 //   }
 // });
 
 // /* ================= CARS ================= */
 // app.get("/cars", async (req, res) => {
-//   const cars = await q("SELECT * FROM cars");
-//   res.json(cars.rows);
+//   try {
+//     const cars = await q("SELECT * FROM cars");
+//     return res.json(cars.rows || []);
+//   } catch {
+//     return res.json([]);
+//   }
 // });
 
 // /* ================= BUY ================= */
 // app.post("/buy", async (req, res) => {
-//   const { userId, carId } = req.body;
+//   try {
+//     const { userId, carId } = req.body;
 
-//   await q(
-//     "UPDATE cars SET user_id=$1 WHERE id=$2",
-//     [userId, carId]
-//   );
+//     await q(
+//       "UPDATE cars SET user_id=$1 WHERE id=$2",
+//       [userId, carId]
+//     );
 
-//   res.json({ success: true });
+//     return res.json({ success: true });
+//   } catch {
+//     return res.status(500).json({ error: "buy failed" });
+//   }
+// });
+
+// /* ================= UPDATE AVATAR (FIXED) ================= */
+// app.post("/update-avatar", async (req, res) => {
+//   try {
+//     const { userId, avatar } = req.body;
+
+//     if (!userId || !avatar) {
+//       return res.status(400).json({ error: "missing data" });
+//     }
+
+//     await q(
+//       "UPDATE users SET avatar=$1 WHERE id=$2",
+//       [avatar, userId]
+//     );
+
+//     const user = await q(
+//       "SELECT id, name, email, avatar, money, level FROM users WHERE id=$1",
+//       [userId]
+//     );
+
+//     return res.json(user.rows[0] || {});
+//   } catch (e) {
+//     console.log("AVATAR ERROR:", e.message);
+//     return res.status(500).json({ error: "avatar failed" });
+//   }
 // });
 
 // /* ================= PROMO ================= */
@@ -198,7 +247,37 @@
 
 //     return res.json({ success: true });
 //   } catch (e) {
+//     console.log("PROMO ERROR:", e.message);
 //     return res.status(500).json({ error: "promo failed" });
+//   }
+// });
+
+// /* ================= TELEGRAM LINK ================= */
+// app.post("/telegram/link", async (req, res) => {
+//   try {
+//     const { userId, telegram_id } = req.body;
+
+//     if (!userId || !telegram_id) {
+//       return res.status(400).json({ error: "missing data" });
+//     }
+
+//     const user = await q(
+//       "UPDATE users SET telegram_id=$1 WHERE id=$2 RETURNING id, telegram_id",
+//       [telegram_id, userId]
+//     );
+
+//     if (!user.rows[0]) {
+//       return res.status(404).json({ error: "user not found" });
+//     }
+
+//     return res.json({
+//       success: true,
+//       telegram_id: user.rows[0].telegram_id,
+//     });
+
+//   } catch (e) {
+//     console.log("TG LINK ERROR:", e.message);
+//     return res.status(500).json({ error: "telegram link failed" });
 //   }
 // });
 
@@ -231,6 +310,7 @@
 
 //     return res.json({ success: true });
 //   } catch (e) {
+//     console.log("TG ERROR:", e.message);
 //     return res.status(500).json({ error: "telegram failed" });
 //   }
 // });
@@ -241,6 +321,16 @@
 // app.listen(PORT, "0.0.0.0", () => {
 //   console.log("🚀 SERVER RUNNING ON", PORT);
 // });
+
+
+
+
+
+
+
+
+
+
 
 
 require("dotenv").config();
@@ -265,7 +355,8 @@ const pool = new Pool({
     : false,
 });
 
-const q = async (text, params) => {
+/* SAFE QUERY */
+const q = async (text, params = []) => {
   try {
     return await pool.query(text, params);
   } catch (e) {
@@ -277,7 +368,7 @@ const q = async (text, params) => {
 /* ================= SAFE JSON ================= */
 const safeJSON = (val, fallback = []) => {
   try {
-    if (!val) return fallback;
+    if (!val || val === "null" || val === "undefined") return fallback;
     if (Array.isArray(val)) return val;
     return JSON.parse(val);
   } catch {
@@ -290,9 +381,7 @@ let bot = null;
 
 if (process.env.BOT_TOKEN) {
   try {
-    bot = new TelegramBot(process.env.BOT_TOKEN, {
-      polling: false,
-    });
+    bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
     console.log("🤖 Telegram OK");
   } catch (e) {
     console.log("BOT ERROR:", e.message);
@@ -331,7 +420,7 @@ app.post("/register", async (req, res) => {
       [name, email, hash]
     );
 
-    return res.json(user.rows[0]);
+    return res.json(user.rows[0] || {});
   } catch (e) {
     console.log("REGISTER ERROR:", e.message);
     return res.status(500).json({ error: "register failed" });
@@ -373,7 +462,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ================= PROFILE (SAFE ALWAYS JSON) ================= */
+/* ================= PROFILE ================= */
 app.get("/profile/:id", async (req, res) => {
   try {
     const userRes = await q(
@@ -383,9 +472,7 @@ app.get("/profile/:id", async (req, res) => {
 
     const u = userRes.rows[0];
 
-    if (!u) {
-      return res.json(null);
-    }
+    if (!u) return res.json(null);
 
     u.discount_cars = safeJSON(u.discount_cars, []);
     u.used_promo = safeJSON(u.used_promo, []);
@@ -425,7 +512,7 @@ app.post("/buy", async (req, res) => {
   }
 });
 
-/* ================= UPDATE AVATAR (FIXED) ================= */
+/* ================= UPDATE AVATAR ================= */
 app.post("/update-avatar", async (req, res) => {
   try {
     const { userId, avatar } = req.body;
@@ -493,6 +580,35 @@ app.post("/promo/redeem", async (req, res) => {
   } catch (e) {
     console.log("PROMO ERROR:", e.message);
     return res.status(500).json({ error: "promo failed" });
+  }
+});
+
+/* ================= TELEGRAM LINK ================= */
+app.post("/telegram/link", async (req, res) => {
+  try {
+    const { userId, telegram_id } = req.body;
+
+    if (!userId || !telegram_id) {
+      return res.status(400).json({ error: "missing data" });
+    }
+
+    const user = await q(
+      "UPDATE users SET telegram_id=$1 WHERE id=$2 RETURNING id, telegram_id",
+      [telegram_id, userId]
+    );
+
+    if (!user.rows[0]) {
+      return res.status(404).json({ error: "user not found" });
+    }
+
+    return res.json({
+      success: true,
+      telegram_id: user.rows[0].telegram_id,
+    });
+
+  } catch (e) {
+    console.log("TG LINK ERROR:", e.message);
+    return res.status(500).json({ error: "telegram link failed" });
   }
 });
 
