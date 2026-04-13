@@ -242,8 +242,26 @@ export default function CarDetail() {
 
   const [showPay, setShowPay] = useState(false);
 
+  /* ================= SAFE FETCH ================= */
+  const safeFetchJSON = async (url: string) => {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+
+      if (!text || text.trim().startsWith("<!DOCTYPE")) {
+        console.error("❌ Not JSON:", url);
+        return [];
+      }
+
+      return JSON.parse(text);
+    } catch (err) {
+      console.error("Fetch error:", url, err);
+      return [];
+    }
+  };
+
   /* ================= PROMO ================= */
-  const activePromo = promoCodes.find(p =>
+  const activePromo = promoCodes.find((p: any) =>
     p.type === "discount" &&
     Array.isArray(p.car_ids) &&
     p.car_ids.map(Number).includes(Number(id))
@@ -252,66 +270,54 @@ export default function CarDetail() {
   const discountValue = activePromo ? Number(activePromo.value) : 0;
 
   /* ================= PRICES ================= */
-
   const basePrice = Number(car?.price) || 0;
 
-  // скидка ТОЛЬКО на машину
   const discountedBasePrice =
     discountValue > 0
       ? Math.floor(basePrice * (1 - discountValue / 100))
       : basePrice;
 
-  // конфиги без скидки
   const configPrice =
     (Number(selectedHp?.price) || 0) +
     (Number(selectedTuning?.price) || 0) +
     (Number(selectedWheels?.price) || 0);
 
   const totalPrice = discountedBasePrice + configPrice;
-
-  // для перечёркнутой цены
   const fullPrice = basePrice + configPrice;
 
   /* ================= LOAD DATA ================= */
   const loadData = async () => {
     try {
-      const [carsRes, configRes, promoRes] = await Promise.all([
-        fetch(`${API}/cars`),
-        fetch(`${API}/config`), // 👈 FIXED
-        fetch(`${API}/promo`)
+      const [carsData, configsData, promoData] = await Promise.all([
+        safeFetchJSON(`${API}/cars`),
+        safeFetchJSON(`${API}/global_car_configs`), // ✅ ТВОЯ ТАБЛИЦА
+        safeFetchJSON(`${API}/promo_codes`)         // ✅ ТВОЯ ТАБЛИЦА
       ]);
 
-      const carsData = await carsRes.json();
-      const configsData = await configRes.json();
-      const promosData = await promoRes.json();
-
-      const carsArray = Array.isArray(carsData) ? carsData : (carsData.data || []);
+      const carsArray = Array.isArray(carsData) ? carsData : [];
       const foundCar = carsArray.find((c: any) => c.id == id);
       setCar(foundCar);
 
-      const configsArray = Array.isArray(configsData)
-        ? configsData
-        : (configsData.data || []);
+      setAllConfigs(Array.isArray(configsData) ? configsData : []);
+      setPromoCodes(Array.isArray(promoData) ? promoData : []);
 
-      setAllConfigs(configsArray);
+      // default configs (0$)
+      const configs = Array.isArray(configsData) ? configsData : [];
 
-      setPromoCodes(Array.isArray(promosData) ? promosData : (promosData.data || []));
-
-      // дефолты (0$)
-      if (configsArray.length > 0) {
-        setSelectedHp(configsArray.find((i: any) => i.type === "power" && Number(i.price) === 0));
-        setSelectedTuning(configsArray.find((i: any) => i.type === "tuning" && Number(i.price) === 0));
-        setSelectedWheels(configsArray.find((i: any) => i.type === "wheels" && Number(i.price) === 0));
-      }
+      setSelectedHp(configs.find((i: any) => i.type === "power" && Number(i.price) === 0));
+      setSelectedTuning(configs.find((i: any) => i.type === "tuning" && Number(i.price) === 0));
+      setSelectedWheels(configs.find((i: any) => i.type === "wheels" && Number(i.price) === 0));
 
       const local = JSON.parse(localStorage.getItem("user") || "{}");
+
       if (local?.id) {
-        const uRes = await fetch(`${API}/profile/${local.id}`);
-        const uData = await uRes.json();
-        setUser(uData);
+        const userRes = await fetch(`${API}/profile/${local.id}`);
+        const userData = await userRes.json();
+        setUser(userData);
       }
+
     } catch (err) {
-      console.error("Data fetch error:", err);
+      console.error("LOAD ERROR:", err);
     }
   };
 
@@ -321,52 +327,44 @@ export default function CarDetail() {
 
   if (!car)
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white font-black tracking-tighter italic text-3xl">
+      <div className="min-h-screen bg-black flex items-center justify-center text-white font-black text-3xl">
         LOADING...
       </div>
     );
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white font-sans pb-20">
+    <div className="min-h-screen bg-[#050608] text-white pb-20">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-6 pt-4">
+      <div className="max-w-7xl mx-auto px-6 pt-6">
+
         <button
           onClick={() => navigate("/market")}
-          className="text-white/20 hover:text-white mb-8 transition text-[10px] font-black uppercase tracking-[3px]"
+          className="text-white/30 mb-6"
         >
-          ← BACK TO MARKET
+          ← BACK
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-          {/* ================= CAR ================= */}
-          <div className="flex flex-col">
-            <h1 className="text-6xl font-black italic uppercase leading-[0.8]">
-              <span className="text-yellow-400 block text-3xl not-italic mb-2">
-                {car.brand}
-              </span>
-              {car.name}
+        <div className="grid lg:grid-cols-2 gap-12">
+
+          {/* CAR */}
+          <div>
+            <h1 className="text-5xl font-black">
+              {car.brand} {car.name}
             </h1>
 
-            <img
-              src={car.image_url}
-              className="w-full rounded-[2.5rem] mt-8"
-              alt="car"
-            />
+            <img src={car.image_url} className="mt-6 rounded-3xl" />
 
-            <div className="grid grid-cols-2 gap-4 mt-10">
-              <SpecItem label="ENGINE" value={car.dvigatel} color="text-blue-400" />
-              <SpecItem label="POWER" value={`${car.power} HP`} color="text-red-500" />
-              <SpecItem label="SPEED" value={`${car.speed} KM/H`} color="text-yellow-400" />
-              <SpecItem label="PRICE" value={`${car.price?.toLocaleString()} $`} color="text-green-500" />
+            <div className="grid grid-cols-2 gap-3 mt-8">
+              <SpecItem label="ENGINE" value={car.dvigatel} />
+              <SpecItem label="POWER" value={`${car.power} HP`} />
+              <SpecItem label="SPEED" value={`${car.speed} KM/H`} />
+              <SpecItem label="PRICE" value={`${car.price}$`} />
             </div>
           </div>
 
-          {/* ================= CONFIG ================= */}
-          <div className="flex flex-col gap-10">
-            <h3 className="text-white/20 font-black tracking-[5px] uppercase text-[11px]">
-              Vehicle Configuration
-            </h3>
+          {/* CONFIG */}
+          <div>
 
             <ConfigGroup
               title="POWER"
@@ -389,71 +387,59 @@ export default function CarDetail() {
               onSelect={setSelectedWheels}
             />
 
-            {/* ================= PRICE ================= */}
-            <div className="bg-yellow-500 rounded-[2.8rem] p-10 text-black">
-              <div className="flex justify-between mb-6">
-                <span className="font-black uppercase text-xs">TOTAL:</span>
+            {/* PRICE */}
+            <div className="bg-yellow-500 text-black p-8 rounded-3xl mt-8">
+
+              <div className="flex justify-between">
+                <span className="font-black">TOTAL</span>
 
                 <div className="text-right">
+
                   {discountValue > 0 && (
-                    <span className="block line-through opacity-40">
+                    <div className="line-through opacity-50">
                       {fullPrice.toLocaleString()} $
-                    </span>
+                    </div>
                   )}
 
-                  <span className="text-4xl font-black italic">
+                  <div className="text-3xl font-black">
                     {totalPrice.toLocaleString()} $
-                  </span>
+                  </div>
+
                 </div>
               </div>
 
               <button
                 onClick={() => setShowPay(true)}
-                className="w-full bg-black text-white py-6 rounded-2xl font-black uppercase"
+                className="w-full mt-6 bg-black text-white py-4 rounded-xl font-black"
               >
-                BUY CAR
+                BUY
               </button>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* ================= PAY ================= */}
+      {/* PAY */}
       {showPay && (
-        <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
-          <div className="bg-[#0a0a0a] p-10 rounded-3xl w-[400px]">
-            <h2 className="text-yellow-400 text-2xl font-black mb-6 text-center">
-              CHECKOUT
-            </h2>
+        <div className="fixed inset-0 bg-black flex items-center justify-center">
+          <div className="bg-[#111] p-8 rounded-3xl w-[380px]">
+            <h2 className="text-yellow-400 mb-4">PAY</h2>
 
-            <div className="text-center mb-6">
-              <p>{car.name}</p>
-              <p className="text-green-400 text-3xl font-black">
-                {totalPrice.toLocaleString()} $
-              </p>
+            <div className="text-green-400 text-2xl font-black mb-6">
+              {totalPrice.toLocaleString()} $
             </div>
-
-            <input
-              placeholder="CARD NUMBER"
-              className="w-full p-4 rounded-xl bg-white/5 text-center mb-4"
-            />
 
             <button
               onClick={() => {
-                alert("PURCHASE SUCCESS!");
+                alert("SUCCESS");
                 navigate("/market");
               }}
-              className="w-full bg-yellow-500 text-black py-4 rounded-xl font-black"
+              className="w-full bg-yellow-500 text-black py-3 font-black rounded-xl"
             >
-              PAY
+              CONFIRM
             </button>
 
-            <button
-              onClick={() => setShowPay(false)}
-              className="w-full text-white/40 mt-4"
-            >
-              CANCEL
-            </button>
           </div>
         </div>
       )}
@@ -461,40 +447,37 @@ export default function CarDetail() {
   );
 }
 
-/* ================= SPEC ================= */
-function SpecItem({ label, value, color }: any) {
+/* UI */
+function SpecItem({ label, value }: any) {
   return (
-    <div className="bg-white/5 p-5 rounded-2xl">
-      <p className="text-xs opacity-40">{label}</p>
-      <p className={`font-black ${color}`}>{value}</p>
+    <div className="bg-white/5 p-4 rounded-xl">
+      <div className="text-white/40 text-xs">{label}</div>
+      <div className="font-black">{value}</div>
     </div>
   );
 }
 
-/* ================= CONFIG ================= */
 function ConfigGroup({ title, items, selected, onSelect }: any) {
   if (!items?.length) return null;
 
   return (
-    <div>
-      <p className="text-yellow-500 text-xs mb-3">{title}</p>
+    <div className="mb-6">
+      <div className="text-yellow-500 text-xs mb-2">{title}</div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         {items.map((item: any) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className={`p-4 rounded-xl text-left ${
+            className={`p-3 rounded-xl ${
               selected?.id === item.id
                 ? "bg-yellow-500 text-black"
-                : "bg-white/5 text-white/40"
+                : "bg-white/5 text-white/50"
             }`}
           >
             <div className="font-black">{item.name}</div>
             <div className="text-xs">
-              {Number(item.price) === 0
-                ? "FREE"
-                : `+${item.price.toLocaleString()} $`}
+              {Number(item.price) === 0 ? "FREE" : `+${item.price}$`}
             </div>
           </button>
         ))}
