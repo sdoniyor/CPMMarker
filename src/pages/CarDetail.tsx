@@ -219,8 +219,6 @@
 
 
 
-
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -246,54 +244,45 @@ export default function CarDetail() {
 
   const [showPay, setShowPay] = useState(false);
 
-  /* ================= SAFE FETCH ================= */
+  /* ================= FETCH ================= */
   const safeFetchJSON = async (url: string) => {
     try {
       const res = await fetch(url);
       const text = await res.text();
 
-      if (!text || text.trim().startsWith("<!DOCTYPE")) {
-        console.error("❌ Not JSON:", url);
-        return null;
-      }
-
+      if (!text || text.startsWith("<!DOCTYPE")) return null;
       return JSON.parse(text);
-    } catch (err) {
-      console.error("Fetch error:", url, err);
+    } catch {
       return null;
     }
   };
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD ================= */
   const loadData = async () => {
-    try {
-      const [carsData, configsData] = await Promise.all([
-        safeFetchJSON(`${API}/cars`),
-        safeFetchJSON(`${API}/configs`),
-      ]);
+    const [carsData, configsData] = await Promise.all([
+      safeFetchJSON(`${API}/cars`),
+      safeFetchJSON(`${API}/configs`),
+    ]);
 
-      const carsArray = Array.isArray(carsData) ? carsData : [];
-      const foundCar = carsArray.find((c: any) => c.id == id);
+    const cars = Array.isArray(carsData) ? carsData : [];
+    const foundCar = cars.find((c: any) => c.id == id);
 
-      setCar(foundCar);
+    setCar(foundCar);
 
-      const configs = configsData || { power: [], tuning: [], wheels: [] };
-      setAllConfigs(configs);
+    const configs = configsData || { power: [], tuning: [], wheels: [] };
+    setAllConfigs(configs);
 
-      // defaults (FREE configs)
-      setSelectedHp(configs.power.find((i: any) => Number(i.price) === 0));
-      setSelectedTuning(configs.tuning.find((i: any) => Number(i.price) === 0));
-      setSelectedWheels(configs.wheels.find((i: any) => Number(i.price) === 0));
+    // defaults (FREE)
+    setSelectedHp(configs.power?.find((i: any) => Number(i.price) === 0));
+    setSelectedTuning(configs.tuning?.find((i: any) => Number(i.price) === 0));
+    setSelectedWheels(configs.wheels?.find((i: any) => Number(i.price) === 0));
 
-      const local = JSON.parse(localStorage.getItem("user") || "{}");
+    const local = JSON.parse(localStorage.getItem("user") || "{}");
 
-      if (local?.id) {
-        const userRes = await fetch(`${API}/profile/${local.id}`);
-        const userData = await userRes.json();
-        setUser(userData);
-      }
-    } catch (err) {
-      console.error("LOAD ERROR:", err);
+    if (local?.id) {
+      const userRes = await fetch(`${API}/profile/${local.id}`);
+      const userData = await userRes.json();
+      setUser(userData);
     }
   };
 
@@ -301,36 +290,43 @@ export default function CarDetail() {
     loadData();
   }, [id]);
 
-  if (!car)
+  if (!car) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white font-black text-3xl">
         LOADING...
       </div>
     );
+  }
+
+  /* ================= DISCOUNT ================= */
+  const discountValue = Number(user?.discount) || 0;
 
   /* ================= PRICE ================= */
-  const basePrice = Number(car?.price) || 0;
+  const basePrice = Number(car.price) || 0;
+
+  const discountedBasePrice =
+    discountValue > 0
+      ? Math.floor(basePrice * (1 - discountValue / 100))
+      : basePrice;
 
   const configPrice =
     (Number(selectedHp?.price) || 0) +
     (Number(selectedTuning?.price) || 0) +
     (Number(selectedWheels?.price) || 0);
 
-  const totalPrice = basePrice + configPrice;
+  const totalPrice = discountedBasePrice + configPrice;
 
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-20">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 pt-6">
-        <button
-          onClick={() => navigate("/market")}
-          className="text-white/30 mb-6"
-        >
+        <button onClick={() => navigate("/market")} className="text-white/30 mb-6">
           ← BACK
         </button>
 
         <div className="grid lg:grid-cols-2 gap-12">
+
           {/* CAR */}
           <div>
             <h1 className="text-5xl font-black">
@@ -372,10 +368,17 @@ export default function CarDetail() {
 
             {/* PRICE */}
             <div className="bg-yellow-500 text-black p-8 rounded-3xl mt-8">
+
               <div className="flex justify-between">
                 <span className="font-black">TOTAL</span>
 
                 <div className="text-right">
+                  {discountValue > 0 && (
+                    <div className="line-through opacity-60">
+                      {basePrice.toLocaleString()} $
+                    </div>
+                  )}
+
                   <div className="text-3xl font-black">
                     {totalPrice.toLocaleString()} $
                   </div>
@@ -393,7 +396,7 @@ export default function CarDetail() {
         </div>
       </div>
 
-      {/* PAY MODAL */}
+      {/* PAY */}
       {showPay && (
         <div className="fixed inset-0 bg-black flex items-center justify-center">
           <div className="bg-[#111] p-8 rounded-3xl w-[380px]">
@@ -419,7 +422,7 @@ export default function CarDetail() {
   );
 }
 
-/* ================= UI COMPONENTS ================= */
+/* ================= UI ================= */
 
 function SpecItem({ label, value }: any) {
   return (

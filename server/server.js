@@ -269,21 +269,21 @@ try {
 }
 
 /* ================= CONFIGS (FIX 404) ================= */
-app.get("/configs", (req, res) => {
-  res.json({
-    power: [
-      { id: 1, name: "Stage 1", price: 1000 },
-      { id: 2, name: "Stage 2", price: 2000 }
-    ],
-    tuning: [
-      { id: 1, name: "Sport Kit", price: 1500 },
-      { id: 2, name: "Racing Kit", price: 2500 }
-    ],
-    wheels: [
-      { id: 1, name: "R18 Wheels", price: 800 },
-      { id: 2, name: "R20 Wheels", price: 1200 }
-    ]
-  });
+app.get("/configs", async (req, res) => {
+  try {
+    const result = await q("SELECT * FROM global_car_configs");
+
+    const rows = result.rows || [];
+
+    const power = rows.filter(i => i.type === "power");
+    const tuning = rows.filter(i => i.type === "tuning");
+    const wheels = rows.filter(i => i.type === "wheels");
+
+    res.json({ power, tuning, wheels });
+  } catch (e) {
+    console.log("CONFIG ERROR:", e.message);
+    res.json({ power: [], tuning: [], wheels: [] });
+  }
 });
 
 /* ================= TELEGRAM CONNECT ================= */
