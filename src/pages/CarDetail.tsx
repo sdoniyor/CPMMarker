@@ -277,7 +277,7 @@ export default function CarDetail() {
     try {
       const [carsRes, configRes, promoRes] = await Promise.all([
         fetch(`${API}/cars`),
-        fetch(`${API}/global_car_config`), // 👈 FIXED
+        fetch(`${API}/global_car_configs`), // 👈 FIXED
         fetch(`${API}/promo_codes`)
       ]);
 
