@@ -249,7 +249,6 @@ export default function CarDetail() {
     try {
       const res = await fetch(url);
       const text = await res.text();
-
       if (!text || text.startsWith("<!DOCTYPE")) return null;
       return JSON.parse(text);
     } catch {
@@ -269,7 +268,6 @@ export default function CarDetail() {
     const foundCar = cars.find((c: any) => c.id == id);
 
     setCar(foundCar);
-
     setAllConfigs(configsData || { power: [], tuning: [], wheels: [] });
     setPromoCodes(Array.isArray(promoData) ? promoData : []);
 
@@ -292,7 +290,7 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= PROMO LOGIC (ONLY THIS CAR) ================= */
+  /* ================= PROMO (ONLY THIS CAR) ================= */
   const activePromo = promoCodes.find((p: any) =>
     p.type === "discount" &&
     Array.isArray(p.car_ids) &&
@@ -342,7 +340,26 @@ export default function CarDetail() {
               <SpecItem label="ENGINE" value={car.dvigatel} />
               <SpecItem label="POWER" value={`${car.power} HP`} />
               <SpecItem label="SPEED" value={`${car.speed} KM/H`} />
-              <SpecItem label="PRICE" value={`${car.price}$`} />
+
+              {/* 💥 FIXED PRICE DISPLAY */}
+              <div className="bg-white/5 p-4 rounded-xl col-span-2">
+                <div className="text-white/40 text-xs">PRICE</div>
+
+                {discountValue > 0 ? (
+                  <>
+                    <div className="line-through opacity-50 text-sm">
+                      {basePrice.toLocaleString()} $
+                    </div>
+                    <div className="font-black text-lg text-yellow-400">
+                      {discountedBasePrice.toLocaleString()} $
+                    </div>
+                  </>
+                ) : (
+                  <div className="font-black text-lg">
+                    {basePrice.toLocaleString()} $
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -369,7 +386,7 @@ export default function CarDetail() {
               onSelect={setSelectedWheels}
             />
 
-            {/* PRICE */}
+            {/* TOTAL */}
             <div className="bg-yellow-500 text-black p-8 rounded-3xl mt-8">
               <div className="flex justify-between">
                 <span className="font-black">TOTAL</span>
