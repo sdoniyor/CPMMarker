@@ -345,7 +345,7 @@ export default function CarDetail() {
           id: user?.id,
           name: user?.name,
           email: user?.email,   // 🔥 ДОБАВИЛИ
-          username: user?.telegram_username || user?.name,
+          username: user?.telegram_username,
           tg_id: user?.telegram_id,
         },
         car: {
