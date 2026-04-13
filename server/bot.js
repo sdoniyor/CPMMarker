@@ -1,28 +1,22 @@
 require("dotenv").config();
-
 const TelegramBot = require("node-telegram-bot-api");
+const { Pool } = require("pg");
 
-// 🔥 берем токен из env
-const token = process.env.TG_BOT_TOKEN;
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
-if (!token) {
-  throw new Error("❌ TG_BOT_TOKEN not found in .env");
-}
-
-const bot = new TelegramBot(token, {
-  polling: true,
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-// /start
-bot.onText(/\/start(.*)/, (msg, match) => {
-  const param = match[1]; // код если есть
+bot.onText(/\/start (.+)/, async (msg, match) => {
+  const telegramId = msg.from.id;
+  const userId = match[1]; // это из ?start=ID
 
-  bot.sendMessage(
-    msg.chat.id,
-    `👋 Welcome!\n\nYour Telegram ID:\n${msg.from.id}`
+  await pool.query(
+    "UPDATE users SET telegram_id=$1 WHERE id=$2",
+    [telegramId, userId]
   );
 
-  console.log("USER TG:", msg.from.id, "CODE:", param);
+  bot.sendMessage(msg.chat.id, "✅ Telegram подключён!");
 });
-
-module.exports = bot;
