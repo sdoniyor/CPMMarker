@@ -236,7 +236,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 
-const API = "https://cpmmarker.onrender.com";
+const API = import.meta.env.VITE_API_URL;
 
 export default function Wheel() {
   const [items, setItems] = useState<any[]>([]);

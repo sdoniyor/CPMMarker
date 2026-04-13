@@ -265,7 +265,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
-const API = "https://cpmmarker.onrender.com";
+const API = import.meta.env.VITE_API_URL;
 
 export default function CarDetail() {
   const { id } = useParams();
