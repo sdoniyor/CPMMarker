@@ -108,27 +108,32 @@
 
 
 
+
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const API = "https://cpmmarker.onrender.com";
 
-/* 🔥 SAFE JSON PARSE (ВАЖНО) */
-const safeParse = (value: string | null): any => {
+const safeGetUser = () => {
   try {
-    if (!value || value === "undefined" || value === "null") return null;
-    return JSON.parse(value);
+    const item = localStorage.getItem("user");
+    if (!item || item === "undefined" || item === "null") return null;
+    return JSON.parse(item);
   } catch {
     return null;
   }
+};
+
+const isActivePath = (path: string, current: string): boolean => {
+  return current === path;
 };
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const localUser = safeParse(localStorage.getItem("user"));
-  const [user, setUser] = useState(localUser);
+  const localUser = safeGetUser();
+  const [user, setUser] = useState<any>(localUser);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -138,7 +143,10 @@ export default function Navbar() {
         const res = await fetch(`${API}/profile/${localUser.id}`);
         const data = await res.json();
 
-        if (data) setUser(data);
+        if (data) {
+          setUser(data);
+          localStorage.setItem("user", JSON.stringify(data)); // 🔥 sync fix
+        }
       } catch (err) {
         console.log("Profile load error", err);
       }
@@ -146,9 +154,6 @@ export default function Navbar() {
 
     loadUser();
   }, [location.pathname]);
-
-const isActive = (path: string): boolean =>
-  location.pathname === path;
 
   return (
     <nav className="w-full h-[80px] flex items-center justify-between px-8 
@@ -168,7 +173,6 @@ const isActive = (path: string): boolean =>
           <span className="text-white font-black text-xl">
             CPM<span className="text-yellow-500">MARKET</span>
           </span>
-          <span className="text-[8px] text-white/30">Digital Dealership</span>
         </div>
       </div>
 
@@ -177,7 +181,7 @@ const isActive = (path: string): boolean =>
         <button
           onClick={() => navigate("/market")}
           className={`px-6 py-2 rounded-full font-black text-xs ${
-            isActive("/market")
+            isActivePath("/market", location.pathname)
               ? "bg-yellow-500 text-black"
               : "text-white/40"
           }`}
@@ -223,4 +227,4 @@ const isActive = (path: string): boolean =>
       </div>
     </nav>
   );
-} 
+}
