@@ -395,4 +395,4 @@ export default function Profile() {
       </div>
     </div>
   );
-}
+}const user = JSON.parse(localStorage.getItem("user"));
