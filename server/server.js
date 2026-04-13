@@ -496,6 +496,23 @@ app.get("/cars", async (req, res) => {
   }
 });
 
+/* ================= Configs ================= */
+app.get("/configs", async (req, res) => {
+  try {
+    const result = await q("SELECT * FROM global_car_configs");
+    const rows = result.rows || [];
+
+    res.json({
+      power: rows.filter(i => i.type === "power"),
+      tuning: rows.filter(i => i.type === "tuning"),
+      wheels: rows.filter(i => i.type === "wheels"),
+    });
+  } catch (e) {
+    console.log("CONFIG ERROR:", e.message);
+    res.json({ power: [], tuning: [], wheels: [] });
+  }
+});
+
 /* ================= BUY ================= */
 app.post("/buy", async (req, res) => {
   try {
