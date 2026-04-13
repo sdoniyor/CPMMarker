@@ -218,7 +218,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -230,7 +229,7 @@ export default function CarDetail() {
   const navigate = useNavigate();
 
   const [car, setCar] = useState<any>(null);
-  const [configs, setConfigs] = useState<any>({}); // Данные из global_car_configs
+  const [allConfigs, setAllConfigs] = useState<any[]>([]); // Массив всех строк из global_car_configs
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
@@ -240,167 +239,164 @@ export default function CarDetail() {
   const [showPay, setShowPay] = useState(false);
 
   // --- РАСЧЕТ ИТОГОВОЙ СУММЫ ---
-  // Берем цену из таблицы cars + цены выбранных опций из global_car_configs
   const totalPrice = 
     (Number(car?.price) || 0) + 
     (Number(selectedHp?.price) || 0) + 
     (Number(selectedTuning?.price) || 0) + 
     (Number(selectedWheels?.price) || 0);
 
-  const loadUser = async () => {
-    const local = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!local?.id) return;
-    const res = await fetch(`${API}/profile/${local.id}`);
-    const data = await res.json();
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data));
-  };
+  /* ================= LOAD DATA ================= */
+  const loadData = async () => {
+    try {
+      // 1. Загружаем машину
+      const carRes = await fetch(`${API}/cars`);
+      const carsData = await carRes.json();
+      const foundCar = carsData.find((c: any) => c.id == id);
+      setCar(foundCar);
 
-  /* ================= LOAD FROM 'cars' ================= */
-  const loadCar = async () => {
-    const res = await fetch(`${API}/cars`);
-    const data = await res.json();
-    const foundCar = data.find((c: any) => c.id == id);
-    setCar(foundCar);
-  };
+      // 2. Загружаем все конфиги
+      const configRes = await fetch(`${API}/configs`);
+      const configData = await configRes.json();
+      setAllConfigs(configData);
 
-  /* ================= LOAD FROM 'global_car_configs' ================= */
-  const loadConfigs = async () => {
-    const res = await fetch(`${API}/configs`); // Предполагаем, что этот роут отдает global_car_configs
-    const data = await res.json();
-    setConfigs(data);
+      // Устанавливаем дефолтные значения (Standart), если они есть
+      setSelectedHp(configData.find((i: any) => i.type === 'power' && i.price === 0));
+      setSelectedTuning(configData.find((i: any) => i.type === 'tuning' && i.price === 0));
+      setSelectedWheels(configData.find((i: any) => i.type === 'wheels' && i.price === 0));
 
-    // Устанавливаем первые элементы по умолчанию
-    if (data.power) setSelectedHp(data.power[0]);
-    if (data.tuning) setSelectedTuning(data.tuning[0]);
-    if (data.wheels) setSelectedWheels(data.wheels[0]);
+      // 3. Загружаем юзера
+      const local = JSON.parse(localStorage.getItem("user") || "{}");
+      if (local?.id) {
+        const userRes = await fetch(`${API}/profile/${local.id}`);
+        const userData = await userRes.json();
+        setUser(userData);
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки:", err);
+    }
   };
 
   useEffect(() => {
-    loadCar();
-    loadConfigs();
-    loadUser();
+    loadData();
   }, [id]);
 
-  if (!car || !configs.power) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (!car) return <div className="text-white text-center mt-20">Загрузка машины...</div>;
 
-  /* ================= ОТПРАВКА В ТЕЛЕГРАМ ================= */
   const completePayment = async () => {
     try {
       await fetch(`${API}/order-to-tg`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user: user?.name || "Аноним",
-          car_info: {
-            brand: car.brand,
-            name: car.name,
-            base_price: car.price
+          user: user?.name || "Alex",
+          car_details: `${car.brand} ${car.name}`,
+          specs: {
+            engine: car.dvigatel,
+            base_power: car.power
           },
-          selected_configs: {
-            power: selectedHp?.name,
+          selected_options: {
+            hp: selectedHp?.name,
             tuning: selectedTuning?.name,
             wheels: selectedWheels?.name,
           },
-          final_price: totalPrice, // Передаем итоговую сумму
+          total_price: totalPrice,
         }),
       });
-
-      alert(`Оплата прошла успешно! Сумма: ${totalPrice} отправлена в Telegram`);
+      alert(`Заказ на сумму ${totalPrice} $ отправлен!`);
       setShowPay(false);
       navigate("/market");
     } catch (err) {
-      alert("Ошибка при оплате");
+      alert("Ошибка оплаты");
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white font-sans">
+    <div className="min-h-screen bg-[#050608] text-white pb-20">
       <Navbar />
 
-      <button onClick={() => navigate("/market")} className="p-4 text-white/50 hover:text-yellow-400">
-        ← НАЗАД В МАРКЕТ
-      </button>
+      <div className="max-w-6xl mx-auto px-4 pt-6">
+        <button onClick={() => navigate("/market")} className="text-white/40 hover:text-yellow-400 mb-6 transition">
+          ← НАЗАД В МАРКЕТ
+        </button>
 
-      <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-5xl font-black text-center text-yellow-400 uppercase">
-          {car.brand} {car.name}
-        </h1>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          
+          {/* ЛЕВАЯ ЧАСТЬ: ФОТО И ХАРАКТЕРИСТИКИ */}
+          <div>
+            <h1 className="text-5xl font-black text-yellow-400 uppercase italic mb-4">
+              {car.brand} <span className="text-white">{car.name}</span>
+            </h1>
+            
+            <img src={car.image_url} className="w-full rounded-3xl shadow-2xl border border-white/5 mb-8" alt="car" />
 
-        <div className="flex justify-center mt-8">
-          <img src={car.image_url || car.image} className="max-w-full h-auto drop-shadow-[0_20px_50px_rgba(234,179,8,0.2)]" />
-        </div>
-
-        {/* ДИНАМИЧЕСКИЕ КОНФИГИ ИЗ БД */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
-          {/* POWER */}
-          <ConfigSection 
-            title="МОЩНОСТЬ" 
-            items={configs.power} 
-            selected={selectedHp} 
-            onSelect={setSelectedHp} 
-          />
-          {/* TUNING */}
-          <ConfigSection 
-            title="ТЮНИНГ" 
-            items={configs.tuning} 
-            selected={selectedTuning} 
-            onSelect={setSelectedTuning} 
-          />
-          {/* WHEELS */}
-          <ConfigSection 
-            title="КОЛЕСА" 
-            items={configs.wheels} 
-            selected={selectedWheels} 
-            onSelect={setSelectedWheels} 
-          />
-        </div>
-
-        {/* ИТОГОВАЯ КНОПКА */}
-        <div className="flex flex-col items-center mt-12 pb-20">
-            <div className="text-3xl font-bold mb-4 text-green-400">
-                Итого: {totalPrice.toLocaleString()} $
+            <div className="grid grid-cols-2 gap-4">
+              <SpecBox label="ДВИГАТЕЛЬ" value={car.dvigatel} color="text-blue-400" />
+              <SpecBox label="МОЩНОСТЬ" value={`${car.power} HP`} color="text-red-400" />
+              <SpecBox label="СКОРОСТЬ" value={`${car.speed} KM/H`} color="text-yellow-400" />
+              <SpecBox label="ЦЕНА БАЗЫ" value={`${car.price.toLocaleString()} $`} color="text-green-400" />
             </div>
-            <button
-              onClick={() => setShowPay(true)}
-              className="bg-yellow-500 text-black px-12 py-4 text-2xl font-black rounded-2xl hover:scale-105 transition-transform shadow-lg shadow-yellow-500/20"
-            >
-              КУПИТЬ СЕЙЧАС
-            </button>
+          </div>
+
+          {/* ПРАВАЯ ЧАСТЬ: КОНФИГУРАТОР */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold tracking-widest text-white/50 mb-4">CUSTOMIZATION</h3>
+            
+            <ConfigGroup 
+              title="STAGE / POWER" 
+              items={allConfigs.filter(i => i.type === 'power')} 
+              selected={selectedHp} 
+              onSelect={setSelectedHp} 
+            />
+
+            <ConfigGroup 
+              title="VISUAL TUNING" 
+              items={allConfigs.filter(i => i.type === 'tuning')} 
+              selected={selectedTuning} 
+              onSelect={setSelectedTuning} 
+            />
+
+            <ConfigGroup 
+              title="WHEELS" 
+              items={allConfigs.filter(i => i.type === 'wheels')} 
+              selected={selectedWheels} 
+              onSelect={setSelectedWheels} 
+            />
+
+            <div className="bg-yellow-500 p-6 rounded-2xl mt-10 shadow-lg shadow-yellow-500/20">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-black font-bold text-lg">ИТОГО К ОПЛАТЕ:</span>
+                <span className="text-black font-black text-3xl">{totalPrice.toLocaleString()} $</span>
+              </div>
+              <button 
+                onClick={() => setShowPay(true)}
+                className="w-full bg-black text-white py-4 rounded-xl font-black uppercase hover:bg-neutral-900 transition"
+              >
+                КУПИТЬ МАШИНУ
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* МОДАЛКА ОПЛАТЫ */}
+      {/* MODAL (как ты просил: Номер карты 1234...) */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111] border-2 border-yellow-500 p-8 rounded-3xl w-full max-w-md">
-            <h2 className="text-yellow-400 text-2xl font-bold mb-6 text-center">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
-            
-            <div className="space-y-2 mb-6 bg-white/5 p-4 rounded-xl border border-white/10">
-                <p className="flex justify-between"><span>Машина:</span> <span>{car.name}</span></p>
-                <p className="flex justify-between text-white/60 text-sm"><span>Конфиг:</span> <span>{selectedHp?.name}, {selectedTuning?.name}</span></p>
-                <div className="border-t border-white/10 mt-2 pt-2 flex justify-between font-bold text-xl text-green-400">
-                    <span>К оплате:</span>
-                    <span>{totalPrice.toLocaleString()} $</span>
-                </div>
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
+          <div className="bg-[#111] p-8 rounded-3xl border border-yellow-500 w-full max-w-md mx-4">
+            <h2 className="text-yellow-400 text-2xl font-black mb-6 text-center">CHECKOUT</h2>
+            <div className="space-y-4 mb-8 text-white/80">
+                <p className="flex justify-between border-b border-white/5 pb-2"><span>Car:</span> <span>{car.name}</span></p>
+                <p className="flex justify-between border-b border-white/5 pb-2"><span>Config:</span> <span>{selectedHp?.name}</span></p>
+                <p className="flex justify-between text-xl font-bold text-green-400 pt-2"><span>Total:</span> <span>{totalPrice} $</span></p>
             </div>
-
-            <div className="space-y-4">
-                <input placeholder="1234 5678 1234 5678" className="w-full p-4 bg-black border border-white/20 rounded-xl outline-none focus:border-yellow-500" />
-                <input placeholder="Имя владельца" className="w-full p-4 bg-black border border-white/20 rounded-xl outline-none focus:border-yellow-500" />
-                
-                <div className="flex gap-4 mt-6">
-                    <button onClick={() => setShowPay(false)} className="flex-1 py-4 font-bold text-white/50 hover:text-white transition">ОТМЕНА</button>
-                    <button onClick={completePayment} className="flex-[2] bg-green-500 text-black py-4 rounded-xl font-bold hover:bg-green-400 transition">
-                        ОПЛАТИТЬ
-                    </button>
-                </div>
+            
+            <input placeholder="1234 5678 9101 1121" className="w-full bg-black border border-white/10 p-4 rounded-xl mb-3 outline-none focus:border-yellow-500" />
+            <input placeholder="ALEX DEVELOPER" className="w-full bg-black border border-white/10 p-4 rounded-xl mb-6 outline-none focus:border-yellow-500" />
+            
+            <div className="flex gap-4">
+              <button onClick={() => setShowPay(false)} className="flex-1 text-white/50 font-bold">CANCEL</button>
+              <button onClick={completePayment} className="flex-[2] bg-green-500 text-black py-4 rounded-xl font-black hover:bg-green-400 transition">
+                CONFIRM PAY
+              </button>
             </div>
           </div>
         </div>
@@ -409,28 +405,34 @@ export default function CarDetail() {
   );
 }
 
-// Вспомогательный компонент для секций конфига
-function ConfigSection({ title, items, selected, onSelect }: any) {
+// Компонент для характеристик (Engine, Power, etc)
+function SpecBox({ label, value, color }: any) {
   return (
     <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-      <p className="text-yellow-400 font-bold mb-4 tracking-widest text-center">{title}</p>
-      <div className="space-y-2">
-        {items?.map((item: any) => (
+      <p className="text-[10px] text-white/40 font-bold mb-1 tracking-tighter">{label}</p>
+      <p className={`text-lg font-black ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+// Компонент для групп кнопок в конфиге
+function ConfigGroup({ title, items, selected, onSelect }: any) {
+  return (
+    <div>
+      <p className="text-[11px] font-black text-yellow-500 mb-3 ml-1 tracking-[3px] uppercase">{title}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {items.map((item: any) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className={`w-full p-3 rounded-xl text-sm font-medium transition-all ${
+            className={`p-3 rounded-xl border text-left transition-all ${
               selected?.id === item.id 
-              ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20" 
-              : "bg-white/5 hover:bg-white/10 text-white/70"
+              ? "border-yellow-500 bg-yellow-500/10 text-yellow-500" 
+              : "border-white/10 bg-white/5 text-white/60 hover:border-white/30"
             }`}
           >
-            <div className="flex justify-between">
-                <span>{item.name}</span>
-                <span className={selected?.id === item.id ? "text-black/60" : "text-green-500"}>
-                    +{item.price || 0} $
-                </span>
-            </div>
+            <div className="text-xs font-bold uppercase">{item.name}</div>
+            <div className="text-[10px] opacity-70">+{item.price} $</div>
           </button>
         ))}
       </div>
