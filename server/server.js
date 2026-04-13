@@ -243,7 +243,6 @@
 // });
 
 
-
 require("dotenv").config();
 
 const express = require("express");
@@ -374,7 +373,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
-/* ================= PROFILE ================= */
+/* ================= PROFILE (SAFE ALWAYS JSON) ================= */
 app.get("/profile/:id", async (req, res) => {
   try {
     const userRes = await q(
@@ -395,14 +394,19 @@ app.get("/profile/:id", async (req, res) => {
 
     return res.json(u);
   } catch (e) {
+    console.log("PROFILE ERROR:", e.message);
     return res.status(500).json({ error: "profile error" });
   }
 });
 
 /* ================= CARS ================= */
 app.get("/cars", async (req, res) => {
-  const cars = await q("SELECT * FROM cars");
-  res.json(cars.rows || []);
+  try {
+    const cars = await q("SELECT * FROM cars");
+    return res.json(cars.rows || []);
+  } catch {
+    return res.json([]);
+  }
 });
 
 /* ================= BUY ================= */
@@ -421,7 +425,7 @@ app.post("/buy", async (req, res) => {
   }
 });
 
-/* ================= UPDATE AVATAR ================= */
+/* ================= UPDATE AVATAR (FIXED) ================= */
 app.post("/update-avatar", async (req, res) => {
   try {
     const { userId, avatar } = req.body;
@@ -440,10 +444,10 @@ app.post("/update-avatar", async (req, res) => {
       [userId]
     );
 
-    return res.json(user.rows[0]);
+    return res.json(user.rows[0] || {});
   } catch (e) {
     console.log("AVATAR ERROR:", e.message);
-    return res.status(500).json({ error: "avatar update failed" });
+    return res.status(500).json({ error: "avatar failed" });
   }
 });
 
@@ -487,6 +491,7 @@ app.post("/promo/redeem", async (req, res) => {
 
     return res.json({ success: true });
   } catch (e) {
+    console.log("PROMO ERROR:", e.message);
     return res.status(500).json({ error: "promo failed" });
   }
 });
