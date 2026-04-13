@@ -245,6 +245,7 @@ const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
 const TelegramBot = require("node-telegram-bot-api");
+const bcrypt = require("bcrypt");
 
 const app = express();
 
@@ -269,19 +270,18 @@ const q = async (text, params) => {
   }
 };
 
-/* ================= TELEGRAM BOT (FIX 409) ================= */
+/* ================= TELEGRAM BOT (NO POLLING) ================= */
 let bot;
 
 if (process.env.BOT_TOKEN) {
-  bot = new TelegramBot(process.env.BOT_TOKEN); // ❌ БЕЗ polling
-  console.log("🤖 Telegram bot ready (no polling)");
+  bot = new TelegramBot(process.env.BOT_TOKEN);
+  console.log("🤖 Telegram bot ready");
 }
 
 /* ================= CONFIGS ================= */
 app.get("/configs", async (req, res) => {
   try {
     const result = await q("SELECT * FROM global_car_configs");
-
     const rows = result.rows || [];
 
     res.json({
@@ -301,15 +301,63 @@ app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
+    // проверка дублей
+    const exists = await q(
+      "SELECT * FROM users WHERE email=$1 OR name=$2",
+      [email, name]
+    );
+
+    if (exists.rows.length > 0) {
+      return res.status(400).json({
+        error: "email or name already used",
+      });
+    }
+
+    // bcrypt
+    const hashed = await bcrypt.hash(password, 10);
+
     const user = await q(
       `INSERT INTO users (name, email, password)
-       VALUES ($1,$2,$3) RETURNING *`,
-      [name, email, password]
+       VALUES ($1,$2,$3)
+       RETURNING id, name, email`,
+      [name, email, hashed]
     );
 
     res.json(user.rows[0]);
+
   } catch (e) {
+    console.log("REGISTER ERROR:", e.message);
     res.status(500).json({ error: "register failed" });
+  }
+});
+
+/* ================= LOGIN ================= */
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = (await q(
+      "SELECT * FROM users WHERE email=$1",
+      [email]
+    )).rows[0];
+
+    if (!user) {
+      return res.status(400).json({ error: "user not found" });
+    }
+
+    const valid = await bcrypt.compare(password, user.password);
+
+    if (!valid) {
+      return res.status(400).json({ error: "wrong password" });
+    }
+
+    delete user.password;
+
+    res.json(user);
+
+  } catch (e) {
+    console.log("LOGIN ERROR:", e.message);
+    res.status(500).json({ error: "login failed" });
   }
 });
 
@@ -347,8 +395,8 @@ app.post("/order-to-tg", async (req, res) => {
     const text = `
 🚗 NEW ORDER
 
-👤 User: ${user?.name || "Unknown"}
-📧 Email: ${user?.email || "none"}
+👤 User: ${user?.name}
+📧 Email: ${user?.email}
 🆔 ID: ${user?.id}
 
 🧾 Username: ${user?.telegram_username ? "@" + user.telegram_username : "none"}
