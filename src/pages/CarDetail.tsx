@@ -251,18 +251,26 @@ export default function CarDetail() {
       // 1. Загружаем машину
       const carRes = await fetch(`${API}/cars`);
       const carsData = await carRes.json();
-      const foundCar = carsData.find((c: any) => c.id == id);
+      
+      // Проверяем: если пришел объект с полем, берем массив оттуда, иначе считаем что это сам массив
+      const carsArray = Array.isArray(carsData) ? carsData : (carsData.cars || carsData.data || []);
+      const foundCar = carsArray.find((c: any) => c.id == id);
       setCar(foundCar);
 
-      // 2. Загружаем все конфиги
+      // 2. Загружаем конфиги
       const configRes = await fetch(`${API}/configs`);
       const configData = await configRes.json();
-      setAllConfigs(configData);
+      
+      // Важно: проверяем, что configData - это массив перед тем как делать find/filter
+      const configsArray = Array.isArray(configData) ? configData : (configData.configs || configData.data || []);
+      setAllConfigs(configsArray);
 
-      // Устанавливаем дефолтные значения (Standart), если они есть
-      setSelectedHp(configData.find((i: any) => i.type === 'power' && i.price === 0));
-      setSelectedTuning(configData.find((i: any) => i.type === 'tuning' && i.price === 0));
-      setSelectedWheels(configData.find((i: any) => i.type === 'wheels' && i.price === 0));
+      // Устанавливаем дефолты только если массив не пустой
+      if (configsArray.length > 0) {
+        setSelectedHp(configsArray.find((i: any) => i.type === 'power' && i.price === 0));
+        setSelectedTuning(configsArray.find((i: any) => i.type === 'tuning' && i.price === 0));
+        setSelectedWheels(configsArray.find((i: any) => i.type === 'wheels' && i.price === 0));
+      }
 
       // 3. Загружаем юзера
       const local = JSON.parse(localStorage.getItem("user") || "{}");
@@ -272,10 +280,9 @@ export default function CarDetail() {
         setUser(userData);
       }
     } catch (err) {
-      console.error("Ошибка загрузки:", err);
+      console.error("Ошибка загрузки данных:", err);
     }
   };
-
   useEffect(() => {
     loadData();
   }, [id]);
