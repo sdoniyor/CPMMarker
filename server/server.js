@@ -332,12 +332,12 @@
 
 
 
-
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
+const TelegramBot = require("node-telegram-bot-api");
 
 const app = express();
 
@@ -364,12 +364,37 @@ const q = async (text, params) => {
   }
 };
 
+/* ================= TELEGRAM BOT (IN SERVER) ================= */
+const bot = new TelegramBot(process.env.BOT_TOKEN, {
+  polling: true,
+});
+
+bot.onText(/\/start (.+)/, async (msg, match) => {
+  const telegramId = msg.from.id;
+  const userId = match[1];
+
+  try {
+    await q(
+      "UPDATE users SET telegram_id=$1 WHERE id=$2",
+      [telegramId, userId]
+    );
+
+    bot.sendMessage(msg.chat.id, "✅ Telegram успешно подключён к аккаунту!");
+  } catch (err) {
+    console.log("TG ERROR:", err.message);
+  }
+});
+
+bot.on("message", (msg) => {
+  console.log("TG MESSAGE:", msg.text);
+});
+
 /* ================= HEALTH ================= */
 app.get("/", (req, res) => {
   res.json({ status: "OK 🚀" });
 });
 
-/* ================= USERS ================= */
+/* ================= PROFILE ================= */
 app.get("/profile/:id", async (req, res) => {
   const user = await q("SELECT * FROM users WHERE id=$1", [req.params.id]);
   res.json(user.rows[0] || {});
@@ -448,7 +473,6 @@ app.post("/wheel/spin", async (req, res) => {
     }
   }
 
-  /* APPLY REWARD */
   if (win.type === "money") {
     await q(
       "UPDATE users SET money = money + $1 WHERE id=$2",
@@ -526,16 +550,7 @@ app.post("/promo/redeem", async (req, res) => {
   });
 });
 
-/* ================= TELEGRAM READY ================= */
-app.post("/tg/webhook", async (req, res) => {
-  const update = req.body;
-
-  console.log("TG EVENT:", update);
-
-  res.json({ ok: true });
-});
-
-/* ================= START ================= */
+/* ================= START SERVER ================= */
 app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
   console.log("🚀 SERVER RUNNING");
 });
