@@ -342,9 +342,11 @@ export default function CarDetail() {
 
       const payload = {
         user: {
-          name: user?.name || "Unknown",
-          username: user?.username || null,
-          tg_id: user?.telegram_id || null,
+          id: user?.id,
+          name: user?.name,
+          email: user?.email,   // 🔥 ДОБАВИЛИ
+          username: user?.telegram_username,
+          tg_id: user?.telegram_id,
         },
         car: {
           brand: car?.brand,
