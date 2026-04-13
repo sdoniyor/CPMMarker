@@ -229,6 +229,7 @@ export default function CarDetail() {
   const [car, setCar] = useState<any>(null);
   const [allConfigs, setAllConfigs] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
@@ -236,51 +237,56 @@ export default function CarDetail() {
 
   const [showPay, setShowPay] = useState(false);
 
-  /* ================= РАСЧЕТ ЦЕНЫ ================= */
-  // Цена без скидки
+  /* ================= ЛОГИКА СКИДКИ ================= */
+  // 1. Ищем промокод типа 'discount', который применен к этому пользователю (used_by содержит user.id)
+  // 2. И проверяем, есть ли id этой машины в массиве car_ids этого промокода
+  const activePromo = promoCodes.find(p => 
+    p.type === 'discount' && 
+    p.used_by?.includes(Number(user?.id)) && 
+    p.car_ids?.includes(Number(id))
+  );
+
+  const discountPercent = activePromo ? Number(activePromo.value) : 0;
+
   const fullPrice = 
     (Number(car?.price) || 0) + 
     (Number(selectedHp?.price) || 0) + 
     (Number(selectedTuning?.price) || 0) + 
     (Number(selectedWheels?.price) || 0);
 
-  // Применяем скидку (если у юзера есть поле discount, например 10 для 10%)
-  const userDiscount = Number(user?.discount) || 0;
-  const totalPrice = userDiscount > 0 
-    ? Math.floor(fullPrice * (1 - userDiscount / 100)) 
+  const totalPrice = discountPercent > 0 
+    ? Math.floor(fullPrice * (1 - discountPercent / 100)) 
     : fullPrice;
 
   /* ================= ЗАГРУЗКА ДАННЫХ ================= */
   const loadData = async () => {
     try {
-      // 1. Машины
+      // Загрузка машины
       const carRes = await fetch(`${API}/cars`);
       const carsData = await carRes.json();
       const carsArray = Array.isArray(carsData) ? carsData : (carsData.data || []);
       const foundCar = carsArray.find((c: any) => c.id == id);
       setCar(foundCar);
 
-      // 2. Конфиги (global_car_configs)
+      // Загрузка конфигов
       const configRes = await fetch(`${API}/configs`);
       const configData = await configRes.json();
-      
-      // Обработка разных форматов ответа API
-      let configsArray: any[] = [];
-      if (Array.isArray(configData)) {
-        configsArray = configData;
-      } else {
-        configsArray = configData.configs || configData.data || [];
-      }
+      const configsArray = Array.isArray(configData) ? configData : (configData.configs || configData.data || []);
       setAllConfigs(configsArray);
 
-      // Установка дефолтов (Standart / 0$)
+      // Установка дефолтов
       if (configsArray.length > 0) {
         setSelectedHp(configsArray.find((i: any) => i.type === 'power' && Number(i.price) === 0));
         setSelectedTuning(configsArray.find((i: any) => i.type === 'tuning' && Number(i.price) === 0));
         setSelectedWheels(configsArray.find((i: any) => i.type === 'wheels' && Number(i.price) === 0));
       }
 
-      // 3. Профиль пользователя для проверки скидки
+      // Загрузка промокодов
+      const promoRes = await fetch(`${API}/promo_codes`);
+      const promoData = await promoRes.json();
+      setPromoCodes(Array.isArray(promoData) ? promoData : []);
+
+      // Загрузка юзера
       const local = JSON.parse(localStorage.getItem("user") || "{}");
       if (local?.id) {
         const userRes = await fetch(`${API}/profile/${local.id}`);
@@ -288,155 +294,108 @@ export default function CarDetail() {
         setUser(userData);
       }
     } catch (err) {
-      console.error("Ошибка загрузки:", err);
+      console.error("Load error:", err);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
+  useEffect(() => { loadData(); }, [id]);
 
-  if (!car) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  const completePayment = async () => {
-    try {
-      await fetch(`${API}/order-to-tg`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: user?.name || "Player",
-          car: `${car.brand} ${car.name}`,
-          config: `${selectedHp?.name}, ${selectedTuning?.name}, ${selectedWheels?.name}`,
-          amount: `${totalPrice} $`,
-          discount_applied: `${userDiscount}%`
-        }),
-      });
-      alert("Оплата успешно проведена! Заказ отправлен в TG.");
-      setShowPay(false);
-      navigate("/market");
-    } catch (err) {
-      alert("Ошибка при отправке заказа");
-    }
-  };
+  if (!car) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Загрузка...</div>;
 
   return (
     <div className="min-h-screen bg-[#050608] text-white font-sans pb-20">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 pt-4">
-        <button onClick={() => navigate("/market")} className="text-white/30 hover:text-yellow-400 mb-6 transition">
-          ← НАЗАД В МАРКЕТ
+      <div className="max-w-6xl mx-auto px-4 pt-6">
+        <button onClick={() => navigate("/market")} className="text-white/30 hover:text-yellow-400 mb-6 transition uppercase text-xs tracking-widest">
+          ← Back to Market
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           
-          {/* БЛОК МАШИНЫ */}
+          {/* ВИЗУАЛ МАШИНЫ */}
           <div>
-            <h1 className="text-5xl font-black italic uppercase mb-2">
-              <span className="text-yellow-400">{car.brand}</span> {car.name}
-            </h1>
-            <img src={car.image_url} className="w-full rounded-3xl shadow-2xl border border-white/5 mb-8" alt="car" />
+            <div className="mb-6">
+               <h1 className="text-5xl font-black italic uppercase leading-none mb-2">
+                <span className="text-yellow-400 block text-2xl not-italic mb-1">{car.brand}</span>
+                {car.name}
+              </h1>
+              {discountPercent > 0 && (
+                <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+                  СКИДКА {discountPercent}% ПРИМЕНЕНА
+                </span>
+              )}
+            </div>
+            
+            <img src={car.image_url} className="w-full rounded-[2rem] shadow-2xl border border-white/5 mb-8" alt="car" />
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] text-white/40 font-bold mb-1">ДВИГАТЕЛЬ</p>
-                <p className="text-lg font-black text-blue-400 uppercase">{car.dvigatel}</p>
-              </div>
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] text-white/40 font-bold mb-1">МОЩНОСТЬ</p>
-                <p className="text-lg font-black text-red-400">{car.power} HP</p>
-              </div>
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] text-white/40 font-bold mb-1">СКОРОСТЬ</p>
-                <p className="text-lg font-black text-yellow-400">{car.speed} KM/H</p>
-              </div>
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                <p className="text-[10px] text-white/40 font-bold mb-1">ЦЕНА БАЗЫ</p>
-                <p className="text-lg font-black text-green-400 uppercase">{car.price.toLocaleString()} $</p>
-              </div>
+              <SpecItem label="Двигатель" value={car.dvigatel} color="text-blue-400" />
+              <SpecItem label="Мощность" value={`${car.power} HP`} color="text-red-500" />
+              <SpecItem label="Скорость" value={`${car.speed} KM/H`} color="text-yellow-400" />
+              <SpecItem label="База" value={`${car.price?.toLocaleString()} $`} color="text-green-500" />
             </div>
           </div>
 
-          {/* КОНФИГУРАТОР */}
-          <div className="flex flex-col gap-6">
-            <h3 className="text-white/30 font-bold tracking-[3px] uppercase text-sm">Customization</h3>
+          {/* КАСТОМИЗАЦИЯ */}
+          <div className="flex flex-col gap-8">
+            <h3 className="text-white/20 font-bold tracking-[4px] uppercase text-xs">Vehicle Configuration</h3>
             
-            <ConfigSection 
-              title="Stage / Power" 
-              items={allConfigs.filter(i => i.type === 'power')} 
-              selected={selectedHp} 
-              onSelect={setSelectedHp} 
-            />
+            <div className="space-y-6">
+              <ConfigGroup title="Engine Stage" items={allConfigs.filter(i => i.type === 'power')} selected={selectedHp} onSelect={setSelectedHp} />
+              <ConfigGroup title="Body & Visual" items={allConfigs.filter(i => i.type === 'tuning')} selected={selectedTuning} onSelect={setSelectedTuning} />
+              <ConfigGroup title="Wheels & Rims" items={allConfigs.filter(i => i.type === 'wheels')} selected={selectedWheels} onSelect={setSelectedWheels} />
+            </div>
 
-            <ConfigSection 
-              title="Visual Tuning" 
-              items={allConfigs.filter(i => i.type === 'tuning')} 
-              selected={selectedTuning} 
-              onSelect={setSelectedTuning} 
-            />
-
-            <ConfigSection 
-              title="Wheels" 
-              items={allConfigs.filter(i => i.type === 'wheels')} 
-              selected={selectedWheels} 
-              onSelect={setSelectedWheels} 
-            />
-
-            {/* ИТОГОВАЯ ПАНЕЛЬ */}
-            <div className="mt-6 bg-yellow-500 rounded-3xl p-6 shadow-xl shadow-yellow-500/10">
-              <div className="flex justify-between items-end mb-4 text-black">
-                <span className="font-bold text-lg">ИТОГО К ОПЛАТЕ:</span>
+            {/* ПАНЕЛЬ ОПЛАТЫ */}
+            <div className="mt-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-[2.5rem] p-8 shadow-2xl shadow-yellow-500/10">
+              <div className="flex justify-between items-end mb-6 text-black">
+                <span className="font-bold text-sm tracking-widest uppercase opacity-70">Итого к оплате:</span>
                 <div className="text-right">
-                  {userDiscount > 0 && (
-                    <span className="block text-black/40 line-through font-bold text-sm">
+                  {discountPercent > 0 && (
+                    <span className="block text-black/40 line-through font-bold text-lg leading-none">
                       {fullPrice.toLocaleString()} $
                     </span>
                   )}
-                  <span className="text-3xl font-black">{totalPrice.toLocaleString()} $</span>
+                  <span className="text-4xl font-black leading-none tracking-tighter">
+                    {totalPrice.toLocaleString()} $
+                  </span>
                 </div>
               </div>
               
               <button 
                 onClick={() => setShowPay(true)}
-                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-neutral-900 transition active:scale-95"
+                className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[2px] hover:scale-[1.02] transition active:scale-95 shadow-xl shadow-black/20"
               >
-                Оформить заказ
+                Оформить покупку
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ОПЛАТА */}
+      {/* MODAL */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111] border border-yellow-500/50 p-8 rounded-[40px] w-full max-w-md shadow-2xl">
-            <h2 className="text-yellow-400 text-2xl font-black mb-6 text-center italic uppercase">Payment Details</h2>
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0c0c0c] border border-yellow-500/30 p-10 rounded-[3rem] w-full max-w-md relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-yellow-500"></div>
+            <h2 className="text-yellow-400 text-3xl font-black mb-8 text-center italic uppercase tracking-tighter">Оплата заказа</h2>
             
-            <div className="bg-white/5 p-4 rounded-2xl mb-6 text-sm border border-white/5">
-              <div className="flex justify-between mb-1"><span>Машина:</span> <span className="text-yellow-400">{car.name}</span></div>
-              <div className="flex justify-between font-bold text-lg pt-2 border-t border-white/10 mt-2">
-                <span>Сумма:</span> 
-                <span className="text-green-400">{totalPrice.toLocaleString()} $</span>
+            <div className="space-y-4 mb-8">
+               <div className="flex justify-between text-sm"><span className="opacity-40">Автомобиль:</span> <span>{car.name}</span></div>
+               <div className="flex justify-between text-sm"><span className="opacity-40">Налог сети:</span> <span>0 $</span></div>
+               <div className="flex justify-between font-black text-2xl pt-4 border-t border-white/5 mt-4 text-green-400">
+                <span>ИТОГО:</span> 
+                <span>{totalPrice.toLocaleString()} $</span>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <input placeholder="4444 4444 4444 4444" className="w-full bg-black border border-white/10 p-4 rounded-2xl outline-none focus:border-yellow-400 transition" />
-              <input placeholder="CARD HOLDER" className="w-full bg-black border border-white/10 p-4 rounded-2xl outline-none focus:border-yellow-400 transition" />
-              
-              <div className="flex gap-4 mt-6">
-                <button onClick={() => setShowPay(false)} className="flex-1 text-white/40 font-bold uppercase text-xs">Назад</button>
-                <button onClick={completePayment} className="flex-[2] bg-green-500 text-black py-4 rounded-2xl font-black uppercase hover:bg-green-400">
-                  Оплатить
-                </button>
-              </div>
+            <div className="space-y-4">
+              <input placeholder="0000 0000 0000 0000" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-yellow-500 text-center text-xl tracking-[4px]" />
+              <button onClick={() => alert("Покупка совершена!")} className="w-full bg-green-500 text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-green-400 transition">
+                Подтвердить
+              </button>
+              <button onClick={() => setShowPay(false)} className="w-full text-white/20 font-bold uppercase text-[10px] tracking-widest">Отмена</button>
             </div>
           </div>
         </div>
@@ -445,26 +404,34 @@ export default function CarDetail() {
   );
 }
 
-function ConfigSection({ title, items, selected, onSelect }: any) {
-  if (items.length === 0) return null;
+function SpecItem({ label, value, color }: any) {
+  return (
+    <div className="bg-white/5 p-5 rounded-3xl border border-white/5">
+      <p className="text-[9px] text-white/30 font-bold mb-1 uppercase tracking-widest">{label}</p>
+      <p className={`text-lg font-black ${color} truncate uppercase italic`}>{value}</p>
+    </div>
+  );
+}
 
+function ConfigGroup({ title, items, selected, onSelect }: any) {
+  if (!items || items.length === 0) return null;
   return (
     <div>
-      <p className="text-[10px] font-black text-yellow-500/50 mb-3 tracking-[2px] uppercase">{title}</p>
-      <div className="grid grid-cols-2 gap-2">
+      <p className="text-[10px] font-black text-yellow-500 mb-3 tracking-[3px] uppercase ml-1">{title}</p>
+      <div className="grid grid-cols-2 gap-3">
         {items.map((item: any) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className={`p-3 rounded-2xl border text-left transition-all ${
+            className={`p-4 rounded-2xl border text-left transition-all duration-300 ${
               selected?.id === item.id 
-              ? "border-yellow-500 bg-yellow-500 text-black" 
-              : "border-white/5 bg-white/5 text-white/50 hover:border-white/20"
+              ? "border-yellow-500 bg-yellow-500/10 text-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.1)]" 
+              : "border-white/5 bg-white/5 text-white/40 hover:border-white/20 hover:text-white"
             }`}
           >
-            <div className="text-[11px] font-black uppercase truncate">{item.name}</div>
-            <div className={`text-[10px] font-bold ${selected?.id === item.id ? "text-black/60" : "text-green-500"}`}>
-              {Number(item.price) === 0 ? "FREE" : `+${item.price} $`}
+            <div className="text-xs font-black uppercase truncate mb-1">{item.name}</div>
+            <div className={`text-[10px] font-bold ${selected?.id === item.id ? "text-yellow-200" : "text-green-500"}`}>
+              {Number(item.price) === 0 ? "DEFAULT" : `+${item.price.toLocaleString()} $`}
             </div>
           </button>
         ))}
