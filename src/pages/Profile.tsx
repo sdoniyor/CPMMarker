@@ -304,7 +304,7 @@ export default function Profile() {
 
   // 🔥 TELEGRAM CONNECT
   const connectTelegram = () => {
-    window.open(`https://t.me/YOUR_BOT_NAME?start=${userLocal.id}`, "_blank");
+    window.open(`https://t.me/CPMMarket_bot?start=${userLocal.id}`, "_blank");
   };
 
   const applyPromo = async () => {
