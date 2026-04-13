@@ -215,7 +215,6 @@
 // }
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -228,8 +227,8 @@ export default function CarDetail() {
 
   const [car, setCar] = useState<any>(null);
   const [allConfigs, setAllConfigs] = useState<any[]>([]);
-  const [user, setUser] = useState<any>(null);
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
@@ -237,16 +236,15 @@ export default function CarDetail() {
 
   const [showPay, setShowPay] = useState(false);
 
-  /* ================= ЛОГИКА СКИДКИ ================= */
-  // 1. Ищем промокод типа 'discount', который применен к этому пользователю (used_by содержит user.id)
-  // 2. И проверяем, есть ли id этой машины в массиве car_ids этого промокода
+  /* ================= РАСЧЕТ СКИДКИ ================= */
+  // Ищем промокод типа discount, где в массиве car_ids есть ID текущей машины
   const activePromo = promoCodes.find(p => 
     p.type === 'discount' && 
-    p.used_by?.includes(Number(user?.id)) && 
-    p.car_ids?.includes(Number(id))
+    Array.isArray(p.car_ids) && 
+    p.car_ids.map(Number).includes(Number(id))
   );
 
-  const discountPercent = activePromo ? Number(activePromo.value) : 0;
+  const discountValue = activePromo ? Number(activePromo.value) : 0;
 
   const fullPrice = 
     (Number(car?.price) || 0) + 
@@ -254,39 +252,39 @@ export default function CarDetail() {
     (Number(selectedTuning?.price) || 0) + 
     (Number(selectedWheels?.price) || 0);
 
-  const totalPrice = discountPercent > 0 
-    ? Math.floor(fullPrice * (1 - discountPercent / 100)) 
+  const totalPrice = discountValue > 0 
+    ? Math.floor(fullPrice * (1 - discountValue / 100)) 
     : fullPrice;
 
   /* ================= ЗАГРУЗКА ДАННЫХ ================= */
   const loadData = async () => {
     try {
-      // Загрузка машины
+      // 1. Загрузка машины
       const carRes = await fetch(`${API}/cars`);
       const carsData = await carRes.json();
       const carsArray = Array.isArray(carsData) ? carsData : (carsData.data || []);
       const foundCar = carsArray.find((c: any) => c.id == id);
       setCar(foundCar);
 
-      // Загрузка конфигов
+      // 2. Загрузка конфигов (global_car_configs)
       const configRes = await fetch(`${API}/configs`);
       const configData = await configRes.json();
-      const configsArray = Array.isArray(configData) ? configData : (configData.configs || configData.data || []);
+      const configsArray = Array.isArray(configData) ? configData : (configData.data || []);
       setAllConfigs(configsArray);
 
-      // Установка дефолтов
+      // Установка дефолтов (Standart с ценой 0)
       if (configsArray.length > 0) {
-        setSelectedHp(configsArray.find((i: any) => i.type === 'power' && Number(i.price) === 0));
-        setSelectedTuning(configsArray.find((i: any) => i.type === 'tuning' && Number(i.price) === 0));
-        setSelectedWheels(configsArray.find((i: any) => i.type === 'wheels' && Number(i.price) === 0));
+        setSelectedHp(configsArray.find((i: any) => i.type === 'power' && Number(i.price) === 0) || configsArray.find(i => i.type === 'power'));
+        setSelectedTuning(configsArray.find((i: any) => i.type === 'tuning' && Number(i.price) === 0) || configsArray.find(i => i.type === 'tuning'));
+        setSelectedWheels(configsArray.find((i: any) => i.type === 'wheels' && Number(i.price) === 0) || configsArray.find(i => i.type === 'wheels'));
       }
 
-      // Загрузка промокодов
+      // 3. Загрузка промокодов
       const promoRes = await fetch(`${API}/promo_codes`);
       const promoData = await promoRes.json();
-      setPromoCodes(Array.isArray(promoData) ? promoData : []);
+      setPromoCodes(Array.isArray(promoData) ? promoData : (promoData.data || []));
 
-      // Загрузка юзера
+      // 4. Загрузка юзера
       const local = JSON.parse(localStorage.getItem("user") || "{}");
       if (local?.id) {
         const userRes = await fetch(`${API}/profile/${local.id}`);
@@ -294,65 +292,63 @@ export default function CarDetail() {
         setUser(userData);
       }
     } catch (err) {
-      console.error("Load error:", err);
+      console.error("Ошибка загрузки:", err);
     }
   };
 
   useEffect(() => { loadData(); }, [id]);
 
-  if (!car) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Загрузка...</div>;
+  if (!car) return <div className="min-h-screen bg-black flex items-center justify-center text-white">ЗАГРУЗКА...</div>;
 
   return (
     <div className="min-h-screen bg-[#050608] text-white font-sans pb-20">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 pt-6">
-        <button onClick={() => navigate("/market")} className="text-white/30 hover:text-yellow-400 mb-6 transition uppercase text-xs tracking-widest">
-          ← Back to Market
+      <div className="max-w-6xl mx-auto px-4 pt-4">
+        <button onClick={() => navigate("/market")} className="text-white/30 hover:text-yellow-400 mb-6 transition text-xs uppercase tracking-widest">
+          ← BACK TO MARKET
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           
-          {/* ВИЗУАЛ МАШИНЫ */}
+          {/* ЛЕВАЯ КОЛОНКА: ИНФО */}
           <div>
             <div className="mb-6">
-               <h1 className="text-5xl font-black italic uppercase leading-none mb-2">
+              <h1 className="text-5xl font-black italic uppercase leading-none">
                 <span className="text-yellow-400 block text-2xl not-italic mb-1">{car.brand}</span>
                 {car.name}
               </h1>
-              {discountPercent > 0 && (
-                <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                  СКИДКА {discountPercent}% ПРИМЕНЕНА
-                </span>
+              {discountValue > 0 && (
+                <div className="mt-3 inline-block bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">
+                  SALE {discountValue}% ACTIVE
+                </div>
               )}
             </div>
             
             <img src={car.image_url} className="w-full rounded-[2rem] shadow-2xl border border-white/5 mb-8" alt="car" />
 
             <div className="grid grid-cols-2 gap-4">
-              <SpecItem label="Двигатель" value={car.dvigatel} color="text-blue-400" />
-              <SpecItem label="Мощность" value={`${car.power} HP`} color="text-red-500" />
-              <SpecItem label="Скорость" value={`${car.speed} KM/H`} color="text-yellow-400" />
-              <SpecItem label="База" value={`${car.price?.toLocaleString()} $`} color="text-green-500" />
+              <SpecBox label="ДВИГАТЕЛЬ" value={car.dvigatel} color="text-blue-400" />
+              <SpecBox label="МОЩНОСТЬ" value={`${car.power} HP`} color="text-red-500" />
+              <SpecBox label="СКОРОСТЬ" value={`${car.speed} KM/H`} color="text-yellow-400" />
+              <SpecBox label="БАЗОВАЯ ЦЕНА" value={`${car.price?.toLocaleString()} $`} color="text-green-500" />
             </div>
           </div>
 
-          {/* КАСТОМИЗАЦИЯ */}
-          <div className="flex flex-col gap-8">
-            <h3 className="text-white/20 font-bold tracking-[4px] uppercase text-xs">Vehicle Configuration</h3>
+          {/* ПРАВАЯ КОЛОНКА: КАСТОМИЗАЦИЯ */}
+          <div className="flex flex-col gap-6">
+            <h3 className="text-white/20 font-bold tracking-[4px] uppercase text-[10px]">Vehicle Configuration</h3>
             
-            <div className="space-y-6">
-              <ConfigGroup title="Engine Stage" items={allConfigs.filter(i => i.type === 'power')} selected={selectedHp} onSelect={setSelectedHp} />
-              <ConfigGroup title="Body & Visual" items={allConfigs.filter(i => i.type === 'tuning')} selected={selectedTuning} onSelect={setSelectedTuning} />
-              <ConfigGroup title="Wheels & Rims" items={allConfigs.filter(i => i.type === 'wheels')} selected={selectedWheels} onSelect={setSelectedWheels} />
-            </div>
+            <ConfigSection title="Stage / Power" items={allConfigs.filter(i => i.type === 'power')} selected={selectedHp} onSelect={setSelectedHp} />
+            <ConfigSection title="Visual Tuning" items={allConfigs.filter(i => i.type === 'tuning')} selected={selectedTuning} onSelect={setSelectedTuning} />
+            <ConfigSection title="Wheels" items={allConfigs.filter(i => i.type === 'wheels')} selected={selectedWheels} onSelect={setSelectedWheels} />
 
-            {/* ПАНЕЛЬ ОПЛАТЫ */}
-            <div className="mt-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-[2.5rem] p-8 shadow-2xl shadow-yellow-500/10">
+            {/* ИТОГО */}
+            <div className="mt-4 bg-yellow-500 rounded-[2.5rem] p-8 shadow-2xl shadow-yellow-500/10">
               <div className="flex justify-between items-end mb-6 text-black">
-                <span className="font-bold text-sm tracking-widest uppercase opacity-70">Итого к оплате:</span>
+                <span className="font-bold text-sm tracking-widest uppercase opacity-60">Итого к оплате:</span>
                 <div className="text-right">
-                  {discountPercent > 0 && (
+                  {discountValue > 0 && (
                     <span className="block text-black/40 line-through font-bold text-lg leading-none">
                       {fullPrice.toLocaleString()} $
                     </span>
@@ -367,7 +363,7 @@ export default function CarDetail() {
                 onClick={() => setShowPay(true)}
                 className="w-full bg-black text-white py-5 rounded-2xl font-black uppercase tracking-[2px] hover:scale-[1.02] transition active:scale-95 shadow-xl shadow-black/20"
               >
-                Оформить покупку
+                ОФОРМИТЬ ПОКУПКУ
               </button>
             </div>
           </div>
@@ -377,25 +373,21 @@ export default function CarDetail() {
       {/* MODAL */}
       {showPay && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0c0c0c] border border-yellow-500/30 p-10 rounded-[3rem] w-full max-w-md relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-yellow-500"></div>
-            <h2 className="text-yellow-400 text-3xl font-black mb-8 text-center italic uppercase tracking-tighter">Оплата заказа</h2>
-            
+          <div className="bg-[#0c0c0c] border border-yellow-500/30 p-10 rounded-[3rem] w-full max-w-md shadow-2xl">
+            <h2 className="text-yellow-400 text-2xl font-black mb-8 text-center italic uppercase tracking-tighter">Оплата заказа</h2>
             <div className="space-y-4 mb-8">
-               <div className="flex justify-between text-sm"><span className="opacity-40">Автомобиль:</span> <span>{car.name}</span></div>
-               <div className="flex justify-between text-sm"><span className="opacity-40">Налог сети:</span> <span>0 $</span></div>
-               <div className="flex justify-between font-black text-2xl pt-4 border-t border-white/5 mt-4 text-green-400">
+               <div className="flex justify-between text-sm"><span className="opacity-40 font-bold uppercase tracking-widest text-[10px]">Автомобиль</span> <span className="font-bold">{car.name}</span></div>
+               <div className="flex justify-between font-black text-3xl pt-6 border-t border-white/5 mt-4 text-green-400">
                 <span>ИТОГО:</span> 
                 <span>{totalPrice.toLocaleString()} $</span>
               </div>
             </div>
-
             <div className="space-y-4">
               <input placeholder="0000 0000 0000 0000" className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none focus:border-yellow-500 text-center text-xl tracking-[4px]" />
-              <button onClick={() => alert("Покупка совершена!")} className="w-full bg-green-500 text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-green-400 transition">
-                Подтвердить
+              <button onClick={() => { alert("Успешно!"); setShowPay(false); navigate("/market"); }} className="w-full bg-green-500 text-black py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-green-400 transition">
+                ПОДТВЕРДИТЬ
               </button>
-              <button onClick={() => setShowPay(false)} className="w-full text-white/20 font-bold uppercase text-[10px] tracking-widest">Отмена</button>
+              <button onClick={() => setShowPay(false)} className="w-full text-white/20 font-bold uppercase text-[10px] tracking-widest mt-2">ОТМЕНА</button>
             </div>
           </div>
         </div>
@@ -404,7 +396,7 @@ export default function CarDetail() {
   );
 }
 
-function SpecItem({ label, value, color }: any) {
+function SpecBox({ label, value, color }: any) {
   return (
     <div className="bg-white/5 p-5 rounded-3xl border border-white/5">
       <p className="text-[9px] text-white/30 font-bold mb-1 uppercase tracking-widest">{label}</p>
@@ -413,7 +405,7 @@ function SpecItem({ label, value, color }: any) {
   );
 }
 
-function ConfigGroup({ title, items, selected, onSelect }: any) {
+function ConfigSection({ title, items, selected, onSelect }: any) {
   if (!items || items.length === 0) return null;
   return (
     <div>
@@ -431,7 +423,7 @@ function ConfigGroup({ title, items, selected, onSelect }: any) {
           >
             <div className="text-xs font-black uppercase truncate mb-1">{item.name}</div>
             <div className={`text-[10px] font-bold ${selected?.id === item.id ? "text-yellow-200" : "text-green-500"}`}>
-              {Number(item.price) === 0 ? "DEFAULT" : `+${item.price.toLocaleString()} $`}
+              {Number(item.price) === 0 ? "FREE" : `+${item.price.toLocaleString()} $`}
             </div>
           </button>
         ))}
