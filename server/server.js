@@ -523,8 +523,10 @@ app.post("/buy", async (req, res) => {
     const { userId, carId } = req.body;
 
     await q(
-      "UPDATE cars SET user_id=$1 WHERE id=$2",
-      [userId, carId]
+      `UPDATE users 
+      SET telegram_id=$1, telegram_username=$2 
+      WHERE id=$3`,
+      [telegram_id, username, userId]
     );
 
     return res.json({ success: true });
