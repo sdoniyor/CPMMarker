@@ -603,28 +603,27 @@ app.post("/promo/redeem", async (req, res) => {
 /* ================= TELEGRAM LINK ================= */
 app.post("/telegram/link", async (req, res) => {
   try {
-    const { userId, telegram_id } = req.body;
+    const { userId, telegram_id, username } = req.body;
 
     if (!userId || !telegram_id) {
       return res.status(400).json({ error: "missing data" });
     }
 
     const user = await q(
-      "UPDATE users SET telegram_id=$1 WHERE id=$2 RETURNING id, telegram_id",
-      [telegram_id, userId]
+      `UPDATE users 
+       SET telegram_id=$1, username=$2 
+       WHERE id=$3
+       RETURNING id, telegram_id, username`,
+      [telegram_id, username || null, userId]
     );
-
-    if (!user.rows[0]) {
-      return res.status(404).json({ error: "user not found" });
-    }
 
     return res.json({
       success: true,
-      telegram_id: user.rows[0].telegram_id,
+      user: user.rows[0],
     });
 
   } catch (e) {
-    console.log("TG LINK ERROR:", e.message);
+    console.log(e.message);
     return res.status(500).json({ error: "telegram link failed" });
   }
 });
@@ -632,26 +631,30 @@ app.post("/telegram/link", async (req, res) => {
 
 
 if (bot) {
-  bot.onText(/\/start (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const userId = match?.[1];
+bot.onText(/\/start (.+)/, async (msg, match) => {
+  try {
+    const telegram_id = msg.from.id;
+    const username = msg.from.username || null;
+    const userId = match[1];
 
-    if (!userId) {
-      return bot.sendMessage(chatId, "❌ Invalid link");
-    }
+    await q(
+      `UPDATE users 
+       SET telegram_id=$1, username=$2 
+       WHERE id=$3`,
+      [telegram_id, username, userId]
+    );
 
-    try {
-      await q(
-        "UPDATE users SET telegram_id=$1 WHERE id=$2",
-        [chatId, userId]
-      );
+    await bot.sendMessage(
+      telegram_id,
+      "✅ Telegram connected successfully!"
+    );
 
-      bot.sendMessage(chatId, "✅ Telegram успешно подключён!");
-    } catch (e) {
-      console.log("BOT ERROR:", e.message);
-      bot.sendMessage(chatId, "❌ Ошибка подключения");
-    }
-  });
+    console.log("TG CONNECT:", { userId, telegram_id, username });
+
+  } catch (e) {
+    console.log("START ERROR:", e.message);
+  }
+});
 }
 
 
@@ -671,8 +674,9 @@ app.post("/order-to-tg", async (req, res) => {
 `🚗 NEW ORDER
 
 👤 ${user?.name || "-"}
+🔗 @${user?.username || "no_username"}
 📧 ${user?.email || "-"}
-🆔 ${user?.id || "-"}
+🆔 ${user?.tg_id || "-"}
 
 🚘 ${car?.brand || ""} ${car?.name || ""}
 
