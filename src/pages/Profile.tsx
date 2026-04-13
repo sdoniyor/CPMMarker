@@ -172,6 +172,13 @@
 //   );
 // }
 
+
+
+
+
+
+
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -188,28 +195,18 @@ export default function Profile() {
   const [promoStatus, setPromoStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* ================= SAFE FETCH ================= */
-  const safeFetchJSON = async (url: string) => {
-    try {
-      const res = await fetch(url);
-      const text = await res.text();
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        return null;
-      }
-    } catch (e) {
-      return null;
-    }
-  };
-
   /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
     if (!userLocal?.id) return;
-    const data = await safeFetchJSON(`${API}/profile/${userLocal.id}`);
-    if (data) {
-      setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
+    try {
+      const res = await fetch(`${API}/profile/${userLocal.id}`);
+      const data = await res.json();
+      if (data) {
+        setUser(data);
+        localStorage.setItem("user", JSON.stringify(data));
+      }
+    } catch (e) {
+      console.error("Load error:", e);
     }
   };
 
@@ -217,7 +214,7 @@ export default function Profile() {
     loadProfile();
   }, []);
 
-  /* ================= BASE64 ================= */
+  /* ================= AVATAR LOGIC ================= */
   const convertBase64 = (file: File) => {
     return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -227,18 +224,21 @@ export default function Profile() {
     });
   };
 
-  /* ================= AVATAR ================= */
   const updateAvatar = async () => {
     if (!avatarFile) return;
     setLoading(true);
-    const base64 = await convertBase64(avatarFile);
-    await fetch(`${API}/update-avatar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: userLocal.id, avatar: base64 }),
-    });
-    await loadProfile();
-    setAvatarFile(null);
+    try {
+      const base64 = await convertBase64(avatarFile);
+      await fetch(`${API}/update-avatar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userLocal.id, avatar: base64 }),
+      });
+      await loadProfile();
+      setAvatarFile(null);
+    } catch (e) {
+      console.error("Avatar update error:", e);
+    }
     setLoading(false);
   };
 
@@ -255,11 +255,11 @@ export default function Profile() {
     });
     const data = await res.json();
     if (data.success) {
-      setPromoStatus("✅ Success");
+      setPromoStatus("✅ Успешно активирован");
       setPromo("");
       loadProfile();
     } else {
-      setPromoStatus("❌ " + data.error);
+      setPromoStatus("❌ " + (data.error || "Ошибка"));
     }
   };
 
@@ -291,18 +291,18 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* ЛЕВАЯ КАРТОЧКА (ИНФО) */}
-          <div className="lg:col-span-5 bg-white/5 border border-white/5 rounded-[3rem] p-10 relative overflow-hidden">
+          {/* КАРТОЧКА ЮЗЕРА */}
+          <div className="lg:col-span-5 bg-white/5 border border-white/5 rounded-[3rem] p-10 relative overflow-hidden h-fit">
             <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-[80px] rounded-full"></div>
             
             <div className="relative z-10 flex flex-col items-center text-center">
-              <div className="relative group mb-6">
+              <div className="relative group mb-8">
                 <img
                   src={user.avatar || "https://i.pravatar.cc/150"}
-                  className="w-44 h-44 rounded-[2.5rem] object-cover border-4 border-white/5 shadow-2xl group-hover:scale-[1.02] transition-transform duration-500"
+                  className="w-48 h-48 rounded-[3rem] object-cover border-4 border-white/5 shadow-2xl group-hover:scale-[1.02] transition-transform duration-500"
                   alt="avatar"
                 />
-                <label className="absolute bottom-2 right-2 bg-yellow-500 text-black p-3 rounded-2xl cursor-pointer hover:bg-yellow-400 shadow-xl active:scale-90 transition-all">
+                <label className="absolute bottom-2 right-2 bg-yellow-400 text-black p-3.5 rounded-2xl cursor-pointer hover:bg-yellow-300 shadow-xl active:scale-90 transition-all">
                   <input 
                     type="file" 
                     className="hidden" 
@@ -316,36 +316,30 @@ export default function Profile() {
                 <button
                   onClick={updateAvatar}
                   disabled={loading}
-                  className="mb-6 bg-white text-black font-black uppercase text-[10px] px-6 py-2 rounded-full tracking-widest hover:bg-yellow-400 transition-colors"
+                  className="mb-6 bg-white text-black font-black uppercase text-[10px] px-8 py-2.5 rounded-full tracking-widest hover:bg-yellow-400 transition-colors shadow-lg"
                 >
-                  {loading ? "Загрузка..." : "Сохранить новое фото"}
+                  {loading ? "Загрузка..." : "Применить фото"}
                 </button>
               )}
 
-              <h2 className="text-3xl font-black uppercase italic tracking-tight">{user.name}</h2>
-              <p className="text-white/30 font-medium mb-6">{user.email}</p>
+              <h2 className="text-4xl font-black uppercase italic tracking-tight mb-1">{user.name}</h2>
+              <p className="text-white/20 font-bold uppercase text-[10px] tracking-widest mb-8">{user.email}</p>
 
-              <div className="flex gap-4 w-full">
-                <div className="flex-1 bg-white/5 rounded-3xl p-4 border border-white/5">
-                  <p className="text-[10px] font-black text-yellow-500/50 tracking-widest uppercase mb-1">Уровень</p>
-                  <p className="text-2xl font-black italic uppercase text-yellow-400">{user.level}</p>
-                </div>
-                <div className="flex-1 bg-white/5 rounded-3xl p-4 border border-white/5">
-                  <p className="text-[10px] font-black text-blue-500/50 tracking-widest uppercase mb-1">Баланс</p>
-                  <p className="text-2xl font-black italic uppercase text-blue-400">${user.balance?.toLocaleString() || 0}</p>
-                </div>
+              <div className="w-full bg-white/5 rounded-[2rem] p-6 border border-white/5">
+                <p className="text-[10px] font-black text-yellow-500/50 tracking-[4px] uppercase mb-1">Игровой Уровень</p>
+                <p className="text-4xl font-black italic uppercase text-yellow-400">{user.level || 1}</p>
               </div>
             </div>
           </div>
 
-          {/* ПРАВАЯ КОЛОНКА (НАСТРОЙКИ) */}
+          {/* НАСТРОЙКИ И АКЦИИ */}
           <div className="lg:col-span-7 flex flex-col gap-6">
             
             {/* ТЕЛЕГРАМ */}
-            <div className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex items-center justify-between group">
+            <div className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex items-center justify-between group transition-colors hover:bg-white/[0.07]">
               <div>
                 <h3 className="text-xl font-black uppercase italic mb-1 group-hover:text-blue-400 transition-colors">Telegram Connect</h3>
-                <p className="text-white/30 text-xs font-bold uppercase tracking-wider">Привязка аккаунта для уведомлений</p>
+                <p className="text-white/30 text-[10px] font-black uppercase tracking-wider">Синхронизация с игровым ботом</p>
               </div>
               {user.tg_id ? (
                 <div className="bg-blue-500/10 text-blue-400 px-6 py-3 rounded-2xl border border-blue-500/20 font-black text-xs uppercase tracking-widest">
@@ -356,24 +350,24 @@ export default function Profile() {
                   onClick={connectTelegram}
                   className="bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[2px] hover:bg-blue-400 transition-all active:scale-95 shadow-lg shadow-blue-500/20"
                 >
-                  Привязать ТГ
+                  Подключить ТГ
                 </button>
               )}
             </div>
 
             {/* ПРОМОКОД */}
             <div className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8">
-              <h3 className="text-xl font-black uppercase italic mb-6">Активация промокода</h3>
+              <h3 className="text-xl font-black uppercase italic mb-6">Активация бонусов</h3>
               <div className="flex gap-3">
                 <input
                   value={promo}
                   onChange={(e) => setPromo(e.target.value)}
-                  className="flex-1 bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-yellow-500/50 transition-all font-black uppercase tracking-widest placeholder:text-white/10"
-                  placeholder="ВВЕДИТЕ КОД"
+                  className="flex-1 bg-black border border-white/10 p-5 rounded-2xl outline-none focus:border-yellow-500/50 transition-all font-black uppercase tracking-widest placeholder:text-white/5"
+                  placeholder="ВВЕДИТЕ ПРОМОКОД"
                 />
                 <button
                   onClick={applyPromo}
-                  className="bg-yellow-500 text-black px-10 rounded-2xl font-black uppercase text-[10px] tracking-[2px] hover:bg-yellow-400 transition-all active:scale-95"
+                  className="bg-yellow-500 text-black px-10 rounded-2xl font-black uppercase text-[10px] tracking-[2px] hover:bg-yellow-400 transition-all active:scale-95 shadow-lg shadow-yellow-500/10"
                 >
                   ОК
                 </button>
@@ -385,13 +379,15 @@ export default function Profile() {
               )}
             </div>
 
-            {/* ДОПОЛНИТЕЛЬНО (ЗАГЛУШКА) */}
-            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-[2.5rem] p-8 flex items-center justify-between">
+            {/* БАННЕР */}
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-[2.5rem] p-10 flex items-center justify-between shadow-2xl shadow-yellow-500/10">
               <div className="text-black">
-                <h3 className="text-xl font-black uppercase italic leading-none mb-1">Реферальная система</h3>
-                <p className="text-black/50 text-[10px] font-bold uppercase tracking-widest">Приглашай друзей и получай бонусы</p>
+                <h3 className="text-2xl font-black uppercase italic leading-none mb-2">Стань партнером</h3>
+                <p className="text-black/50 text-[10px] font-black uppercase tracking-[2px]">Получай % с продаж машин</p>
               </div>
-              <button className="bg-black text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest">Скоро</button>
+              <div className="bg-black/10 p-4 rounded-2xl">
+                 <svg width="30" height="30" fill="black" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+              </div>
             </div>
 
           </div>
