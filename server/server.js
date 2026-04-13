@@ -29,32 +29,31 @@
 //   }
 // };
 
-// /* ================= TELEGRAM BOT SAFE INIT ================= */
+// /* ================= TELEGRAM BOT ================= */
 // let bot;
 
 // try {
 //   if (process.env.BOT_TOKEN) {
-//     bot = new TelegramBot(process.env.BOT_TOKEN, {
-//       polling: true,
-//     });
+//     bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 //     console.log("🤖 Telegram bot started");
 //   }
 // } catch (e) {
 //   console.log("BOT INIT ERROR:", e.message);
 // }
 
-// /* ================= CONFIGS (FIX 404) ================= */
+// /* ================= CONFIGS ================= */
 // app.get("/configs", async (req, res) => {
 //   try {
 //     const result = await q("SELECT * FROM global_car_configs");
 
 //     const rows = result.rows || [];
 
-//     const power = rows.filter(i => i.type === "power");
-//     const tuning = rows.filter(i => i.type === "tuning");
-//     const wheels = rows.filter(i => i.type === "wheels");
+//     res.json({
+//       power: rows.filter(i => i.type === "power"),
+//       tuning: rows.filter(i => i.type === "tuning"),
+//       wheels: rows.filter(i => i.type === "wheels"),
+//     });
 
-//     res.json({ power, tuning, wheels });
 //   } catch (e) {
 //     console.log("CONFIG ERROR:", e.message);
 //     res.json({ power: [], tuning: [], wheels: [] });
@@ -84,35 +83,49 @@
 //   });
 // }
 
-// /* ================= ORDER TO TG ================= */
+// /* ================= ORDER TO TG (FIXED) ================= */
 // app.post("/order-to-tg", async (req, res) => {
-//   const { user, car, configs } = req.body;
+//   try {
+//     const { user, car, configs, total } = req.body;
 
-//   if (!bot) {
-//     return res.status(500).json({ error: "bot not running" });
-//   }
+//     if (!bot) {
+//       return res.status(500).json({ error: "bot not initialized" });
+//     }
 
-//   const chatId = process.env.CHAT_ID || "@snrice1";
+//     const chatId = process.env.CHAT_ID;
 
-//   const text = `
+//     if (!chatId) {
+//       return res.status(500).json({ error: "CHAT_ID missing" });
+//     }
+
+//     const text = `
 // 🚗 NEW ORDER
 
 // 👤 User: ${user?.name || "Unknown"}
+// 🧾 Username: ${user?.username ? "@" + user.username : "none"}
+// 🆔 TG ID: ${user?.tg_id || "unknown"}
 
 // 🚘 Car: ${car?.brand || ""} ${car?.name || ""}
 
-// ⚙️ CONFIG:
-// • HP: ${configs?.hp || "-"}
-// • Tuning: ${configs?.tuning || "-"}
-// • Wheels: ${configs?.wheels || "-"}
+// ⚙️ CONFIGS:
+// ${Array.isArray(configs) && configs.length
+//   ? configs.map(c => "• " + c).join("\n")
+//   : "• none"}
+
+// 💰 TOTAL: ${total || 0} $
 // `;
 
-//   try {
 //     await bot.sendMessage(chatId, text);
-//     res.json({ success: true });
-//   } catch (e) {
-//     console.log("TG ERROR:", e.message);
-//     res.status(500).json({ error: "telegram failed" });
+
+//     return res.json({ success: true });
+
+//   } catch (err) {
+//     console.log("🔥 ORDER ERROR:", err);
+
+//     return res.status(500).json({
+//       error: "telegram send failed",
+//       detail: err.message
+//     });
 //   }
 // });
 
@@ -226,9 +239,6 @@
 
 
 
-
-
-
 require("dotenv").config();
 
 const express = require("express");
@@ -259,16 +269,12 @@ const q = async (text, params) => {
   }
 };
 
-/* ================= TELEGRAM BOT ================= */
+/* ================= TELEGRAM BOT (FIX 409) ================= */
 let bot;
 
-try {
-  if (process.env.BOT_TOKEN) {
-    bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-    console.log("🤖 Telegram bot started");
-  }
-} catch (e) {
-  console.log("BOT INIT ERROR:", e.message);
+if (process.env.BOT_TOKEN) {
+  bot = new TelegramBot(process.env.BOT_TOKEN); // ❌ БЕЗ polling
+  console.log("🤖 Telegram bot ready (no polling)");
 }
 
 /* ================= CONFIGS ================= */
@@ -290,78 +296,21 @@ app.get("/configs", async (req, res) => {
   }
 });
 
-/* ================= TELEGRAM CONNECT ================= */
-if (bot) {
-  bot.onText(/\/start (.+)/, async (msg, match) => {
-    const telegramId = msg.from.id;
-    const userId = match?.[1];
+/* ================= REGISTER ================= */
+app.post("/register", async (req, res) => {
+  const { name, email, password } = req.body;
 
-    if (!userId) {
-      return bot.sendMessage(msg.chat.id, "❌ Invalid start link");
-    }
-
-    try {
-      await q(
-        "UPDATE users SET telegram_id=$1 WHERE id=$2",
-        [telegramId, userId]
-      );
-
-      bot.sendMessage(msg.chat.id, "✅ Telegram connected!");
-    } catch (e) {
-      console.log("TG ERROR:", e.message);
-    }
-  });
-}
-
-/* ================= ORDER TO TG (FIXED) ================= */
-app.post("/order-to-tg", async (req, res) => {
   try {
-    const { user, car, configs, total } = req.body;
+    const user = await q(
+      `INSERT INTO users (name, email, password)
+       VALUES ($1,$2,$3) RETURNING *`,
+      [name, email, password]
+    );
 
-    if (!bot) {
-      return res.status(500).json({ error: "bot not initialized" });
-    }
-
-    const chatId = process.env.CHAT_ID;
-
-    if (!chatId) {
-      return res.status(500).json({ error: "CHAT_ID missing" });
-    }
-
-    const text = `
-🚗 NEW ORDER
-
-👤 User: ${user?.name || "Unknown"}
-🧾 Username: ${user?.username ? "@" + user.username : "none"}
-🆔 TG ID: ${user?.tg_id || "unknown"}
-
-🚘 Car: ${car?.brand || ""} ${car?.name || ""}
-
-⚙️ CONFIGS:
-${Array.isArray(configs) && configs.length
-  ? configs.map(c => "• " + c).join("\n")
-  : "• none"}
-
-💰 TOTAL: ${total || 0} $
-`;
-
-    await bot.sendMessage(chatId, text);
-
-    return res.json({ success: true });
-
-  } catch (err) {
-    console.log("🔥 ORDER ERROR:", err);
-
-    return res.status(500).json({
-      error: "telegram send failed",
-      detail: err.message
-    });
+    res.json(user.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: "register failed" });
   }
-});
-
-/* ================= HEALTH ================= */
-app.get("/", (req, res) => {
-  res.json({ status: "OK 🚀" });
 });
 
 /* ================= PROFILE ================= */
@@ -374,44 +323,57 @@ app.get("/profile/:id", async (req, res) => {
   res.json(user.rows[0] || {});
 });
 
-/* ================= AVATAR ================= */
-app.post("/update-avatar", async (req, res) => {
-  const { userId, avatar } = req.body;
-
-  const result = await q(
-    "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-    [avatar, userId]
-  );
-
-  res.json({
-    success: true,
-    user: result.rows[0] || null,
-  });
-});
-
 /* ================= CARS ================= */
 app.get("/cars", async (req, res) => {
   const cars = await q("SELECT * FROM cars WHERE user_id IS NULL");
   res.json(cars.rows);
 });
 
-/* ================= BUY ================= */
-app.post("/buy", async (req, res) => {
-  const { userId, carId } = req.body;
+/* ================= ORDER TO TG ================= */
+app.post("/order-to-tg", async (req, res) => {
+  try {
+    const { user, car, configs, total } = req.body;
 
-  const user = (await q("SELECT * FROM users WHERE id=$1", [userId])).rows[0];
-  const car = (await q("SELECT * FROM cars WHERE id=$1", [carId])).rows[0];
+    if (!bot) {
+      return res.status(500).json({ error: "bot not ready" });
+    }
 
-  if (!user || !car) {
-    return res.status(404).json({ error: "not found" });
+    const chatId = process.env.CHAT_ID;
+
+    if (!chatId) {
+      return res.status(500).json({ error: "CHAT_ID missing" });
+    }
+
+    const text = `
+🚗 NEW ORDER
+
+👤 User: ${user?.name || "Unknown"}
+📧 Email: ${user?.email || "none"}
+🆔 ID: ${user?.id}
+
+🧾 Username: ${user?.telegram_username ? "@" + user.telegram_username : "none"}
+📱 TG ID: ${user?.telegram_id || "not linked"}
+
+🚘 Car: ${car?.brand} ${car?.name}
+
+⚙️ CONFIGS:
+${configs?.map(c => "• " + c).join("\n")}
+
+💰 TOTAL: ${total} $
+`;
+
+    await bot.sendMessage(chatId, text);
+
+    res.json({ success: true });
+
+  } catch (e) {
+    console.log("🔥 TG ERROR:", e.message);
+
+    res.status(500).json({
+      error: "telegram failed",
+      detail: e.message
+    });
   }
-
-  await q(
-    "UPDATE cars SET user_id=$1 WHERE id=$2",
-    [userId, carId]
-  );
-
-  res.json({ success: true });
 });
 
 /* ================= PROMO ================= */
