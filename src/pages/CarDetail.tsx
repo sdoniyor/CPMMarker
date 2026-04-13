@@ -218,7 +218,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -230,8 +229,14 @@ export default function CarDetail() {
   const navigate = useNavigate();
 
   const [car, setCar] = useState<any>(null);
-  const [configs, setConfigs] = useState<any>({ power: [], tuning: [], wheels: [] });
-  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+
+  const [configs, setConfigs] = useState<any>({
+    power: [],
+    tuning: [],
+    wheels: [],
+  });
+
+  const [user, setUser] = useState<any>(null);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
@@ -253,24 +258,30 @@ export default function CarDetail() {
 
   /* ================= LOAD ================= */
   const load = async () => {
-    const [carsData, configsData, promoData] = await Promise.all([
+    const [carsData, configsData] = await Promise.all([
       safeFetch(`${API}/cars`),
       safeFetch(`${API}/configs`),
-      safeFetch(`${API}/promo_codes`),
     ]);
 
     const cars = Array.isArray(carsData) ? carsData : [];
-    const found = cars.find((c: any) => c.id == id);
+    const foundCar = cars.find((c: any) => c.id == id);
 
-    setCar(found);
+    setCar(foundCar);
     setConfigs(configsData || { power: [], tuning: [], wheels: [] });
-    setPromoCodes(Array.isArray(promoData) ? promoData : []);
 
     const cfg = configsData || { power: [], tuning: [], wheels: [] };
 
     setSelectedHp(cfg.power?.find((i: any) => Number(i.price) === 0));
     setSelectedTuning(cfg.tuning?.find((i: any) => Number(i.price) === 0));
     setSelectedWheels(cfg.wheels?.find((i: any) => Number(i.price) === 0));
+
+    const local = JSON.parse(localStorage.getItem("user") || "{}");
+
+    if (local?.id) {
+      const userRes = await fetch(`${API}/profile/${local.id}`);
+      const userData = await userRes.json();
+      setUser(userData);
+    }
   };
 
   useEffect(() => {
@@ -285,21 +296,22 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= PROMO LOGIC ================= */
-  const activePromo = promoCodes.find((p: any) =>
-    p.type === "discount" &&
-    Array.isArray(p.car_ids) &&
-    p.car_ids.map(Number).includes(Number(id))
-  );
+  /* ================= DISCOUNT LOGIC ================= */
 
-  const discount = activePromo ? Number(activePromo.value) : 0;
+  const discount = Number(user?.discount) || 0;
+  const allowedCars: number[] = user?.discount_cars || [];
+
+  const hasDiscount = allowedCars.includes(Number(id));
+
+  const finalDiscount = hasDiscount ? discount : 0;
 
   /* ================= PRICE ================= */
+
   const basePrice = Number(car.price) || 0;
 
-  const finalPrice =
-    discount > 0
-      ? Math.floor(basePrice * (1 - discount / 100))
+  const discountedPrice =
+    finalDiscount > 0
+      ? Math.floor(basePrice * (1 - finalDiscount / 100))
       : basePrice;
 
   const configPrice =
@@ -307,7 +319,7 @@ export default function CarDetail() {
     (Number(selectedTuning?.price) || 0) +
     (Number(selectedWheels?.price) || 0);
 
-  const total = finalPrice + configPrice;
+  const totalPrice = discountedPrice + configPrice;
 
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-20">
@@ -335,8 +347,6 @@ export default function CarDetail() {
               <SpecItem label="ENGINE" value={car.dvigatel} />
               <SpecItem label="POWER" value={`${car.power} HP`} />
               <SpecItem label="SPEED" value={`${car.speed} KM/H`} />
-
-              {/* ❌ PRICE REMOVED FROM HERE */}
             </div>
           </div>
 
@@ -369,17 +379,23 @@ export default function CarDetail() {
                 <span className="font-black">TOTAL</span>
 
                 <div className="text-right">
-                  {discount > 0 && (
+                  {finalDiscount > 0 && (
                     <div className="line-through opacity-60">
                       {basePrice.toLocaleString()} $
                     </div>
                   )}
 
                   <div className="text-3xl font-black">
-                    {total.toLocaleString()} $
+                    {totalPrice.toLocaleString()} $
                   </div>
                 </div>
               </div>
+
+              {finalDiscount > 0 && (
+                <div className="text-xs mt-2 font-bold opacity-70">
+                  -{finalDiscount}% DISCOUNT ACTIVE
+                </div>
+              )}
 
               <button
                 onClick={() => setShowPay(true)}
@@ -399,7 +415,7 @@ export default function CarDetail() {
             <h2 className="text-yellow-400 mb-4">PAY</h2>
 
             <div className="text-green-400 text-2xl font-black mb-6">
-              {total.toLocaleString()} $
+              {totalPrice.toLocaleString()} $
             </div>
 
             <button
