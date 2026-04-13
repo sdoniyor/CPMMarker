@@ -645,7 +645,7 @@ bot.onText(/\/start (.+)/, async (msg, match) => {
 
     await q(
       `UPDATE users 
-       SET telegram_id=$1, username=$2 
+       SET telegram_id=$1, telegram_username=$2=$2 
        WHERE id=$3`,
       [telegram_id, username, userId]
     );
