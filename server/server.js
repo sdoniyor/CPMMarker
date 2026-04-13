@@ -225,7 +225,6 @@
 
 
 
-
 require("dotenv").config();
 
 const express = require("express");
@@ -261,13 +260,13 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, {
   polling: true,
 });
 
-/* ================= CONNECT TELEGRAM ================= */
+/* ================= CONNECT TG ================= */
 bot.onText(/\/start (.+)/, async (msg, match) => {
   const telegramId = msg.from.id;
   const userId = match?.[1];
 
   if (!userId) {
-    return bot.sendMessage(msg.chat.id, "❌ Invalid link");
+    return bot.sendMessage(msg.chat.id, "❌ Invalid start link");
   }
 
   try {
@@ -278,7 +277,7 @@ bot.onText(/\/start (.+)/, async (msg, match) => {
 
     bot.sendMessage(
       msg.chat.id,
-      "✅ Telegram connected successfully!"
+      "✅ Telegram successfully connected!"
     );
   } catch (e) {
     console.log("TG ERROR:", e.message);
@@ -289,17 +288,22 @@ bot.onText(/\/start (.+)/, async (msg, match) => {
 app.post("/order-to-tg", async (req, res) => {
   const { user, car, configs } = req.body;
 
+  if (!car || !configs) {
+    return res.status(400).json({ error: "invalid data" });
+  }
+
   const text = `
 🚗 NEW ORDER
 
-👤 User: ${user || "Unknown"}
+👤 User: ${user?.name || "Unknown"}
+🆔 ID: ${user?.id || "-"}
 
 🚘 Car: ${car.brand} ${car.name}
 
 ⚙️ CONFIG:
-- HP: ${configs.hp}
-- Tuning: ${configs.tuning}
-- Wheels: ${configs.wheels}
+• HP: ${configs.hp || "-"}
+• Tuning: ${configs.tuning || "-"}
+• Wheels: ${configs.wheels || "-"}
 `;
 
   try {
@@ -342,10 +346,7 @@ app.post("/update-avatar", async (req, res) => {
 
 /* ================= CARS ================= */
 app.get("/cars", async (req, res) => {
-  const cars = await q(
-    "SELECT * FROM cars WHERE user_id IS NULL"
-  );
-
+  const cars = await q("SELECT * FROM cars WHERE user_id IS NULL");
   res.json(cars.rows);
 });
 

@@ -188,25 +188,51 @@ export default function Profile() {
   const [promo, setPromo] = useState("");
   const [promoStatus, setPromoStatus] = useState("");
 
+  /* ================= SAFE FETCH ================= */
+  const safeFetchJSON = async (url: string) => {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        console.error("❌ Not JSON:", text);
+        return null;
+      }
+    } catch (e) {
+      console.error("Fetch error:", e);
+      return null;
+    }
+  };
+
+  /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
-    const res = await fetch(`${API}/profile/${userLocal.id}`);
-    const data = await res.json();
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data));
+    if (!userLocal?.id) return;
+
+    const data = await safeFetchJSON(`${API}/profile/${userLocal.id}`);
+
+    if (data) {
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    }
   };
 
   useEffect(() => {
     loadProfile();
   }, []);
 
+  /* ================= BASE64 ================= */
   const convertBase64 = (file: File) => {
-    return new Promise<string>((resolve) => {
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
     });
   };
 
+  /* ================= AVATAR ================= */
   const updateAvatar = async () => {
     if (!avatarFile) return;
 
@@ -214,9 +240,7 @@ export default function Profile() {
 
     await fetch(`${API}/update-avatar`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: userLocal.id,
         avatar: base64,
@@ -227,20 +251,21 @@ export default function Profile() {
     setAvatarFile(null);
   };
 
-  // 🔥 Telegram connect
+  /* ================= TELEGRAM CONNECT ================= */
   const connectTelegram = () => {
+    if (!userLocal?.id) return;
+
     window.open(
       `https://t.me/CPMMarket_bot?start=${userLocal.id}`,
       "_blank"
     );
   };
 
+  /* ================= PROMO ================= */
   const applyPromo = async () => {
     const res = await fetch(`${API}/promo/redeem`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: userLocal.id,
         code: promo,
@@ -251,36 +276,46 @@ export default function Profile() {
 
     if (data.success) {
       setPromoStatus("✅ Success");
+      setPromo("");
       loadProfile();
     } else {
       setPromoStatus("❌ " + data.error);
     }
   };
 
-  if (!user) return <div className="text-white p-10">Loading...</div>;
+  /* ================= LOADING ================= */
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
 
       <div className="max-w-5xl mx-auto p-6">
+
+        {/* TITLE */}
         <h1 className="text-4xl font-bold text-yellow-400 mb-8">
           PROFILE
         </h1>
 
-        <div className="grid grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
           {/* LEFT */}
           <div className="bg-white/5 p-6 rounded-xl">
 
             <img
               src={user.avatar || "https://i.pravatar.cc/150"}
-              className="w-32 h-32 rounded-xl mb-4"
+              className="w-32 h-32 rounded-xl mb-4 object-cover"
             />
 
             <input
               type="file"
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setAvatarFile(e.target.files?.[0] || null)
               }
             />
@@ -294,11 +329,13 @@ export default function Profile() {
               </button>
             )}
 
-            <p className="mt-4 text-lg">{user.name}</p>
+            <p className="mt-4 text-lg font-bold">{user.name}</p>
             <p className="text-white/60">{user.email}</p>
 
-            {/* ❌ MONEY УБРАНО */}
-            <p className="mt-2">⭐ Level {user.level}</p>
+            {/* LEVEL ONLY */}
+            <p className="mt-2 text-white/80">
+              ⭐ Level {user.level}
+            </p>
           </div>
 
           {/* RIGHT */}
@@ -306,7 +343,9 @@ export default function Profile() {
 
             {/* TELEGRAM */}
             <div className="bg-white/5 p-6 rounded-xl">
-              <h2 className="text-yellow-400 mb-3">Telegram</h2>
+              <h2 className="text-yellow-400 mb-3">
+                Telegram
+              </h2>
 
               {user.tg_id ? (
                 <p>✅ Connected: {user.tg_id}</p>
@@ -322,7 +361,9 @@ export default function Profile() {
 
             {/* PROMO */}
             <div className="bg-white/5 p-6 rounded-xl">
-              <h2 className="text-yellow-400 mb-3">Promo Code</h2>
+              <h2 className="text-yellow-400 mb-3">
+                Promo Code
+              </h2>
 
               <input
                 value={promo}
@@ -338,7 +379,11 @@ export default function Profile() {
                 Apply
               </button>
 
-              {promoStatus && <p className="mt-2">{promoStatus}</p>}
+              {promoStatus && (
+                <p className="mt-2 text-sm">
+                  {promoStatus}
+                </p>
+              )}
             </div>
 
           </div>

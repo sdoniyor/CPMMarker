@@ -205,156 +205,192 @@
 
 
 
+
+
+
+
+
+
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
 const API = import.meta.env.VITE_API_URL;
 
-export default function Profile() {
+export default function Market() {
+  const [cars, setCars] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [search, setSearch] = useState("");
+  const [onlyPremium, setOnlyPremium] = useState(false);
+
+  const navigate = useNavigate();
   const userLocal = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const [user, setUser] = useState<any>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [promo, setPromo] = useState("");
-  const [promoStatus, setPromoStatus] = useState("");
-
-  const loadProfile = async () => {
-    try {
-      const res = await fetch(`${API}/profile/${userLocal.id}`);
-      const text = await res.text();
-
-      if (!res.ok) throw new Error(text);
-
-      const data = JSON.parse(text);
-      setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
-    } catch (err) {
-      console.error("Profile error:", err);
-    }
-  };
-
   useEffect(() => {
-    loadProfile();
+    loadCars();
+    loadUser();
   }, []);
 
-  const convertBase64 = (file: File) =>
-    new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
+  /* ================= SAFE FETCH JSON ================= */
+  const safeFetchJSON = async (url: string) => {
+    const res = await fetch(url);
+    const text = await res.text();
 
-  const updateAvatar = async () => {
-    if (!avatarFile) return;
-
-    const base64 = await convertBase64(avatarFile);
-
-    await fetch(`${API}/update-avatar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: userLocal.id,
-        avatar: base64,
-      }),
-    });
-
-    loadProfile();
-  };
-
-  const connectTelegram = () => {
-    window.open(
-      `https://t.me/YOUR_BOT_USERNAME?start=${userLocal.id}`,
-      "_blank"
-    );
-  };
-
-  const applyPromo = async () => {
-    const res = await fetch(`${API}/promo/redeem`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: userLocal.id,
-        code: promo,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      setPromoStatus("✅ OK");
-      loadProfile();
-    } else {
-      setPromoStatus("❌ " + data.error);
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("❌ Server returned non-JSON:", text);
+      return null;
     }
   };
 
-  if (!user) return <div className="text-white p-10">Loading...</div>;
+  /* ================= LOAD CARS ================= */
+  const loadCars = async () => {
+    try {
+      const data = await safeFetchJSON(`${API}/cars`);
+      setCars(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Ошибка загрузки авто:", err);
+    }
+  };
+
+  /* ================= LOAD USER ================= */
+  const loadUser = async () => {
+    if (!userLocal.id) return;
+
+    try {
+      const data = await safeFetchJSON(`${API}/profile/${userLocal.id}`);
+      if (data) setUser(data);
+    } catch (err) {
+      console.error("Ошибка загрузки профиля:", err);
+    }
+  };
+
+  /* ================= DISCOUNT CHECK ================= */
+  const isDiscountCar = (car: any) => {
+    if (!user?.discount || !user?.discount_cars) return false;
+
+    const allowed =
+      typeof user.discount_cars === "string"
+        ? JSON.parse(user.discount_cars)
+        : user.discount_cars;
+
+    return Array.isArray(allowed) ? allowed.includes(car.id) : false;
+  };
+
+  const getPrice = (car: any) => {
+    if (isDiscountCar(car)) {
+      return Math.floor(car.price - (car.price * user.discount) / 100);
+    }
+    return car.price;
+  };
+
+  /* ================= FILTER ================= */
+  const filteredCars = cars.filter((car) => {
+    const matchSearch =
+      car.name?.toLowerCase().includes(search.toLowerCase()) ||
+      car.brand?.toLowerCase().includes(search.toLowerCase());
+
+    const matchPremium = onlyPremium ? car.premium : true;
+
+    return matchSearch && matchPremium;
+  });
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Navbar />
+    <div className="min-h-screen bg-[#050608] text-white relative">
 
-      <div className="max-w-4xl mx-auto p-6">
+      {/* NAVBAR */}
+      <div className="sticky top-0 z-[100] bg-[#050608]/80 backdrop-blur-xl border-b border-white/5">
+        <Navbar />
+      </div>
 
-        <h1 className="text-3xl font-bold text-yellow-400">PROFILE</h1>
+      {/* BACKGROUND */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,#1a1d26_0%,#050608_100%)] pointer-events-none z-0" />
 
-        {/* AVATAR */}
-        <div className="mt-6">
-          <img
-            src={user.avatar || "https://i.pravatar.cc/150"}
-            className="w-28 h-28 rounded-xl"
-          />
+      <div className="relative z-10 max-w-[1400px] mx-auto p-4 lg:p-8">
 
-          <input
-            type="file"
-            onChange={(e: any) => setAvatarFile(e.target.files[0])}
-          />
+        {/* HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 bg-white/5 p-6 rounded-[2rem] border border-white/10">
 
-          {avatarFile && (
-            <button onClick={updateAvatar} className="bg-yellow-500 text-black px-4 py-1 mt-2">
-              Save Avatar
-            </button>
-          )}
-        </div>
+          <div>
+            <h1 className="text-4xl font-black italic uppercase">
+              AUTO <span className="text-yellow-500">MARKET</span>
+            </h1>
+          </div>
 
-        <p className="mt-4">👤 {user.name}</p>
-        <p>📧 {user.email}</p>
+          <div className="flex gap-4">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="SEARCH..."
+              className="px-6 py-3 bg-black/40 border border-white/10 rounded-xl"
+            />
 
-        {/* TELEGRAM */}
-        <div className="mt-6 bg-white/10 p-4 rounded">
-          <h2 className="text-yellow-400">Telegram</h2>
-
-          {user.telegram_id ? (
-            <p>✅ Connected: {user.telegram_id}</p>
-          ) : (
             <button
-              onClick={connectTelegram}
-              className="bg-blue-500 px-4 py-2 mt-2"
+              onClick={() => setOnlyPremium(!onlyPremium)}
+              className={`px-6 py-3 rounded-xl font-black ${
+                onlyPremium ? "bg-yellow-500 text-black" : "bg-white/10"
+              }`}
             >
-              Connect Telegram
+              PREMIUM
             </button>
-          )}
+          </div>
         </div>
 
-        {/* PROMO */}
-        <div className="mt-6 bg-white/10 p-4 rounded">
-          <h2 className="text-yellow-400">Promo</h2>
+        {/* CAR GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 
-          <input
-            value={promo}
-            onChange={(e) => setPromo(e.target.value)}
-            className="w-full p-2 bg-black border"
-          />
+          {filteredCars.map((car) => {
+            const discounted = isDiscountCar(car);
+            const price = getPrice(car);
 
-          <button
-            onClick={applyPromo}
-            className="bg-yellow-500 text-black px-4 py-1 mt-2"
-          >
-            Apply
-          </button>
+            return (
+              <div
+                key={car.id}
+                onClick={() => navigate(`/car/${car.id}`)}
+                className="cursor-pointer bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-yellow-500 transition"
+              >
 
-          {promoStatus && <p>{promoStatus}</p>}
+                <div className="h-40 flex items-center justify-center">
+                  <img
+                    src={car.image_url}
+                    className="h-full object-contain"
+                  />
+                </div>
+
+                <div className="p-4">
+
+                  <h2 className="font-bold">{car.name}</h2>
+                  <p className="text-white/40 text-sm">{car.brand}</p>
+
+                  <div className="flex justify-between mt-3">
+                    <div>
+                      {discounted && (
+                        <p className="line-through text-xs text-white/30">
+                          ${car.price}
+                        </p>
+                      )}
+                      <p className="text-yellow-400 font-bold">
+                        ${price}
+                      </p>
+                    </div>
+
+                    {car.premium && <span>👑</span>}
+                  </div>
+
+                </div>
+              </div>
+            );
+          })}
+
         </div>
+
+        {/* EMPTY */}
+        {filteredCars.length === 0 && (
+          <div className="text-center mt-20 text-white/30">
+            NO CARS FOUND
+          </div>
+        )}
 
       </div>
     </div>
