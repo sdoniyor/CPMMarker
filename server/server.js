@@ -381,7 +381,7 @@ let bot = null;
 
 if (process.env.BOT_TOKEN) {
   try {
-    bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
+    bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
     console.log("🤖 Telegram OK");
   } catch (e) {
     console.log("BOT ERROR:", e.message);
@@ -611,6 +611,33 @@ app.post("/telegram/link", async (req, res) => {
     return res.status(500).json({ error: "telegram link failed" });
   }
 });
+
+
+
+if (bot) {
+  bot.onText(/\/start (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const userId = match?.[1];
+
+    if (!userId) {
+      return bot.sendMessage(chatId, "❌ Invalid link");
+    }
+
+    try {
+      await q(
+        "UPDATE users SET telegram_id=$1 WHERE id=$2",
+        [chatId, userId]
+      );
+
+      bot.sendMessage(chatId, "✅ Telegram успешно подключён!");
+    } catch (e) {
+      console.log("BOT ERROR:", e.message);
+      bot.sendMessage(chatId, "❌ Ошибка подключения");
+    }
+  });
+}
+
+
 
 /* ================= ORDER TO TG ================= */
 app.post("/order-to-tg", async (req, res) => {
