@@ -230,12 +230,7 @@ export default function CarDetail() {
   const navigate = useNavigate();
 
   const [car, setCar] = useState<any>(null);
-  const [allConfigs, setAllConfigs] = useState<any>({
-    power: [],
-    tuning: [],
-    wheels: [],
-  });
-
+  const [configs, setConfigs] = useState<any>({ power: [], tuning: [], wheels: [] });
   const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
@@ -245,7 +240,7 @@ export default function CarDetail() {
   const [showPay, setShowPay] = useState(false);
 
   /* ================= FETCH ================= */
-  const safeFetchJSON = async (url: string) => {
+  const safeFetch = async (url: string) => {
     try {
       const res = await fetch(url);
       const text = await res.text();
@@ -257,29 +252,29 @@ export default function CarDetail() {
   };
 
   /* ================= LOAD ================= */
-  const loadData = async () => {
+  const load = async () => {
     const [carsData, configsData, promoData] = await Promise.all([
-      safeFetchJSON(`${API}/cars`),
-      safeFetchJSON(`${API}/configs`),
-      safeFetchJSON(`${API}/promo_codes`),
+      safeFetch(`${API}/cars`),
+      safeFetch(`${API}/configs`),
+      safeFetch(`${API}/promo_codes`),
     ]);
 
     const cars = Array.isArray(carsData) ? carsData : [];
-    const foundCar = cars.find((c: any) => c.id == id);
+    const found = cars.find((c: any) => c.id == id);
 
-    setCar(foundCar);
-    setAllConfigs(configsData || { power: [], tuning: [], wheels: [] });
+    setCar(found);
+    setConfigs(configsData || { power: [], tuning: [], wheels: [] });
     setPromoCodes(Array.isArray(promoData) ? promoData : []);
 
-    const configs = configsData || { power: [], tuning: [], wheels: [] };
+    const cfg = configsData || { power: [], tuning: [], wheels: [] };
 
-    setSelectedHp(configs.power?.find((i: any) => Number(i.price) === 0));
-    setSelectedTuning(configs.tuning?.find((i: any) => Number(i.price) === 0));
-    setSelectedWheels(configs.wheels?.find((i: any) => Number(i.price) === 0));
+    setSelectedHp(cfg.power?.find((i: any) => Number(i.price) === 0));
+    setSelectedTuning(cfg.tuning?.find((i: any) => Number(i.price) === 0));
+    setSelectedWheels(cfg.wheels?.find((i: any) => Number(i.price) === 0));
   };
 
   useEffect(() => {
-    loadData();
+    load();
   }, [id]);
 
   if (!car) {
@@ -290,21 +285,21 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= PROMO (ONLY THIS CAR) ================= */
+  /* ================= PROMO LOGIC ================= */
   const activePromo = promoCodes.find((p: any) =>
     p.type === "discount" &&
     Array.isArray(p.car_ids) &&
     p.car_ids.map(Number).includes(Number(id))
   );
 
-  const discountValue = activePromo ? Number(activePromo.value) : 0;
+  const discount = activePromo ? Number(activePromo.value) : 0;
 
   /* ================= PRICE ================= */
   const basePrice = Number(car.price) || 0;
 
-  const discountedBasePrice =
-    discountValue > 0
-      ? Math.floor(basePrice * (1 - discountValue / 100))
+  const finalPrice =
+    discount > 0
+      ? Math.floor(basePrice * (1 - discount / 100))
       : basePrice;
 
   const configPrice =
@@ -312,7 +307,7 @@ export default function CarDetail() {
     (Number(selectedTuning?.price) || 0) +
     (Number(selectedWheels?.price) || 0);
 
-  const totalPrice = discountedBasePrice + configPrice;
+  const total = finalPrice + configPrice;
 
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-20">
@@ -341,25 +336,7 @@ export default function CarDetail() {
               <SpecItem label="POWER" value={`${car.power} HP`} />
               <SpecItem label="SPEED" value={`${car.speed} KM/H`} />
 
-              {/* 💥 FIXED PRICE DISPLAY */}
-              <div className="bg-white/5 p-4 rounded-xl col-span-2">
-                <div className="text-white/40 text-xs">PRICE</div>
-
-                {discountValue > 0 ? (
-                  <>
-                    <div className="line-through opacity-50 text-sm">
-                      {basePrice.toLocaleString()} $
-                    </div>
-                    <div className="font-black text-lg text-yellow-400">
-                      {discountedBasePrice.toLocaleString()} $
-                    </div>
-                  </>
-                ) : (
-                  <div className="font-black text-lg">
-                    {basePrice.toLocaleString()} $
-                  </div>
-                )}
-              </div>
+              {/* ❌ PRICE REMOVED FROM HERE */}
             </div>
           </div>
 
@@ -367,21 +344,21 @@ export default function CarDetail() {
           <div>
             <ConfigGroup
               title="POWER"
-              items={allConfigs.power}
+              items={configs.power}
               selected={selectedHp}
               onSelect={setSelectedHp}
             />
 
             <ConfigGroup
               title="TUNING"
-              items={allConfigs.tuning}
+              items={configs.tuning}
               selected={selectedTuning}
               onSelect={setSelectedTuning}
             />
 
             <ConfigGroup
               title="WHEELS"
-              items={allConfigs.wheels}
+              items={configs.wheels}
               selected={selectedWheels}
               onSelect={setSelectedWheels}
             />
@@ -392,14 +369,14 @@ export default function CarDetail() {
                 <span className="font-black">TOTAL</span>
 
                 <div className="text-right">
-                  {discountValue > 0 && (
+                  {discount > 0 && (
                     <div className="line-through opacity-60">
                       {basePrice.toLocaleString()} $
                     </div>
                   )}
 
                   <div className="text-3xl font-black">
-                    {totalPrice.toLocaleString()} $
+                    {total.toLocaleString()} $
                   </div>
                 </div>
               </div>
@@ -422,7 +399,7 @@ export default function CarDetail() {
             <h2 className="text-yellow-400 mb-4">PAY</h2>
 
             <div className="text-green-400 text-2xl font-black mb-6">
-              {totalPrice.toLocaleString()} $
+              {total.toLocaleString()} $
             </div>
 
             <button
