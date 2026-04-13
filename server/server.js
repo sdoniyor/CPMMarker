@@ -421,6 +421,32 @@ app.post("/buy", async (req, res) => {
   }
 });
 
+/* ================= UPDATE AVATAR ================= */
+app.post("/update-avatar", async (req, res) => {
+  try {
+    const { userId, avatar } = req.body;
+
+    if (!userId || !avatar) {
+      return res.status(400).json({ error: "missing data" });
+    }
+
+    await q(
+      "UPDATE users SET avatar=$1 WHERE id=$2",
+      [avatar, userId]
+    );
+
+    const user = await q(
+      "SELECT id, name, email, avatar, money, level FROM users WHERE id=$1",
+      [userId]
+    );
+
+    return res.json(user.rows[0]);
+  } catch (e) {
+    console.log("AVATAR ERROR:", e.message);
+    return res.status(500).json({ error: "avatar update failed" });
+  }
+});
+
 /* ================= PROMO ================= */
 app.post("/promo/redeem", async (req, res) => {
   try {
