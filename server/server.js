@@ -238,7 +238,6 @@
 
 
 
-
 require("dotenv").config();
 
 const express = require("express");
@@ -249,7 +248,6 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
 app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "20mb" }));
 
@@ -270,38 +268,48 @@ const q = async (text, params) => {
   }
 };
 
-/* ================= TELEGRAM BOT (NO POLLING) ================= */
-let bot;
+/* ================= TELEGRAM (NO POLLING) ================= */
+let bot = null;
 
 if (process.env.BOT_TOKEN) {
-  bot = new TelegramBot(process.env.BOT_TOKEN);
-  console.log("🤖 Telegram bot ready");
+  bot = new TelegramBot(process.env.BOT_TOKEN, {
+    polling: false, // ❗ FIX 409
+  });
+  console.log("🤖 Telegram ready");
 }
+
+/* ================= SAFE JSON ================= */
+const safeJSON = (val, fallback = []) => {
+  try {
+    if (!val) return fallback;
+    if (Array.isArray(val)) return val;
+    return JSON.parse(val);
+  } catch {
+    return fallback;
+  }
+};
 
 /* ================= CONFIGS ================= */
 app.get("/configs", async (req, res) => {
-  try {
-    const result = await q("SELECT * FROM global_car_configs");
-    const rows = result.rows || [];
+  const result = await q("SELECT * FROM global_car_configs");
+  const rows = result.rows || [];
 
-    res.json({
-      power: rows.filter(i => i.type === "power"),
-      tuning: rows.filter(i => i.type === "tuning"),
-      wheels: rows.filter(i => i.type === "wheels"),
-    });
-
-  } catch (e) {
-    console.log("CONFIG ERROR:", e.message);
-    res.json({ power: [], tuning: [], wheels: [] });
-  }
+  res.json({
+    power: rows.filter(i => i.type === "power"),
+    tuning: rows.filter(i => i.type === "tuning"),
+    wheels: rows.filter(i => i.type === "wheels"),
+  });
 });
 
-/* ================= REGISTER ================= */
+/* ================= REGISTER (bcrypt + уникальность) ================= */
 app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "missing fields" });
+  }
+
   try {
-    // проверка дублей
     const exists = await q(
       "SELECT * FROM users WHERE email=$1 OR name=$2",
       [email, name]
@@ -309,11 +317,10 @@ app.post("/register", async (req, res) => {
 
     if (exists.rows.length > 0) {
       return res.status(400).json({
-        error: "email or name already used",
+        error: "email or name already exists",
       });
     }
 
-    // bcrypt
     const hashed = await bcrypt.hash(password, 10);
 
     const user = await q(
@@ -324,9 +331,8 @@ app.post("/register", async (req, res) => {
     );
 
     res.json(user.rows[0]);
-
   } catch (e) {
-    console.log("REGISTER ERROR:", e.message);
+    console.log(e);
     res.status(500).json({ error: "register failed" });
   }
 });
@@ -345,18 +351,16 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ error: "user not found" });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
+    const ok = await bcrypt.compare(password, user.password);
 
-    if (!valid) {
+    if (!ok) {
       return res.status(400).json({ error: "wrong password" });
     }
 
     delete user.password;
 
     res.json(user);
-
   } catch (e) {
-    console.log("LOGIN ERROR:", e.message);
     res.status(500).json({ error: "login failed" });
   }
 });
@@ -368,7 +372,12 @@ app.get("/profile/:id", async (req, res) => {
     [req.params.id]
   );
 
-  res.json(user.rows[0] || {});
+  const u = user.rows[0] || {};
+
+  // FIX discount_cars parsing
+  u.discount_cars = safeJSON(u.discount_cars, []);
+
+  res.json(u);
 });
 
 /* ================= CARS ================= */
@@ -377,51 +386,16 @@ app.get("/cars", async (req, res) => {
   res.json(cars.rows);
 });
 
-/* ================= ORDER TO TG ================= */
-app.post("/order-to-tg", async (req, res) => {
-  try {
-    const { user, car, configs, total } = req.body;
+/* ================= BUY ================= */
+app.post("/buy", async (req, res) => {
+  const { userId, carId } = req.body;
 
-    if (!bot) {
-      return res.status(500).json({ error: "bot not ready" });
-    }
+  await q(
+    "UPDATE cars SET user_id=$1 WHERE id=$2",
+    [userId, carId]
+  );
 
-    const chatId = process.env.CHAT_ID;
-
-    if (!chatId) {
-      return res.status(500).json({ error: "CHAT_ID missing" });
-    }
-
-    const text = `
-🚗 NEW ORDER
-
-👤 User: ${user?.name}
-📧 Email: ${user?.email}
-🆔 ID: ${user?.id}
-
-🧾 Username: ${user?.telegram_username ? "@" + user.telegram_username : "none"}
-📱 TG ID: ${user?.telegram_id || "not linked"}
-
-🚘 Car: ${car?.brand} ${car?.name}
-
-⚙️ CONFIGS:
-${configs?.map(c => "• " + c).join("\n")}
-
-💰 TOTAL: ${total} $
-`;
-
-    await bot.sendMessage(chatId, text);
-
-    res.json({ success: true });
-
-  } catch (e) {
-    console.log("🔥 TG ERROR:", e.message);
-
-    res.status(500).json({
-      error: "telegram failed",
-      detail: e.message
-    });
-  }
+  res.json({ success: true });
 });
 
 /* ================= PROMO ================= */
@@ -437,7 +411,7 @@ app.post("/promo/redeem", async (req, res) => {
     return res.status(400).json({ error: "invalid promo" });
   }
 
-  const used = promo.used_by || [];
+  const used = safeJSON(promo.used_by, []);
 
   if (used.includes(userId)) {
     return res.status(400).json({ error: "already used" });
@@ -459,11 +433,42 @@ app.post("/promo/redeem", async (req, res) => {
     [userId, code]
   );
 
-  res.json({
-    success: true,
-    type: promo.type,
-    value: promo.value,
-  });
+  res.json({ success: true });
+});
+
+/* ================= ORDER TO TG ================= */
+app.post("/order-to-tg", async (req, res) => {
+  try {
+    const { user, car, configs, total } = req.body;
+
+    if (!bot) {
+      return res.status(500).json({ error: "bot not ready" });
+    }
+
+    const chatId = process.env.CHAT_ID;
+
+    const text = `
+🚗 NEW ORDER
+
+👤 ${user?.name}
+📧 ${user?.email}
+🆔 ${user?.id}
+
+🚘 ${car?.brand} ${car?.name}
+
+⚙️ CONFIGS:
+${configs?.map(c => "• " + c).join("\n")}
+
+💰 TOTAL: ${total} $
+`;
+
+    await bot.sendMessage(chatId, text);
+
+    res.json({ success: true });
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "telegram failed" });
+  }
 });
 
 /* ================= START ================= */
