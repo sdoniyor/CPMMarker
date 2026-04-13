@@ -437,8 +437,7 @@ app.post("/login", async (req, res) => {
     }
 
     const userRes = await q(
-      `SELECT id, name, email, money, avatar, level, telegram_id, telegram_username
-      FROM users WHERE email=$1`,
+      "SELECT * FROM users WHERE email=$1",
       [email]
     );
 
@@ -448,11 +447,6 @@ app.post("/login", async (req, res) => {
       return res.status(404).json({ error: "user not found" });
     }
 
-    return res.json({
-      user,
-      token: "demo-token"
-    });
-
     const ok = await bcrypt.compare(password, user.password);
 
     if (!ok) {
@@ -461,7 +455,11 @@ app.post("/login", async (req, res) => {
 
     delete user.password;
 
-    return res.json(user);
+    return res.json({
+      user,
+      token: "demo-token"
+    });
+
   } catch (e) {
     console.log("LOGIN ERROR:", e.message);
     return res.status(500).json({ error: "login failed" });
