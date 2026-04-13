@@ -232,8 +232,12 @@ export default function CarDetail() {
   const navigate = useNavigate();
 
   const [car, setCar] = useState<any>(null);
-  const [allConfigs, setAllConfigs] = useState<any[]>([]);
-  const [promoCodes, setPromoCodes] = useState<any[]>([]);
+  const [allConfigs, setAllConfigs] = useState<any>({
+    power: [],
+    tuning: [],
+    wheels: [],
+  });
+
   const [user, setUser] = useState<any>(null);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
@@ -250,63 +254,36 @@ export default function CarDetail() {
 
       if (!text || text.trim().startsWith("<!DOCTYPE")) {
         console.error("❌ Not JSON:", url);
-        return [];
+        return null;
       }
 
       return JSON.parse(text);
     } catch (err) {
       console.error("Fetch error:", url, err);
-      return [];
+      return null;
     }
   };
-
-  /* ================= PROMO ================= */
-  const activePromo = promoCodes.find((p: any) =>
-    p.type === "discount" &&
-    Array.isArray(p.car_ids) &&
-    p.car_ids.map(Number).includes(Number(id))
-  );
-
-  const discountValue = activePromo ? Number(activePromo.value) : 0;
-
-  /* ================= PRICES ================= */
-  const basePrice = Number(car?.price) || 0;
-
-  const discountedBasePrice =
-    discountValue > 0
-      ? Math.floor(basePrice * (1 - discountValue / 100))
-      : basePrice;
-
-  const configPrice =
-    (Number(selectedHp?.price) || 0) +
-    (Number(selectedTuning?.price) || 0) +
-    (Number(selectedWheels?.price) || 0);
-
-  const totalPrice = discountedBasePrice + configPrice;
-  const fullPrice = basePrice + configPrice;
 
   /* ================= LOAD DATA ================= */
   const loadData = async () => {
     try {
-      const [carsData, configsData, promoData] = await Promise.all([
+      const [carsData, configsData] = await Promise.all([
         safeFetchJSON(`${API}/cars`),
-        safeFetchJSON(`${API}/global_car_configs`), // ✅ ТВОЯ ТАБЛИЦА
-        safeFetchJSON(`${API}/promo_codes`)         // ✅ ТВОЯ ТАБЛИЦА
+        safeFetchJSON(`${API}/configs`),
       ]);
 
       const carsArray = Array.isArray(carsData) ? carsData : [];
       const foundCar = carsArray.find((c: any) => c.id == id);
+
       setCar(foundCar);
 
-      setAllConfigs(Array.isArray(configsData) ? configsData : []);
-      setPromoCodes(Array.isArray(promoData) ? promoData : []);
+      const configs = configsData || { power: [], tuning: [], wheels: [] };
+      setAllConfigs(configs);
 
-      // default configs (0$)
-      const configs = Array.isArray(configsData) ? configsData : [];
-
-      setSelectedHp(configs.find((i: any) => i.type === "power" && Number(i.price) === 0));
-      setSelectedTuning(configs.find((i: any) => i.type === "tuning" && Number(i.price) === 0));
-      setSelectedWheels(configs.find((i: any) => i.type === "wheels" && Number(i.price) === 0));
+      // defaults (FREE configs)
+      setSelectedHp(configs.power.find((i: any) => Number(i.price) === 0));
+      setSelectedTuning(configs.tuning.find((i: any) => Number(i.price) === 0));
+      setSelectedWheels(configs.wheels.find((i: any) => Number(i.price) === 0));
 
       const local = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -315,7 +292,6 @@ export default function CarDetail() {
         const userData = await userRes.json();
         setUser(userData);
       }
-
     } catch (err) {
       console.error("LOAD ERROR:", err);
     }
@@ -332,12 +308,21 @@ export default function CarDetail() {
       </div>
     );
 
+  /* ================= PRICE ================= */
+  const basePrice = Number(car?.price) || 0;
+
+  const configPrice =
+    (Number(selectedHp?.price) || 0) +
+    (Number(selectedTuning?.price) || 0) +
+    (Number(selectedWheels?.price) || 0);
+
+  const totalPrice = basePrice + configPrice;
+
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-20">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 pt-6">
-
         <button
           onClick={() => navigate("/market")}
           className="text-white/30 mb-6"
@@ -346,7 +331,6 @@ export default function CarDetail() {
         </button>
 
         <div className="grid lg:grid-cols-2 gap-12">
-
           {/* CAR */}
           <div>
             <h1 className="text-5xl font-black">
@@ -365,46 +349,36 @@ export default function CarDetail() {
 
           {/* CONFIG */}
           <div>
-
             <ConfigGroup
               title="POWER"
-              items={allConfigs.filter(i => i.type === "power")}
+              items={allConfigs.power}
               selected={selectedHp}
               onSelect={setSelectedHp}
             />
 
             <ConfigGroup
               title="TUNING"
-              items={allConfigs.filter(i => i.type === "tuning")}
+              items={allConfigs.tuning}
               selected={selectedTuning}
               onSelect={setSelectedTuning}
             />
 
             <ConfigGroup
               title="WHEELS"
-              items={allConfigs.filter(i => i.type === "wheels")}
+              items={allConfigs.wheels}
               selected={selectedWheels}
               onSelect={setSelectedWheels}
             />
 
             {/* PRICE */}
             <div className="bg-yellow-500 text-black p-8 rounded-3xl mt-8">
-
               <div className="flex justify-between">
                 <span className="font-black">TOTAL</span>
 
                 <div className="text-right">
-
-                  {discountValue > 0 && (
-                    <div className="line-through opacity-50">
-                      {fullPrice.toLocaleString()} $
-                    </div>
-                  )}
-
                   <div className="text-3xl font-black">
                     {totalPrice.toLocaleString()} $
                   </div>
-
                 </div>
               </div>
 
@@ -415,12 +389,11 @@ export default function CarDetail() {
                 BUY
               </button>
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* PAY */}
+      {/* PAY MODAL */}
       {showPay && (
         <div className="fixed inset-0 bg-black flex items-center justify-center">
           <div className="bg-[#111] p-8 rounded-3xl w-[380px]">
@@ -439,7 +412,6 @@ export default function CarDetail() {
             >
               CONFIRM
             </button>
-
           </div>
         </div>
       )}
@@ -447,7 +419,8 @@ export default function CarDetail() {
   );
 }
 
-/* UI */
+/* ================= UI COMPONENTS ================= */
+
 function SpecItem({ label, value }: any) {
   return (
     <div className="bg-white/5 p-4 rounded-xl">
