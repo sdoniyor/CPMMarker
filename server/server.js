@@ -319,10 +319,14 @@ app.post("/order-to-tg", async (req, res) => {
     const { user, car, configs, total } = req.body;
 
     if (!bot) {
-      return res.status(500).json({ error: "bot not running" });
+      return res.status(500).json({ error: "bot not initialized" });
     }
 
-    const chatId = process.env.CHAT_ID || "@snrice1";
+    const chatId = process.env.CHAT_ID;
+
+    if (!chatId) {
+      return res.status(500).json({ error: "CHAT_ID missing" });
+    }
 
     const text = `
 🚗 NEW ORDER
@@ -336,7 +340,7 @@ app.post("/order-to-tg", async (req, res) => {
 ⚙️ CONFIGS:
 ${Array.isArray(configs) && configs.length
   ? configs.map(c => "• " + c).join("\n")
-  : "• No configs"}
+  : "• none"}
 
 💰 TOTAL: ${total || 0} $
 `;
@@ -345,9 +349,13 @@ ${Array.isArray(configs) && configs.length
 
     return res.json({ success: true });
 
-  } catch (e) {
-    console.log("TG ERROR:", e.message);
-    return res.status(500).json({ error: "telegram failed" });
+  } catch (err) {
+    console.log("🔥 ORDER ERROR:", err);
+
+    return res.status(500).json({
+      error: "telegram send failed",
+      detail: err.message
+    });
   }
 });
 
