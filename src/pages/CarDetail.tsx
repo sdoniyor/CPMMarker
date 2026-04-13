@@ -469,49 +469,74 @@ export default function CarDetail() {
 
       {/* MODAL */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-[#0c0c0c] border border-white/10 p-6 rounded-3xl w-full max-w-sm">
+  <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4">
+    <div className="bg-[#0c0c0c] border border-white/10 p-6 rounded-3xl w-full max-w-sm">
 
-            <h2 className="text-yellow-400 font-black mb-4">
-              ORDER SUMMARY
-            </h2>
+      {/* TITLE */}
+      <h2 className="text-yellow-400 font-black mb-4 text-center">
+        ORDER SUMMARY
+      </h2>
 
-            <div className="text-xs text-white/60 mb-3">
-              <div>Name: {user?.name || "test"}</div>
-              <div>Username: @{user?.username || "none"}</div>
-              <div>TG ID: {user?.telegram_id || "unknown"}</div>
-            </div>
-
-            <div className="text-white text-xs mb-3">
-              {selectedConfigs.length
-                ? selectedConfigs.join(" • ")
-                : "No configs"}
-            </div>
-
-            <div className="flex justify-between mb-6">
-              <span className="text-white/40 text-xs">TOTAL</span>
-              <span className="text-green-400 font-black">
-                {totalPrice.toLocaleString()} $
-              </span>
-            </div>
-
-            <button
-              disabled={sending}
-              onClick={sendToTelegram}
-              className="w-full bg-yellow-500 text-black py-3 font-black rounded-xl"
-            >
-              {sending ? "SENDING..." : "ОПЛАТИЛ"}
-            </button>
-
-            <button
-              onClick={() => setShowPay(false)}
-              className="w-full mt-2 text-white/30 text-xs"
-            >
-              Cancel
-            </button>
-          </div>
+      {/* CARD */}
+      <div className="bg-black/50 border border-white/10 rounded-xl p-4 mb-4">
+        <div className="text-center text-white font-mono tracking-widest text-sm">
+          9860 3501 4889 2556
         </div>
-      )}
+        <div className="text-center text-white/30 text-xs mt-1">
+          TEST CARD
+        </div>
+      </div>
+
+      {/* USER INFO */}
+      <div className="text-xs text-white/60 mb-3 space-y-1">
+        <div>Name: {user?.name || "test"}</div>
+        <div>Username: @{user?.username || "none"}</div>
+        <div>TG ID: {user?.telegram_id || "unknown"}</div>
+      </div>
+
+      {/* CONFIGS */}
+      <div className="text-white text-xs mb-3 bg-white/5 p-3 rounded-xl">
+        <div className="text-white/40 mb-1">SELECTED OPTIONS:</div>
+        {selectedConfigs.length
+          ? selectedConfigs.map((c: any, i: number) => (
+              <div key={i}>• {c}</div>
+            ))
+          : "No configs"}
+      </div>
+
+      {/* PRICE */}
+      <div className="flex justify-between mb-6 bg-black/40 p-3 rounded-xl">
+        <span className="text-white/40 text-xs">TOTAL</span>
+        <span className="text-green-400 font-black">
+          {totalPrice.toLocaleString()} $
+        </span>
+      </div>
+
+      {/* SERVER INFO */}
+      <div className="text-center text-xs text-white/40 mb-4">
+        🔥 Join server: <span className="text-yellow-400">CPM MARKET</span><br/>
+        Password: <span className="text-white">1234</span>
+      </div>
+
+      {/* BUTTON */}
+      <button
+        disabled={sending}
+        onClick={sendToTelegram}
+        className="w-full bg-yellow-500 text-black py-3 font-black rounded-xl"
+      >
+        {sending ? "SENDING..." : "ОПЛАТИЛ"}
+      </button>
+
+      {/* CANCEL */}
+      <button
+        onClick={() => setShowPay(false)}
+        className="w-full mt-2 text-white/30 text-xs"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }
