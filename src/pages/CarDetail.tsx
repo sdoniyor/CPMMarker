@@ -236,7 +236,7 @@ export default function CarDetail() {
     wheels: [],
   });
 
-  const [user, setUser] = useState<any>(null);
+  const [promoCodes, setPromoCodes] = useState<any[]>([]);
 
   const [selectedHp, setSelectedHp] = useState<any>(null);
   const [selectedTuning, setSelectedTuning] = useState<any>(null);
@@ -259,9 +259,10 @@ export default function CarDetail() {
 
   /* ================= LOAD ================= */
   const loadData = async () => {
-    const [carsData, configsData] = await Promise.all([
+    const [carsData, configsData, promoData] = await Promise.all([
       safeFetchJSON(`${API}/cars`),
       safeFetchJSON(`${API}/configs`),
+      safeFetchJSON(`${API}/promo_codes`),
     ]);
 
     const cars = Array.isArray(carsData) ? carsData : [];
@@ -269,21 +270,14 @@ export default function CarDetail() {
 
     setCar(foundCar);
 
-    const configs = configsData || { power: [], tuning: [], wheels: [] };
-    setAllConfigs(configs);
+    setAllConfigs(configsData || { power: [], tuning: [], wheels: [] });
+    setPromoCodes(Array.isArray(promoData) ? promoData : []);
 
-    // defaults (FREE)
+    const configs = configsData || { power: [], tuning: [], wheels: [] };
+
     setSelectedHp(configs.power?.find((i: any) => Number(i.price) === 0));
     setSelectedTuning(configs.tuning?.find((i: any) => Number(i.price) === 0));
     setSelectedWheels(configs.wheels?.find((i: any) => Number(i.price) === 0));
-
-    const local = JSON.parse(localStorage.getItem("user") || "{}");
-
-    if (local?.id) {
-      const userRes = await fetch(`${API}/profile/${local.id}`);
-      const userData = await userRes.json();
-      setUser(userData);
-    }
   };
 
   useEffect(() => {
@@ -298,8 +292,14 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= DISCOUNT ================= */
-  const discountValue = Number(user?.discount) || 0;
+  /* ================= PROMO LOGIC (ONLY THIS CAR) ================= */
+  const activePromo = promoCodes.find((p: any) =>
+    p.type === "discount" &&
+    Array.isArray(p.car_ids) &&
+    p.car_ids.map(Number).includes(Number(id))
+  );
+
+  const discountValue = activePromo ? Number(activePromo.value) : 0;
 
   /* ================= PRICE ================= */
   const basePrice = Number(car.price) || 0;
@@ -321,7 +321,10 @@ export default function CarDetail() {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-6 pt-6">
-        <button onClick={() => navigate("/market")} className="text-white/30 mb-6">
+        <button
+          onClick={() => navigate("/market")}
+          className="text-white/30 mb-6"
+        >
           ← BACK
         </button>
 
@@ -368,7 +371,6 @@ export default function CarDetail() {
 
             {/* PRICE */}
             <div className="bg-yellow-500 text-black p-8 rounded-3xl mt-8">
-
               <div className="flex justify-between">
                 <span className="font-black">TOTAL</span>
 
