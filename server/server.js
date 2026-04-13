@@ -237,7 +237,6 @@
 
 
 
-
 require("dotenv").config();
 
 const express = require("express");
@@ -268,14 +267,18 @@ const q = async (text, params) => {
   }
 };
 
-/* ================= TELEGRAM (NO POLLING) ================= */
+/* ================= TELEGRAM (SAFE) ================= */
 let bot = null;
 
 if (process.env.BOT_TOKEN) {
-  bot = new TelegramBot(process.env.BOT_TOKEN, {
-    polling: false, // ❗ FIX 409
-  });
-  console.log("🤖 Telegram ready");
+  try {
+    bot = new TelegramBot(process.env.BOT_TOKEN, {
+      polling: false,
+    });
+    console.log("🤖 Telegram ready");
+  } catch (e) {
+    console.log("BOT ERROR:", e.message);
+  }
 }
 
 /* ================= SAFE JSON ================= */
@@ -301,22 +304,22 @@ app.get("/configs", async (req, res) => {
   });
 });
 
-/* ================= REGISTER (bcrypt + уникальность) ================= */
+/* ================= REGISTER ================= */
 app.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ error: "missing fields" });
+    return res.status(400).json({ error: "fill all fields" });
   }
 
   try {
     const exists = await q(
-      "SELECT * FROM users WHERE email=$1 OR name=$2",
+      "SELECT id FROM users WHERE email=$1 OR name=$2",
       [email, name]
     );
 
     if (exists.rows.length > 0) {
-      return res.status(400).json({
+      return res.status(409).json({
         error: "email or name already exists",
       });
     }
@@ -330,10 +333,10 @@ app.post("/register", async (req, res) => {
       [name, email, hashed]
     );
 
-    res.json(user.rows[0]);
+    return res.json(user.rows[0]);
   } catch (e) {
     console.log(e);
-    res.status(500).json({ error: "register failed" });
+    return res.status(500).json({ error: "register failed" });
   }
 });
 
@@ -348,20 +351,21 @@ app.post("/login", async (req, res) => {
     )).rows[0];
 
     if (!user) {
-      return res.status(400).json({ error: "user not found" });
+      return res.status(404).json({ error: "user not found" });
     }
 
     const ok = await bcrypt.compare(password, user.password);
 
     if (!ok) {
-      return res.status(400).json({ error: "wrong password" });
+      return res.status(401).json({ error: "wrong password" });
     }
 
     delete user.password;
 
-    res.json(user);
+    return res.json(user);
   } catch (e) {
-    res.status(500).json({ error: "login failed" });
+    console.log(e);
+    return res.status(500).json({ error: "login failed" });
   }
 });
 
@@ -374,10 +378,10 @@ app.get("/profile/:id", async (req, res) => {
 
   const u = user.rows[0] || {};
 
-  // FIX discount_cars parsing
   u.discount_cars = safeJSON(u.discount_cars, []);
+  u.used_promo = safeJSON(u.used_promo, []);
 
-  res.json(u);
+  return res.json(u);
 });
 
 /* ================= CARS ================= */
@@ -408,7 +412,7 @@ app.post("/promo/redeem", async (req, res) => {
   )).rows[0];
 
   if (!promo) {
-    return res.status(400).json({ error: "invalid promo" });
+    return res.status(404).json({ error: "invalid promo" });
   }
 
   const used = safeJSON(promo.used_by, []);
@@ -439,34 +443,34 @@ app.post("/promo/redeem", async (req, res) => {
 /* ================= ORDER TO TG ================= */
 app.post("/order-to-tg", async (req, res) => {
   try {
-    const { user, car, configs, total } = req.body;
-
     if (!bot) {
-      return res.status(500).json({ error: "bot not ready" });
+      return res.status(500).json({ error: "telegram bot not ready" });
     }
+
+    const { user, car, configs, total } = req.body;
 
     const chatId = process.env.CHAT_ID;
 
-    const text = `
-🚗 NEW ORDER
+    const text =
+`🚗 NEW ORDER
 
-👤 ${user?.name}
-📧 ${user?.email}
-🆔 ${user?.id}
+👤 ${user?.name || "-"}
+📧 ${user?.email || "-"}
+🆔 ${user?.id || "-"}
 
-🚘 ${car?.brand} ${car?.name}
+🚘 ${car?.brand || ""} ${car?.name || ""}
 
 ⚙️ CONFIGS:
-${configs?.map(c => "• " + c).join("\n")}
+${Array.isArray(configs) ? configs.map(c => "• " + c).join("\n") : "none"}
 
-💰 TOTAL: ${total} $
-`;
+💰 TOTAL: ${total || 0} $`;
 
     await bot.sendMessage(chatId, text);
 
     res.json({ success: true });
+
   } catch (e) {
-    console.log(e);
+    console.log("ORDER ERROR:", e.message);
     res.status(500).json({ error: "telegram failed" });
   }
 });
