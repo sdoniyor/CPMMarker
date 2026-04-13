@@ -285,12 +285,10 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
-// const API = import.meta.env.VITE_API_URL;
 const API = "https://cpmmarker.onrender.com";
 
 export default function CarDetail() {
@@ -307,14 +305,20 @@ export default function CarDetail() {
   const [user, setUser] = useState<any>(null);
   const [showPay, setShowPay] = useState(false);
 
+  // --- РАСЧЕТ ИТОГОВОЙ СУММЫ ---
+  // Складываем цену машины и цены выбранных конфигов (если они есть в БД)
+  const totalPrice = 
+    (Number(car?.price) || 0) + 
+    (Number(selectedHp?.price) || 0) + 
+    (Number(selectedTuning?.price) || 0) + 
+    (Number(selectedWheels?.price) || 0);
+
   /* ================= USER ================= */
   const loadUser = async () => {
     const local = JSON.parse(localStorage.getItem("user") || "{}");
     if (!local?.id) return;
-
     const res = await fetch(`${API}/profile/${local.id}`);
     const data = await res.json();
-
     setUser(data);
     localStorage.setItem("user", JSON.stringify(data));
   };
@@ -323,16 +327,15 @@ export default function CarDetail() {
   const loadCar = async () => {
     const res = await fetch(`${API}/cars`);
     const data = await res.json();
-    setCar(data.find((c: any) => c.id == id));
+    const foundCar = data.find((c: any) => c.id == id);
+    setCar(foundCar);
   };
 
   /* ================= CONFIGS ================= */
   const loadConfigs = async () => {
     const res = await fetch(`${API}/configs`);
     const data = await res.json();
-
     setConfigs(data);
-
     setSelectedHp(data.power?.[0] || null);
     setSelectedTuning(data.tuning?.[0] || null);
     setSelectedWheels(data.wheels?.[0] || null);
@@ -359,20 +362,22 @@ export default function CarDetail() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user: user?.name,
+          user: user?.name || "Guest",
           car: {
             name: car.name,
             brand: car.brand,
+            basePrice: car.price
           },
           configs: {
             hp: selectedHp?.name,
             tuning: selectedTuning?.name,
             wheels: selectedWheels?.name,
           },
+          totalAmount: totalPrice, // ОТПРАВЛЯЕМ СУММУ В ТГ
         }),
       });
 
-      alert("Payment successful! Order sent to Telegram 🚀");
+      alert(`Payment successful! Total: $${totalPrice} sent to Telegram 🚀`);
       setShowPay(false);
       navigate("/market");
     } catch (err) {
@@ -382,33 +387,26 @@ export default function CarDetail() {
 
   return (
     <div className="min-h-screen bg-[#050608] text-white font-sans relative">
-
       <Navbar />
 
-      {/* BACK BUTTON */}
-      <button
-        onClick={() => navigate("/market")}
-        className="p-4 text-white/50 hover:text-yellow-400"
-      >
+      <button onClick={() => navigate("/market")} className="p-4 text-white/50 hover:text-yellow-400">
         ← BACK
       </button>
 
-      {/* TITLE */}
       <h1 className="text-5xl font-black text-center text-yellow-400">
         {car.brand} {car.name}
       </h1>
 
-      {/* CAR IMAGE */}
       <div className="flex justify-center mt-10">
-        <img
-          src={car.image_url || car.image}
-          className="max-w-[700px] drop-shadow-2xl"
-        />
+        <img src={car.image_url || car.image} className="max-w-[700px] drop-shadow-2xl" />
       </div>
 
-      {/* CONFIG */}
-      <div className="flex justify-center gap-6 mt-10">
+      {/* ОТОБРАЖЕНИЕ ТЕКУЩЕЙ ЦЕНЫ */}
+      <div className="text-center mt-4">
+        <p className="text-2xl font-bold text-green-400">Total Price: ${totalPrice}</p>
+      </div>
 
+      <div className="flex justify-center gap-6 mt-10">
         {/* HP */}
         <div>
           <p className="text-yellow-400 mb-2">POWER</p>
@@ -416,13 +414,9 @@ export default function CarDetail() {
             <button
               key={c.id}
               onClick={() => setSelectedHp(c)}
-              className={`block px-4 py-2 mb-2 rounded ${
-                selectedHp?.id === c.id
-                  ? "bg-yellow-500 text-black"
-                  : "bg-white/10"
-              }`}
+              className={`block px-4 py-2 mb-2 rounded w-full ${selectedHp?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"}`}
             >
-              {c.name}
+              {c.name} (+${c.price || 0})
             </button>
           ))}
         </div>
@@ -434,13 +428,9 @@ export default function CarDetail() {
             <button
               key={c.id}
               onClick={() => setSelectedTuning(c)}
-              className={`block px-4 py-2 mb-2 rounded ${
-                selectedTuning?.id === c.id
-                  ? "bg-yellow-500 text-black"
-                  : "bg-white/10"
-              }`}
+              className={`block px-4 py-2 mb-2 rounded w-full ${selectedTuning?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"}`}
             >
-              {c.name}
+              {c.name} (+${c.price || 0})
             </button>
           ))}
         </div>
@@ -452,59 +442,60 @@ export default function CarDetail() {
             <button
               key={c.id}
               onClick={() => setSelectedWheels(c)}
-              className={`block px-4 py-2 mb-2 rounded ${
-                selectedWheels?.id === c.id
-                  ? "bg-yellow-500 text-black"
-                  : "bg-white/10"
-              }`}
+              className={`block px-4 py-2 mb-2 rounded w-full ${selectedWheels?.id === c.id ? "bg-yellow-500 text-black" : "bg-white/10"}`}
             >
-              {c.name}
+              {c.name} (+${c.price || 0})
             </button>
           ))}
         </div>
       </div>
 
-      {/* BUY BUTTON */}
       <div className="flex justify-center mt-10">
         <button
           onClick={() => setShowPay(true)}
-          className="bg-yellow-500 text-black px-10 py-4 text-xl font-bold rounded-xl"
+          className="bg-yellow-500 text-black px-10 py-4 text-xl font-bold rounded-xl hover:bg-yellow-400 transition"
         >
-          BUY NOW
+          BUY NOW — ${totalPrice}
         </button>
       </div>
 
       {/* PAYMENT MODAL */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
-
-          <div className="bg-[#111] p-6 rounded-xl w-[350px] border border-yellow-500">
-
-            <h2 className="text-yellow-400 font-bold mb-4">
-              PAYMENT
-            </h2>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-[#111] p-6 rounded-xl w-[350px] border border-yellow-500 shadow-2xl">
+            <h2 className="text-yellow-400 font-bold mb-4 text-center">ORDER PAYMENT</h2>
+            
+            <div className="mb-4 text-sm bg-white/5 p-3 rounded">
+                <p>Car: {car.brand} {car.name}</p>
+                <p className="text-green-400 font-bold text-lg mt-2">Total: ${totalPrice}</p>
+            </div>
 
             <input
-              placeholder="Card Number"
-              className="w-full p-2 mb-2 bg-black border border-white/20"
+              placeholder="4444 4444 4444 4444"
+              className="w-full p-2 mb-2 bg-black border border-white/20 text-white rounded"
             />
-
             <input
               placeholder="Card Holder Name"
-              className="w-full p-2 mb-4 bg-black border border-white/20"
+              className="w-full p-2 mb-4 bg-black border border-white/20 text-white rounded"
             />
 
-            <button
-              onClick={completePayment}
-              className="w-full bg-green-500 text-black font-bold py-2"
-            >
-              COMPLETE PAYMENT
-            </button>
-
+            <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPay(false)}
+                  className="flex-1 bg-red-500/20 text-red-500 font-bold py-2 rounded"
+                >
+                  CANCEL
+                </button>
+                <button
+                  onClick={completePayment}
+                  className="flex-[2] bg-green-500 text-black font-bold py-2 rounded hover:bg-green-400"
+                >
+                  PAY ${totalPrice}
+                </button>
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
