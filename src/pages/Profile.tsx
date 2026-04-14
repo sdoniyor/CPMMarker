@@ -325,7 +325,7 @@ export default function Profile() {
 
     const base64 = await convertBase64(avatarFile);
 
-    const data = await safeFetch(`${API}/update-avatar`, {
+    const data = await safeFetch(`${API}/profile/update-avatar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: localUser.id, avatar: base64 }),
