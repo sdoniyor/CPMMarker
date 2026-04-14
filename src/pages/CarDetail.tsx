@@ -412,7 +412,7 @@ export default function CarDetail() {
   /* ================= LOAD ================= */
   const load = async () => {
     const [carsData, configsData] = await Promise.all([
-      safeFetch(`${API}/cars`),
+      safeFetch(`${API}/market/cars`),
       safeFetch(`${API}/market/configs`),
     ]);
 
