@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -8,7 +7,7 @@ const authRoutes = require("./routes/auth");
 const marketRoutes = require("./routes/market");
 const profileRoutes = require("./routes/profile");
 const telegramRoutes = require("./routes/telegram");
-const promoRoutes = require("./routes/promo"); 
+const promoRoutes = require("./routes/promo"); // 🔥 ДОБАВЬ
 
 const app = express();
 
@@ -31,10 +30,9 @@ app.use("/profile", profileRoutes);
 app.use("/telegram", telegramRoutes);
 
 /* PROMO */
-app.use("/promo", promoRoutes); 
+app.use("/promo", promoRoutes); // 🔥 ВАЖНО
 
-
-/* ================= HEALTH CHECK ================= */
+/* ================= ROOT ================= */
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -42,7 +40,7 @@ app.get("/", (req, res) => {
   });
 });
 
-/* ================= 404 HANDLER ================= */
+/* ================= 404 ================= */
 app.use((req, res) => {
   res.status(404).json({
     error: "Route not found",
@@ -50,7 +48,7 @@ app.use((req, res) => {
   });
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
