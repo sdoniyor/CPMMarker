@@ -203,7 +203,7 @@ export default function Navbar() {
       <div className="flex items-center gap-4 md:gap-8">
         
         {/* BALANCE BOX */}
-        <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl hover:border-yellow-500/30 transition-colors">
+        {/* <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl hover:border-yellow-500/30 transition-colors">
           <div className="w-8 h-8 bg-yellow-500/10 rounded-full flex items-center justify-center text-yellow-500 font-bold">
             $
           </div>
@@ -213,7 +213,7 @@ export default function Navbar() {
               {(user?.money || 0).toLocaleString()}
             </span>
           </div>
-        </div>
+        </div> */}
 
         {/* PROFILE CHIP */}
         <div
