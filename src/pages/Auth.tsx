@@ -172,7 +172,7 @@ export default function Auth() {
   const isRegister = mode === "register";
 
   const handleAuth = async () => {
-    const endpoint = isRegister ? "/register" : "/login";
+    const endpoint = isRegister ? "/auth/register" : "/auth/login";
 
     const body = isRegister
       ? { name, email, password }
