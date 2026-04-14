@@ -413,7 +413,7 @@ export default function CarDetail() {
   const load = async () => {
     const [carsData, configsData] = await Promise.all([
       safeFetch(`${API}/cars`),
-      safeFetch(`${API}/configs`),
+      safeFetch(`${API}/market/configs`),
     ]);
 
     const cars = Array.isArray(carsData) ? carsData : [];
