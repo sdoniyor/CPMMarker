@@ -511,13 +511,13 @@ export default function CarDetail() {
         total: totalPrice,
       };
 
-      await fetch(`${API}/order-to-tg`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+    await fetch(`${API}/telegram/order-to-tg`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
 
       alert("ORDER SENT 🚀");
       navigate("/market");
