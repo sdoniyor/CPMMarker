@@ -304,7 +304,7 @@ export default function Market() {
   };
 
   const loadUser = async (id: number) => {
-    const data = await safeFetch(`${API}/profile/${id}`);
+    const data = await safeFetch(`${API}/profile/me`);
 
     if (data) {
       console.log("👤 USER:", data);

@@ -130,7 +130,7 @@ export default function Navbar() {
 
     const res = await fetch(`${API}/profile/me`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
     });
 
