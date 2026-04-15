@@ -93,7 +93,7 @@ export default function Market() {
   return (
     <div className="min-h-screen bg-[#050608] text-white">
 
-      <Navbar />
+      {/* <Navbar /> */}
 
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 

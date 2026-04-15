@@ -5,45 +5,19 @@ import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import MarketPage from "./pages/MarketPage";
 
-/* Layout wrapper */
-function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Navbar />
-      {children}
-    </>
-  );
-}
-
 export default function App() {
   return (
     <BrowserRouter>
+
+      {/* Navbar только тут */}
+      <Navbar />
+
       <Routes>
-
-        {/* AUTH без navbar */}
         <Route path="/" element={<AuthPage />} />
-
-        {/* MARKET с navbar */}
-        <Route
-          path="/market"
-          element={
-            <Layout>
-              <MarketPage />
-            </Layout>
-          }
-        />
-
-        {/* PROFILE с navbar */}
-        <Route
-          path="/profile"
-          element={
-            <Layout>
-              <ProfilePage />
-            </Layout>
-          }
-        />
-
+        <Route path="/market" element={<MarketPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
+
     </BrowserRouter>
   );
 }

@@ -64,7 +64,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white">
-      <Navbar />
+      {/* <Navbar /> */}
 
       <div className="max-w-5xl mx-auto p-6">
 
