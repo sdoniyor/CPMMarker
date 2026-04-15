@@ -188,16 +188,20 @@ export default function Auth() {
   const isRegister = mode === "register";
 
   const loadProfile = async (token: string) => {
-    const res = await fetch(`${API}/profile/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const res = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data?.id) {
-      localStorage.setItem("user", JSON.stringify(data));
+      if (data?.id) {
+        localStorage.setItem("user", JSON.stringify(data));
+      }
+    } catch (e) {
+      console.log("PROFILE ERROR", e);
     }
   };
 
@@ -227,8 +231,17 @@ export default function Auth() {
       return;
     }
 
+    // 🔥 FIX 1: защита от пустого token
+    if (!data?.token) {
+      alert("No token from server");
+      return;
+    }
+
     // 🔥 SAVE TOKEN
     localStorage.setItem("token", data.token);
+
+    // 🔥 CLEAR OLD USER (ВАЖНО!)
+    localStorage.removeItem("user");
 
     // 🔥 LOAD USER FROM JWT
     await loadProfile(data.token);
@@ -257,14 +270,20 @@ export default function Auth() {
         </div>
 
         {isRegister && (
-          <input value={name} onChange={e => setName(e.target.value)}
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
             placeholder="Username"
-            className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+            className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10"
+          />
         )}
 
-        <input value={email} onChange={e => setEmail(e.target.value)}
+        <input
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           placeholder="Email"
-          className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+          className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10"
+        />
 
         <div className="relative">
           <input
@@ -286,6 +305,7 @@ export default function Auth() {
           className="w-full mt-6 py-4 bg-yellow-500 text-black font-black rounded-xl">
           {isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
         </button>
+
       </div>
     </div>
   );
