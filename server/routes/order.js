@@ -1,7 +1,7 @@
 const express = require("express");
-const { q } = require("../db");
 const auth = require("../middleware/auth");
 const bot = require("../bot/bot");
+const { q } = require("../db");
 
 const router = express.Router();
 
@@ -17,6 +17,10 @@ router.post("/", auth, async (req, res) => {
 
     const { car, total } = req.body;
 
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     const message =
       `🚗 NEW ORDER\n\n` +
       `👤 ${user.name}\n` +
@@ -28,8 +32,8 @@ router.post("/", auth, async (req, res) => {
 
     res.json({ success: true });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({ error: "Order error" });
+    console.log("ORDER ERROR:", e);
+    res.status(500).json({ error: "Order failed" });
   }
 });
 

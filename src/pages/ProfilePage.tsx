@@ -5,13 +5,13 @@ const API = "https://cpmmarker.onrender.com";
 export default function Profile() {
   const [user, setUser] = useState<any>(null);
   const [promo, setPromo] = useState("");
-  const [avatar, setAvatar] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [tgLoading, setTgLoading] = useState(false);
 
   const token = localStorage.getItem("token");
 
-  /* ================= SAFE LOAD USER ================= */
+  /* ================= LOAD USER ================= */
   const loadUser = async () => {
     try {
       const res = await fetch(`${API}/profile/me`, {
@@ -21,9 +21,12 @@ export default function Profile() {
       });
 
       const data = await res.json();
+
       if (data?.id) setUser(data);
+      else setUser(null);
     } catch (e) {
       console.log("LOAD USER ERROR:", e);
+      setUser(null);
     }
   };
 
@@ -31,7 +34,7 @@ export default function Profile() {
     loadUser();
   }, []);
 
-  /* ================= TELEGRAM CONNECT (FIXED) ================= */
+  /* ================= TELEGRAM CONNECT ================= */
   const connectTG = async () => {
     try {
       setTgLoading(true);
@@ -57,11 +60,9 @@ export default function Profile() {
     }
   };
 
-  /* ================= PROMO (SAFE) ================= */
+  /* ================= PROMO ================= */
   const applyPromo = async () => {
-    if (!promo || promo.length < 3) {
-      return alert("Invalid promo code");
-    }
+    if (!promo.trim()) return alert("Enter promo code");
 
     setLoading(true);
 
@@ -82,7 +83,7 @@ export default function Profile() {
         setPromo("");
         loadUser();
       } else {
-        alert(data?.error || "Error");
+        alert(data?.error || "Invalid promo");
       }
     } catch (e) {
       console.log(e);
@@ -91,36 +92,27 @@ export default function Profile() {
     }
   };
 
-  /* ================= AVATAR VALIDATION ================= */
-  const isValidUrl = (url: string) => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
+  /* ================= AVATAR UPLOAD (FILE) ================= */
   const uploadAvatar = async () => {
-    if (!isValidUrl(avatar)) {
-      return alert("Invalid image URL");
-    }
+    if (!file) return alert("Select image first");
+
+    const form = new FormData();
+    form.append("avatar", file);
 
     try {
-      const res = await fetch(`${API}/profile/update-avatar`, {
+      const res = await fetch(`${API}/profile/upload-avatar`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ avatar }),
+        body: form,
       });
 
       const data = await res.json();
 
       if (data?.id) {
         setUser(data);
-        setAvatar("");
+        setFile(null);
         alert("Avatar updated!");
       }
     } catch (e) {
@@ -128,11 +120,11 @@ export default function Profile() {
     }
   };
 
-  /* ================= LOADING ================= */
+  /* ================= LOADING STATE ================= */
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-[#0a0b0d]">
-        LOADING...
+        Loading...
       </div>
     );
   }
@@ -147,17 +139,24 @@ export default function Profile() {
         <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6">
 
           <div className="w-24 h-24 rounded-2xl bg-yellow-400 text-black flex items-center justify-center text-3xl font-black overflow-hidden">
+
             {user.avatar ? (
-              <img src={user.avatar} className="w-full h-full object-cover" />
+              <img
+                src={user.avatar}
+                className="w-full h-full object-cover"
+              />
             ) : (
               user.name?.[0]
             )}
+
           </div>
 
           <div>
             <h1 className="text-3xl font-black">{user.name}</h1>
             <p className="text-white/40">{user.email}</p>
-            <p className="text-sm text-white/60 mt-1">ID: #{user.id}</p>
+            <p className="text-sm text-white/60 mt-1">
+              ID: #{user.id}
+            </p>
           </div>
 
         </div>
@@ -173,11 +172,14 @@ export default function Profile() {
           </div>
 
           <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
+
             <p className="text-white/40 text-sm">Telegram</p>
 
             {user.telegram_id ? (
               <div>
-                <p className="text-green-400 font-bold">Connected</p>
+                <p className="text-green-400 font-bold">
+                  Connected
+                </p>
                 <p className="text-sm text-white/60">
                   @{user.telegram_username}
                 </p>
@@ -191,6 +193,7 @@ export default function Profile() {
                 {tgLoading ? "Connecting..." : "Connect Telegram"}
               </button>
             )}
+
           </div>
 
           <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
@@ -225,23 +228,25 @@ export default function Profile() {
 
         </div>
 
-        {/* AVATAR */}
+        {/* AVATAR UPLOAD */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
 
-          <h2 className="font-bold mb-3">Change Avatar</h2>
+          <h2 className="font-bold mb-3">Upload Avatar</h2>
 
           <input
-            value={avatar}
-            onChange={(e) => setAvatar(e.target.value)}
-            placeholder="Image URL..."
-            className="w-full px-4 py-2 bg-black/40 border border-white/10 rounded-xl"
+            type="file"
+            accept="image/*"
+            onChange={(e) =>
+              setFile(e.target.files?.[0] || null)
+            }
+            className="w-full text-sm"
           />
 
           <button
             onClick={uploadAvatar}
             className="mt-3 px-6 py-2 bg-green-500 text-white font-bold rounded-xl"
           >
-            Save Avatar
+            Upload
           </button>
 
         </div>
