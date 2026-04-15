@@ -19,8 +19,8 @@ router.post("/redeem", async (req, res) => {
     }
 
     // ищем промокод
-    const promoRes = await q(
-      "SELECT * FROM promos WHERE code = $1",
+      const promoRes = await q(
+      "SELECT * FROM promo_codes WHERE code = $1",
       [code]
     );
 
@@ -40,15 +40,13 @@ router.post("/redeem", async (req, res) => {
       });
     }
 
-    // начисляем скидку пользователю
     await q(
       "UPDATE users SET discount = COALESCE(discount, 0) + $1 WHERE id = $2",
       [promo.discount, userId]
     );
 
-    // помечаем промо как использованный
     await q(
-      "UPDATE promos SET used = true, used_by = $1 WHERE code = $2",
+      "UPDATE promo_codes SET used = true, used_by = $1 WHERE code = $2",
       [userId, code]
     );
 
