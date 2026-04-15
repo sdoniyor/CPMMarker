@@ -13,7 +13,7 @@
 
 //     const parsed = JSON.parse(raw);
 
-//     // 🔥 ВАЖНО: у тебя user лежит как { user, token }
+//     // backend может вернуть {user, token}
 //     return parsed.user || parsed;
 //   } catch {
 //     return null;
@@ -24,14 +24,18 @@
 // const safeFetch = async (url: string) => {
 //   try {
 //     const res = await fetch(url);
+
 //     const text = await res.text();
 
-//     if (!text) return null;
+//     if (!text || text.startsWith("<!DOCTYPE")) {
+//       console.log("❌ NOT JSON:", text);
+//       return null;
+//     }
 
 //     try {
 //       return JSON.parse(text);
 //     } catch {
-//       console.log("❌ NOT JSON:", text);
+//       console.log("❌ JSON PARSE ERROR:", text);
 //       return null;
 //     }
 //   } catch (e) {
@@ -59,13 +63,15 @@
 //     }
 //   }, []);
 
+//   /* ================= API CALLS (FIXED ROUTES) ================= */
 //   const loadCars = async () => {
-//     const data = await safeFetch(`${API}/cars`);
+//     const data = await safeFetch(`${API}/market/cars`);
 //     setCars(Array.isArray(data) ? data : []);
 //   };
 
 //   const loadUser = async (id: number) => {
 //     const data = await safeFetch(`${API}/profile/${id}`);
+
 //     if (data) {
 //       setUser(data);
 //       localStorage.setItem("user", JSON.stringify(data));
@@ -104,9 +110,7 @@
 //       car.name?.toLowerCase().includes(search.toLowerCase()) ||
 //       car.brand?.toLowerCase().includes(search.toLowerCase());
 
-//     return onlyPremium
-//       ? matchSearch && car.premium
-//       : matchSearch;
+//     return onlyPremium ? matchSearch && car.premium : matchSearch;
 //   });
 
 //   /* ================= UI ================= */
@@ -140,18 +144,18 @@
 //             <button
 //               onClick={() => setOnlyPremium(!onlyPremium)}
 //               className={`px-4 py-2 rounded-xl ${
-//                 onlyPremium
-//                   ? "bg-yellow-400 text-black"
-//                   : "bg-white/10"
+//                 onlyPremium ? "bg-yellow-400 text-black" : "bg-white/10"
 //               }`}
 //             >
 //               👑 Premium
 //             </button>
+
 //           </div>
 //         </div>
 
 //         {/* CARS */}
 //         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
 //           {filteredCars.map((car) => {
 //             const hasDiscount = isDiscountCar(car);
 //             const finalPrice = getPrice(car);
@@ -160,8 +164,9 @@
 //               <div
 //                 key={car.id}
 //                 onClick={() => navigate(`/car/${car.id}`)}
-//                 className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer hover:border-yellow-400 border border-transparent"
+//                 className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
 //               >
+
 //                 <img
 //                   src={car.image_url}
 //                   className="w-full h-40 object-contain"
@@ -171,8 +176,8 @@
 //                   {car.brand} {car.name}
 //                 </h2>
 
-//                 {/* PRICE */}
 //                 <div className="mt-2">
+
 //                   {hasDiscount && (
 //                     <div className="text-red-400 line-through text-sm">
 //                       ${car.price}
@@ -182,10 +187,12 @@
 //                   <div className="text-green-400 font-bold text-lg">
 //                     ${finalPrice}
 //                   </div>
+
 //                 </div>
 //               </div>
 //             );
 //           })}
+
 //         </div>
 
 //         {/* EMPTY */}
@@ -198,6 +205,12 @@
 //     </div>
 //   );
 // }
+
+
+
+
+
+
 
 
 
@@ -215,8 +228,6 @@ const getUser = () => {
     if (!raw || raw === "undefined" || raw === "null") return null;
 
     const parsed = JSON.parse(raw);
-
-    // backend может вернуть {user, token}
     return parsed.user || parsed;
   } catch {
     return null;
@@ -227,7 +238,6 @@ const getUser = () => {
 const safeFetch = async (url: string) => {
   try {
     const res = await fetch(url);
-
     const text = await res.text();
 
     if (!text || text.startsWith("<!DOCTYPE")) {
@@ -235,15 +245,38 @@ const safeFetch = async (url: string) => {
       return null;
     }
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      console.log("❌ JSON PARSE ERROR:", text);
-      return null;
-    }
+    return JSON.parse(text);
   } catch (e) {
     console.log("❌ FETCH ERROR:", e);
     return null;
+  }
+};
+
+/* ================= PARSE discount_cars ================= */
+const parseDiscountCars = (val: any): number[] => {
+  try {
+    if (!val) return [];
+
+    // уже массив
+    if (Array.isArray(val)) return val.map(Number);
+
+    // postgres {1,2,3}
+    if (typeof val === "string" && val.startsWith("{")) {
+      return val
+        .replace("{", "")
+        .replace("}", "")
+        .split(",")
+        .map(Number);
+    }
+
+    // json строка "[1,2,3]"
+    if (typeof val === "string") {
+      return JSON.parse(val);
+    }
+
+    return [];
+  } catch {
+    return [];
   }
 };
 
@@ -254,7 +287,6 @@ export default function Market() {
   const [onlyPremium, setOnlyPremium] = useState(false);
 
   const navigate = useNavigate();
-
   const localUser = getUser();
 
   /* ================= LOAD ================= */
@@ -266,7 +298,6 @@ export default function Market() {
     }
   }, []);
 
-  /* ================= API CALLS (FIXED ROUTES) ================= */
   const loadCars = async () => {
     const data = await safeFetch(`${API}/market/cars`);
     setCars(Array.isArray(data) ? data : []);
@@ -276,34 +307,33 @@ export default function Market() {
     const data = await safeFetch(`${API}/profile/${id}`);
 
     if (data) {
+      console.log("👤 USER:", data);
+
       setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
+      localStorage.setItem("user", JSON.stringify({ user: data }));
     }
   };
 
-  /* ================= HELPERS ================= */
-  const parseSafe = (val: any) => {
-    try {
-      if (!val || val === "undefined") return [];
-      return typeof val === "string" ? JSON.parse(val) : val;
-    } catch {
-      return [];
-    }
-  };
-
+  /* ================= LOGIC ================= */
   const isDiscountCar = (car: any) => {
     if (!user?.discount) return false;
 
-    const allowed = parseSafe(user.discount_cars);
-    return Array.isArray(allowed) && allowed.includes(car.id);
+    const allowed = parseDiscountCars(user.discount_cars);
+
+    console.log("🚗 CHECK:", car.id, allowed);
+
+    return allowed.includes(Number(car.id));
   };
 
   const getPrice = (car: any) => {
-    if (isDiscountCar(car)) {
+    const hasDiscount = isDiscountCar(car);
+
+    if (hasDiscount) {
       return Math.floor(
         car.price - (car.price * user.discount) / 100
       );
     }
+
     return car.price;
   };
 
@@ -347,7 +377,9 @@ export default function Market() {
             <button
               onClick={() => setOnlyPremium(!onlyPremium)}
               className={`px-4 py-2 rounded-xl ${
-                onlyPremium ? "bg-yellow-400 text-black" : "bg-white/10"
+                onlyPremium
+                  ? "bg-yellow-400 text-black"
+                  : "bg-white/10"
               }`}
             >
               👑 Premium
@@ -404,6 +436,7 @@ export default function Market() {
             No cars found
           </div>
         )}
+
       </div>
     </div>
   );
