@@ -7,7 +7,7 @@ const API = "https://cpmmarker.onrender.com";
 /* ================= GET TOKEN ================= */
 const getToken = () => localStorage.getItem("token");
 
-/* ================= SAFE FETCH WITH JWT ================= */
+/* ================= SAFE FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
   try {
     const token = getToken();
@@ -22,7 +22,10 @@ const safeFetch = async (url: string, options: any = {}) => {
 
     const text = await res.text();
 
-    if (!text || text.startsWith("<!DOCTYPE")) return null;
+    if (!text || text.startsWith("<!DOCTYPE")) {
+      console.log("❌ NOT JSON:", text);
+      return null;
+    }
 
     return JSON.parse(text);
   } catch (e) {
@@ -51,7 +54,12 @@ export default function Market() {
   /* ================= LOAD CARS ================= */
   const loadCars = async () => {
     const data = await safeFetch(`${API}/market/cars`);
-    setCars(Array.isArray(data) ? data : []);
+
+    if (Array.isArray(data)) {
+      setCars(data);
+    } else {
+      setCars([]);
+    }
   };
 
   useEffect(() => {
@@ -61,12 +69,25 @@ export default function Market() {
 
   /* ================= PRICE LOGIC ================= */
   const getPrice = (car: any) => {
-    if (!user?.discount) return car.price;
+    const discount = user?.discount || 0;
+
+    if (!discount) return car.price;
 
     return Math.floor(
-      car.price - (car.price * user.discount) / 100
+      car.price - (car.price * discount) / 100
     );
   };
+
+  /* ================= SAFE FILTER ================= */
+  const filteredCars = (cars || [])
+    .filter((car) => {
+      const name = car?.name?.toLowerCase() || "";
+      const brand = car?.brand?.toLowerCase() || "";
+      const s = search.toLowerCase();
+
+      return name.includes(s) || brand.includes(s);
+    })
+    .filter((car) => (onlyPremium ? car?.premium : true));
 
   /* ================= UI ================= */
   return (
@@ -114,37 +135,33 @@ export default function Market() {
         {/* CARS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          {cars
-            .filter((car) =>
-              car.name?.toLowerCase().includes(search.toLowerCase()) ||
-              car.brand?.toLowerCase().includes(search.toLowerCase())
-            )
-            .filter((car) => (onlyPremium ? car.premium : true))
-            .map((car) => (
-              <div
-                key={car.id}
-                onClick={() => navigate(`/car/${car.id}`)}
-                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
-              >
+          {filteredCars.map((car) => (
+            <div
+              key={car.id}
+              onClick={() => navigate(`/car/${car.id}`)}
+              className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
+            >
 
-                <img
-                  src={car.image_url}
-                  className="w-full h-40 object-contain"
-                />
+              <img
+                src={car.image_url}
+                className="w-full h-40 object-contain"
+              />
 
-                <h2 className="text-xl font-bold mt-2">
-                  {car.brand} {car.name}
-                </h2>
+              <h2 className="text-xl font-bold mt-2">
+                {car?.brand} {car?.name}
+              </h2>
 
-                <div className="mt-2 text-green-400 font-bold text-lg">
-                  ${getPrice(car)}
-                </div>
-
+              <div className="mt-2 text-green-400 font-bold text-lg">
+                ${getPrice(car)}
               </div>
-            ))}
+
+            </div>
+          ))}
+
         </div>
 
-        {cars.length === 0 && (
+        {/* EMPTY STATE */}
+        {filteredCars.length === 0 && (
           <div className="text-center mt-20 text-white/30">
             Loading cars...
           </div>
