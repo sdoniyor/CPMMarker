@@ -124,39 +124,32 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
 
-  const load = async () => {
-    const token = getToken();
-    if (!token) return;
-
-    const res = await fetch(`${API}/profile/me`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
-
-    const data = await res.json();
-
-    if (data?.id) {
-      setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
-    }
-  };
-
   useEffect(() => {
+    const load = async () => {
+      const token = getToken();
+      if (!token) return;
+
+      const res = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data?.id) setUser(data);
+    };
+
     load();
   }, []);
 
   return (
-    <nav className="flex justify-between p-4 text-white">
-
-      <div onClick={() => navigate("/market")}>
-        CPM MARKET
-      </div>
+    <nav>
+      <div onClick={() => navigate("/market")}>CPM MARKET</div>
 
       <div onClick={() => navigate("/profile")}>
         {user?.name || "Guest"}
       </div>
-
     </nav>
   );
 }

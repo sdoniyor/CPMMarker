@@ -242,203 +242,122 @@
 // }
 
 
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
+type Mode = "login" | "register";
 
 const API = "https://cpmmarker.onrender.com";
 
-/* ================= TOKEN ================= */
-const getToken = () => localStorage.getItem("token");
+export default function Auth() {
+  const [mode, setMode] = useState<Mode>("login");
+  const [showPassword, setShowPassword] = useState(false);
 
-/* ================= SAFE FETCH (JWT FIXED) ================= */
-const safeFetch = async (url: string, options?: any) => {
-  const token = getToken();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(options?.headers || {}),
-    },
-  });
+  const isRegister = mode === "register";
 
-  return res.json();
-};
+  const loadProfile = async (token: string) => {
+    const res = await fetch(`${API}/profile/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-export default function Profile() {
-  const navigate = useNavigate();
-
-  const [user, setUser] = useState<any>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [promo, setPromo] = useState("");
-  const [promoStatus, setPromoStatus] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  /* ================= LOAD PROFILE ================= */
-  const loadProfile = async () => {
-    const data = await safeFetch(`${API}/profile/me`);
+    const data = await res.json();
 
     if (data?.id) {
-      setUser(data);
       localStorage.setItem("user", JSON.stringify(data));
-    } else {
-      console.log("AUTH ERROR:", data);
     }
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  const handleAuth = async () => {
+    const endpoint = isRegister ? "/auth/register" : "/auth/login";
 
-  /* ================= BASE64 ================= */
-  const convertBase64 = (file: File) =>
-    new Promise<string>((res, rej) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => res(reader.result as string);
-      reader.onerror = rej;
-    });
+    const body = isRegister
+      ? { name, email, password }
+      : { email, password };
 
-  /* ================= UPDATE AVATAR ================= */
-  const updateAvatar = async () => {
-    if (!avatarFile) return;
-
-    setLoading(true);
-
-    const base64 = await convertBase64(avatarFile);
-
-    const data = await safeFetch(`${API}/profile/update-avatar`, {
+    const res = await fetch(`${API}${endpoint}`, {
       method: "POST",
-      body: JSON.stringify({ avatar: base64 }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
 
-    if (data?.id) {
-      setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
-      setAvatarFile(null);
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data?.error || "Error");
+      return;
     }
 
-    setLoading(false);
-  };
-
-  /* ================= PROMO ================= */
-  const applyPromo = async () => {
-    const data = await safeFetch(`${API}/promo/redeem`, {
-      method: "POST",
-      body: JSON.stringify({ code: promo }),
-    });
-
-    if (data?.success) {
-      setPromoStatus("✅ OK");
-      setPromo("");
-      loadProfile();
-    } else {
-      setPromoStatus("❌ " + (data?.error || "Error"));
+    if (isRegister) {
+      alert("Account created!");
+      setMode("login");
+      return;
     }
-  };
 
-  /* ================= UI ================= */
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0a0b0d] flex items-center justify-center">
-        <div className="text-yellow-400 font-black text-2xl">
-          LOADING...
-        </div>
-      </div>
-    );
-  }
+    // 🔥 SAVE TOKEN
+    localStorage.setItem("token", data.token);
+
+    // 🔥 LOAD USER FROM JWT
+    await loadProfile(data.token);
+
+    window.location.href = "/market";
+  };
 
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-white pb-20">
-      <Navbar />
+    <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="w-[420px] p-8 rounded-3xl border border-white/10 bg-white/5">
 
-      <div className="max-w-5xl mx-auto px-6 pt-10">
+        <h1 className="text-3xl font-black text-center text-yellow-400 mb-6">
+          CPM MARKET
+        </h1>
+
+        <div className="flex mb-6 bg-black/40 rounded-xl p-1">
+          <button onClick={() => setMode("login")}
+            className={`flex-1 py-2 rounded-lg font-bold ${mode === "login" ? "bg-yellow-500 text-black" : "text-white/40"}`}>
+            LOGIN
+          </button>
+
+          <button onClick={() => setMode("register")}
+            className={`flex-1 py-2 rounded-lg font-bold ${mode === "register" ? "bg-yellow-500 text-black" : "text-white/40"}`}>
+            SIGN UP
+          </button>
+        </div>
+
+        {isRegister && (
+          <input value={name} onChange={e => setName(e.target.value)}
+            placeholder="Username"
+            className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+        )}
+
+        <input value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="Email"
+          className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+
+        <div className="relative">
+          <input
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
+            className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
+          />
+
+          <button onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3">
+            {showPassword ? <EyeOff /> : <Eye />}
+          </button>
+        </div>
 
         <button
-          onClick={() => navigate(-1)}
-          className="mb-6 px-4 py-2 bg-white/5 rounded-xl"
-        >
-          ← BACK
+          onClick={handleAuth}
+          className="w-full mt-6 py-4 bg-yellow-500 text-black font-black rounded-xl">
+          {isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
         </button>
-
-        <h1 className="text-5xl font-black mb-10">MY PROFILE</h1>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-
-          {/* LEFT */}
-          <div className="bg-white/5 p-6 rounded-3xl text-center border border-white/10">
-            <img
-              src={user.avatar || "https://i.pravatar.cc/300"}
-              className="w-40 h-40 mx-auto rounded-2xl object-cover"
-            />
-
-            <h2 className="mt-4 text-xl font-black">{user.name}</h2>
-            <p className="text-white/40">{user.email}</p>
-
-            <input
-              type="file"
-              className="mt-4 text-xs"
-              onChange={(e) =>
-                setAvatarFile(e.target.files?.[0] || null)
-              }
-            />
-
-            {avatarFile && (
-              <button
-                onClick={updateAvatar}
-                className="mt-3 w-full bg-yellow-400 text-black py-2 rounded-xl font-bold"
-              >
-                {loading ? "SAVING..." : "SAVE"}
-              </button>
-            )}
-          </div>
-
-          {/* RIGHT */}
-          <div className="space-y-6">
-
-            {/* PROMO */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Promo Code</h3>
-
-              <div className="flex gap-2">
-                <input
-                  value={promo}
-                  onChange={(e) => setPromo(e.target.value)}
-                  className="flex-1 p-3 bg-black/40 rounded-xl"
-                  placeholder="Enter code..."
-                />
-
-                <button
-                  onClick={applyPromo}
-                  className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
-                >
-                  APPLY
-                </button>
-              </div>
-
-              {promoStatus && (
-                <p className="mt-3 text-sm">{promoStatus}</p>
-              )}
-            </div>
-
-            {/* INFO */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Account Info</h3>
-
-              <p className="text-sm text-white/60">
-                Discount: {user.discount || 0}%
-              </p>
-
-              <p className="text-sm text-white/60">
-                ID: {user.id}
-              </p>
-            </div>
-
-          </div>
-        </div>
       </div>
     </div>
   );

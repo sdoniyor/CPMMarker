@@ -196,7 +196,7 @@ export default function Auth() {
 
     const data = await res.json();
 
-    if (data) {
+    if (data?.id) {
       localStorage.setItem("user", JSON.stringify(data));
     }
   };
@@ -217,7 +217,7 @@ export default function Auth() {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data?.error);
+      alert(data?.error || "Error");
       return;
     }
 
@@ -227,8 +227,10 @@ export default function Auth() {
       return;
     }
 
+    // 🔥 SAVE TOKEN
     localStorage.setItem("token", data.token);
 
+    // 🔥 LOAD USER FROM JWT
     await loadProfile(data.token);
 
     window.location.href = "/market";
@@ -243,72 +245,47 @@ export default function Auth() {
         </h1>
 
         <div className="flex mb-6 bg-black/40 rounded-xl p-1">
-          <button
-            onClick={() => setMode("login")}
-            className={`flex-1 py-2 rounded-lg font-bold ${
-              mode === "login"
-                ? "bg-yellow-500 text-black"
-                : "text-white/40"
-            }`}
-          >
+          <button onClick={() => setMode("login")}
+            className={`flex-1 py-2 rounded-lg font-bold ${mode === "login" ? "bg-yellow-500 text-black" : "text-white/40"}`}>
             LOGIN
           </button>
 
-          <button
-            onClick={() => setMode("register")}
-            className={`flex-1 py-2 rounded-lg font-bold ${
-              mode === "register"
-                ? "bg-yellow-500 text-black"
-                : "text-white/40"
-            }`}
-          >
+          <button onClick={() => setMode("register")}
+            className={`flex-1 py-2 rounded-lg font-bold ${mode === "register" ? "bg-yellow-500 text-black" : "text-white/40"}`}>
             SIGN UP
           </button>
         </div>
 
-        <div className="space-y-3">
-          {isRegister && (
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Username"
-              className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
-            />
-          )}
+        {isRegister && (
+          <input value={name} onChange={e => setName(e.target.value)}
+            placeholder="Username"
+            className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+        )}
 
+        <input value={email} onChange={e => setEmail(e.target.value)}
+          placeholder="Email"
+          className="w-full p-4 mb-3 rounded-xl bg-black/40 border border-white/10" />
+
+        <div className="relative">
           <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            type={showPassword ? "text" : "password"}
+            placeholder="Password"
             className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
           />
 
-          <div className="relative">
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
-            />
-
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+          <button onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3">
+            {showPassword ? <EyeOff /> : <Eye />}
+          </button>
         </div>
 
         <button
           onClick={handleAuth}
-          className="w-full mt-6 py-4 bg-yellow-500 text-black font-black rounded-xl"
-        >
+          className="w-full mt-6 py-4 bg-yellow-500 text-black font-black rounded-xl">
           {isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
         </button>
-
       </div>
     </div>
   );
