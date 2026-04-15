@@ -245,7 +245,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -269,9 +268,14 @@ const safeFetch = async (url: string, options?: any) => {
     const res = await fetch(url, options);
     const text = await res.text();
 
+    if (!text || text.startsWith("<!DOCTYPE")) {
+      console.log("❌ NOT JSON:", text);
+      return null;
+    }
+
     return JSON.parse(text);
   } catch (e) {
-    console.log("FETCH ERROR:", e);
+    console.log("❌ FETCH ERROR:", e);
     return null;
   }
 };
@@ -287,7 +291,7 @@ export default function Profile() {
 
   /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
-    const local = getUser(); // 🔥 ВСЕГДА СВЕЖИЙ
+    const local = getUser();
 
     if (!local?.id) {
       setUser(null);
@@ -300,8 +304,6 @@ export default function Profile() {
       console.log("🔥 PROFILE UPDATED:", data);
 
       setUser(data);
-
-      // 🔥 всегда обновляем
       localStorage.setItem("user", JSON.stringify(data));
     }
   };
@@ -368,13 +370,13 @@ export default function Profile() {
       setPromoStatus("✅ Успешно активирован");
       setPromo("");
 
-      // 🔥 ОБЯЗАТЕЛЬНО перезагружаем профиль
-      await loadProfile();
+      await loadProfile(); // 🔥 обновляем профиль
     } else {
       setPromoStatus("❌ " + (data?.error || "Ошибка"));
     }
   };
 
+  /* ================= UI ================= */
   if (!user) {
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex items-center justify-center">
@@ -391,9 +393,10 @@ export default function Profile() {
 
       <div className="max-w-5xl mx-auto px-6 pt-10">
 
+        {/* BACK */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-8 px-4 py-2 bg-white/5 rounded-full"
+          className="mb-8 px-4 py-2 bg-white/5 rounded-full border border-white/10"
         >
           ← BACK
         </button>
@@ -403,7 +406,7 @@ export default function Profile() {
         <div className="grid lg:grid-cols-3 gap-8">
 
           {/* LEFT */}
-          <div className="bg-white/5 p-6 rounded-3xl text-center">
+          <div className="bg-white/5 p-6 rounded-3xl border border-white/10 text-center">
             <img
               src={user.avatar || "https://i.pravatar.cc/300"}
               className="w-40 h-40 mx-auto rounded-2xl object-cover"
@@ -416,32 +419,69 @@ export default function Profile() {
             <p className="text-white/40 text-sm">
               {user.email}
             </p>
-          </div>
 
-          {/* PROMO */}
-          <div className="bg-white/5 p-6 rounded-3xl">
-            <h3 className="font-bold mb-4">Promo Code</h3>
+            <input
+              type="file"
+              onChange={(e) =>
+                setAvatarFile(e.target.files?.[0] || null)
+              }
+              className="mt-4 text-xs"
+            />
 
-            <div className="flex gap-2">
-              <input
-                value={promo}
-                onChange={(e) => setPromo(e.target.value)}
-                className="flex-1 p-3 bg-black/40 rounded-xl"
-              />
-
+            {avatarFile && (
               <button
-                onClick={applyPromo}
-                className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
+                onClick={updateAvatar}
+                className="mt-3 w-full bg-yellow-400 text-black py-2 rounded-xl font-bold"
               >
-                APPLY
+                {loading ? "SAVING..." : "SAVE"}
               </button>
-            </div>
-
-            {promoStatus && (
-              <p className="mt-3 text-sm">{promoStatus}</p>
             )}
           </div>
 
+          {/* RIGHT */}
+          <div className="space-y-6">
+
+            {/* PROMO */}
+            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+              <h3 className="font-bold mb-4">Promo Code</h3>
+
+              <div className="flex gap-2">
+                <input
+                  value={promo}
+                  onChange={(e) => setPromo(e.target.value)}
+                  className="flex-1 p-3 bg-black/40 rounded-xl"
+                  placeholder="Enter code..."
+                />
+
+                <button
+                  onClick={applyPromo}
+                  className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
+                >
+                  APPLY
+                </button>
+              </div>
+
+              {promoStatus && (
+                <p className="mt-3 text-sm">
+                  {promoStatus}
+                </p>
+              )}
+            </div>
+
+            {/* INFO */}
+            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+              <h3 className="font-bold mb-4">Account Info</h3>
+
+              <p className="text-sm text-white/60">
+                Discount: {user.discount || 0}%
+              </p>
+
+              <p className="text-sm text-white/60">
+                ID: {user.id}
+              </p>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>
