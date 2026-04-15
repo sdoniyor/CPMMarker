@@ -1,25 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Auth from "./pages/Auth";
-import Market from "./pages/Market";
-import Profile from "./pages/Profile";
-
-import CarDetail from "./pages/CarDetail";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* старт — регистрация/логин */}
-        <Route path="/" element={<Navigate to="/login" />} />
-
-        <Route path="/login" element={<Auth />} />
-        <Route path="/market" element={<Market />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/car/:id" element={<CarDetail />} />
+        <Route path="/" element={<AuthPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
-
