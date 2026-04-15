@@ -7,6 +7,7 @@ const router = express.Router();
  * REDEEM PROMO CODE
  */
 router.post("/redeem", async (req, res) => {
+   console.log("🔥 PROMO HIT:", req.body);
   try {
     const { userId, code } = req.body;
 
@@ -63,5 +64,8 @@ router.post("/redeem", async (req, res) => {
     });
   }
 });
+
+
+
 
 module.exports = router;
