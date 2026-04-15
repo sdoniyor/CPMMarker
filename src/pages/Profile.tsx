@@ -246,14 +246,13 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
 const API = "https://cpmmarker.onrender.com";
 
-/* ================= SAFE USER ================= */
+/* ================= GET USER ================= */
 const getUser = () => {
   try {
     const raw = localStorage.getItem("user");
@@ -270,12 +269,7 @@ const safeFetch = async (url: string, options?: any) => {
     const res = await fetch(url, options);
     const text = await res.text();
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      console.log("NOT JSON:", text);
-      return null;
-    }
+    return JSON.parse(text);
   } catch (e) {
     console.log("FETCH ERROR:", e);
     return null;
@@ -284,7 +278,6 @@ const safeFetch = async (url: string, options?: any) => {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const localUser = getUser();
 
   const [user, setUser] = useState<any>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -292,15 +285,23 @@ export default function Profile() {
   const [promoStatus, setPromoStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
-    if (!localUser?.id) return;
+    const local = getUser(); // 🔥 ВСЕГДА СВЕЖИЙ
 
-    const data = await safeFetch(`${API}/profile/${localUser.id}`);
+    if (!local?.id) {
+      setUser(null);
+      return;
+    }
+
+    const data = await safeFetch(`${API}/profile/${local.id}`);
 
     if (data) {
-      console.log("PROFILE UPDATED:", data);
+      console.log("🔥 PROFILE UPDATED:", data);
 
       setUser(data);
+
+      // 🔥 всегда обновляем
       localStorage.setItem("user", JSON.stringify(data));
     }
   };
@@ -319,7 +320,9 @@ export default function Profile() {
     });
 
   const updateAvatar = async () => {
-    if (!avatarFile || !localUser?.id) return;
+    const local = getUser();
+
+    if (!avatarFile || !local?.id) return;
 
     setLoading(true);
 
@@ -327,8 +330,13 @@ export default function Profile() {
 
     const data = await safeFetch(`${API}/profile/update-avatar`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: localUser.id, avatar: base64 }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: local.id,
+        avatar: base64,
+      }),
     });
 
     if (data) {
@@ -339,32 +347,29 @@ export default function Profile() {
     setLoading(false);
   };
 
-  /* ================= TELEGRAM ================= */
-  const connectTelegram = () => {
-    if (!localUser?.id) return;
-
-    window.open(`https://t.me/CPMMarket_bot?start=${localUser.id}`, "_blank");
-
-    // 🔥 авто обновление профиля
-    setTimeout(() => {
-      loadProfile();
-    }, 3000);
-  };
-
   /* ================= PROMO ================= */
   const applyPromo = async () => {
-    if (!localUser?.id) return;
+    const local = getUser();
+
+    if (!local?.id) return;
 
     const data = await safeFetch(`${API}/promo/redeem`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: localUser.id, code: promo }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId: local.id,
+        code: promo,
+      }),
     });
 
     if (data?.success) {
       setPromoStatus("✅ Успешно активирован");
       setPromo("");
-      loadProfile();
+
+      // 🔥 ОБЯЗАТЕЛЬНО перезагружаем профиль
+      await loadProfile();
     } else {
       setPromoStatus("❌ " + (data?.error || "Ошибка"));
     }
@@ -373,7 +378,7 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="min-h-screen bg-[#0a0b0d] flex items-center justify-center">
-        <div className="animate-pulse text-yellow-400 font-black text-2xl">
+        <div className="text-yellow-400 font-black text-2xl">
           LOADING...
         </div>
       </div>
@@ -386,10 +391,9 @@ export default function Profile() {
 
       <div className="max-w-5xl mx-auto px-6 pt-10">
 
-        {/* BACK */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-8 px-4 py-2 bg-white/5 rounded-full border border-white/10"
+          className="mb-8 px-4 py-2 bg-white/5 rounded-full"
         >
           ← BACK
         </button>
@@ -399,88 +403,45 @@ export default function Profile() {
         <div className="grid lg:grid-cols-3 gap-8">
 
           {/* LEFT */}
-          <div className="bg-white/5 p-6 rounded-3xl border border-white/10 text-center">
+          <div className="bg-white/5 p-6 rounded-3xl text-center">
             <img
               src={user.avatar || "https://i.pravatar.cc/300"}
               className="w-40 h-40 mx-auto rounded-2xl object-cover"
             />
 
-            <h2 className="mt-4 text-xl font-black">{user.name}</h2>
-            <p className="text-white/40 text-sm">{user.email}</p>
+            <h2 className="mt-4 text-xl font-black">
+              {user.name}
+            </h2>
 
-            <input
-              type="file"
-              onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-              className="mt-4 text-xs"
-            />
+            <p className="text-white/40 text-sm">
+              {user.email}
+            </p>
+          </div>
 
-            {avatarFile && (
+          {/* PROMO */}
+          <div className="bg-white/5 p-6 rounded-3xl">
+            <h3 className="font-bold mb-4">Promo Code</h3>
+
+            <div className="flex gap-2">
+              <input
+                value={promo}
+                onChange={(e) => setPromo(e.target.value)}
+                className="flex-1 p-3 bg-black/40 rounded-xl"
+              />
+
               <button
-                onClick={updateAvatar}
-                className="mt-3 w-full bg-yellow-400 text-black py-2 rounded-xl font-bold"
+                onClick={applyPromo}
+                className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
               >
-                {loading ? "SAVING..." : "SAVE"}
+                APPLY
               </button>
+            </div>
+
+            {promoStatus && (
+              <p className="mt-3 text-sm">{promoStatus}</p>
             )}
           </div>
 
-          {/* RIGHT */}
-          <div className="lg:col-span-2 space-y-6">
-
-            {/* TELEGRAM */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Telegram</h3>
-
-              {user.telegram_id ? (
-                <div className="bg-green-500/10 p-4 rounded-xl">
-                  <p className="text-green-400 font-bold">
-                    ✅ Connected
-                  </p>
-
-                  <p className="text-white/40 text-sm">
-                    ID: {user.telegram_id}
-                  </p>
-
-                  <p className="text-white/40 text-sm">
-                    Username: @{user.telegram_username || "none"}
-                  </p>
-                </div>
-              ) : (
-                <button
-                  onClick={connectTelegram}
-                  className="bg-blue-500 px-6 py-3 rounded-xl font-bold"
-                >
-                  CONNECT TELEGRAM
-                </button>
-              )}
-            </div>
-
-            {/* PROMO */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Promo Code</h3>
-
-              <div className="flex gap-2">
-                <input
-                  value={promo}
-                  onChange={(e) => setPromo(e.target.value)}
-                  className="flex-1 p-3 bg-black/40 rounded-xl"
-                  placeholder="Enter code..."
-                />
-
-                <button
-                  onClick={applyPromo}
-                  className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
-                >
-                  APPLY
-                </button>
-              </div>
-
-              {promoStatus && (
-                <p className="mt-3 text-sm">{promoStatus}</p>
-              )}
-            </div>
-
-          </div>
         </div>
       </div>
     </div>
