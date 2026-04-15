@@ -243,15 +243,16 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
 const API = "https://cpmmarker.onrender.com";
 
+/* ================= TOKEN ================= */
 const getToken = () => localStorage.getItem("token");
 
+/* ================= SAFE FETCH (JWT FIXED) ================= */
 const safeFetch = async (url: string, options?: any) => {
   const token = getToken();
 
@@ -260,6 +261,7 @@ const safeFetch = async (url: string, options?: any) => {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      ...(options?.headers || {}),
     },
   });
 
@@ -275,15 +277,23 @@ export default function Profile() {
   const [promoStatus, setPromoStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
     const data = await safeFetch(`${API}/profile/me`);
-    if (data?.id) setUser(data);
+
+    if (data?.id) {
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+    } else {
+      console.log("AUTH ERROR:", data);
+    }
   };
 
   useEffect(() => {
     loadProfile();
   }, []);
 
+  /* ================= BASE64 ================= */
   const convertBase64 = (file: File) =>
     new Promise<string>((res, rej) => {
       const reader = new FileReader();
@@ -292,6 +302,7 @@ export default function Profile() {
       reader.onerror = rej;
     });
 
+  /* ================= UPDATE AVATAR ================= */
   const updateAvatar = async () => {
     if (!avatarFile) return;
 
@@ -304,27 +315,41 @@ export default function Profile() {
       body: JSON.stringify({ avatar: base64 }),
     });
 
-    if (data) loadProfile();
+    if (data?.id) {
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+      setAvatarFile(null);
+    }
 
     setLoading(false);
   };
 
+  /* ================= PROMO ================= */
   const applyPromo = async () => {
     const data = await safeFetch(`${API}/promo/redeem`, {
       method: "POST",
       body: JSON.stringify({ code: promo }),
     });
 
-    if (data.success) {
+    if (data?.success) {
       setPromoStatus("✅ OK");
       setPromo("");
       loadProfile();
     } else {
-      setPromoStatus("❌ " + data.error);
+      setPromoStatus("❌ " + (data?.error || "Error"));
     }
   };
 
-  if (!user) return <div>LOADING...</div>;
+  /* ================= UI ================= */
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0a0b0d] flex items-center justify-center">
+        <div className="text-yellow-400 font-black text-2xl">
+          LOADING...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white pb-20">
@@ -332,52 +357,84 @@ export default function Profile() {
 
       <div className="max-w-5xl mx-auto px-6 pt-10">
 
-        <button onClick={() => navigate(-1)}>← BACK</button>
+        <button
+          onClick={() => navigate(-1)}
+          className="mb-6 px-4 py-2 bg-white/5 rounded-xl"
+        >
+          ← BACK
+        </button>
 
         <h1 className="text-5xl font-black mb-10">MY PROFILE</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
 
-          <div className="bg-white/5 p-6 rounded-3xl text-center">
+          {/* LEFT */}
+          <div className="bg-white/5 p-6 rounded-3xl text-center border border-white/10">
             <img
               src={user.avatar || "https://i.pravatar.cc/300"}
-              className="w-40 h-40 mx-auto rounded-2xl"
+              className="w-40 h-40 mx-auto rounded-2xl object-cover"
             />
 
-            <h2>{user.name}</h2>
-            <p>{user.email}</p>
+            <h2 className="mt-4 text-xl font-black">{user.name}</h2>
+            <p className="text-white/40">{user.email}</p>
 
             <input
               type="file"
+              className="mt-4 text-xs"
               onChange={(e) =>
                 setAvatarFile(e.target.files?.[0] || null)
               }
             />
 
             {avatarFile && (
-              <button onClick={updateAvatar}>
+              <button
+                onClick={updateAvatar}
+                className="mt-3 w-full bg-yellow-400 text-black py-2 rounded-xl font-bold"
+              >
                 {loading ? "SAVING..." : "SAVE"}
               </button>
             )}
           </div>
 
-          <div>
+          {/* RIGHT */}
+          <div className="space-y-6">
 
-            <div>
-              <h3>Promo</h3>
+            {/* PROMO */}
+            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+              <h3 className="font-bold mb-4">Promo Code</h3>
 
-              <input
-                value={promo}
-                onChange={(e) => setPromo(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <input
+                  value={promo}
+                  onChange={(e) => setPromo(e.target.value)}
+                  className="flex-1 p-3 bg-black/40 rounded-xl"
+                  placeholder="Enter code..."
+                />
 
-              <button onClick={applyPromo}>APPLY</button>
+                <button
+                  onClick={applyPromo}
+                  className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
+                >
+                  APPLY
+                </button>
+              </div>
 
-              {promoStatus && <p>{promoStatus}</p>}
+              {promoStatus && (
+                <p className="mt-3 text-sm">{promoStatus}</p>
+              )}
             </div>
 
-            <div>
-              <p>Discount: {user.discount || 0}%</p>
+            {/* INFO */}
+            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
+              <h3 className="font-bold mb-4">Account Info</h3>
+
+              <p className="text-sm text-white/60">
+                Discount: {user.discount || 0}%
+              </p>
+
+              <p className="text-sm text-white/60">
+                ID: {user.id}
+              </p>
             </div>
 
           </div>
