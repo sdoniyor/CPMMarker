@@ -29,7 +29,7 @@ export default function Profile() {
   /* ================= TELEGRAM CONNECT ================= */
   const connectTG = () => {
     const userId = user?.id;
-    window.open(`https://t.me/YOUR_BOT_USERNAME?start=${userId}`, "_blank");
+    window.open(`https://t.me/CPMMarket_bot?start=${userId}`, "_blank");
   };
 
   /* ================= PROMO ================= */
