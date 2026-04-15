@@ -7,90 +7,143 @@ export default function Profile() {
   const [promo, setPromo] = useState("");
   const [avatar, setAvatar] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tgLoading, setTgLoading] = useState(false);
 
   const token = localStorage.getItem("token");
 
-  /* ================= LOAD USER ================= */
+  /* ================= SAFE LOAD USER ================= */
   const loadUser = async () => {
-    const res = await fetch(`${API}/profile/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const res = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    const data = await res.json();
-    if (data?.id) setUser(data);
+      const data = await res.json();
+      if (data?.id) setUser(data);
+    } catch (e) {
+      console.log("LOAD USER ERROR:", e);
+    }
   };
 
   useEffect(() => {
     loadUser();
   }, []);
 
-  /* ================= TELEGRAM CONNECT ================= */
-  const connectTG = () => {
-    const userId = user?.id;
-    window.open(`https://t.me/CPMMarket_bot?start=${userId}`, "_blank");
+  /* ================= TELEGRAM CONNECT (FIXED) ================= */
+  const connectTG = async () => {
+    try {
+      setTgLoading(true);
+
+      const res = await fetch(`${API}/profile/telegram/link`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data?.link) {
+        window.open(data.link, "_blank");
+      }
+
+      setTimeout(loadUser, 2000);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setTgLoading(false);
+    }
   };
 
-  /* ================= PROMO ================= */
+  /* ================= PROMO (SAFE) ================= */
   const applyPromo = async () => {
+    if (!promo || promo.length < 3) {
+      return alert("Invalid promo code");
+    }
+
     setLoading(true);
 
-    const res = await fetch(`${API}/promo/redeem`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ code: promo }),
-    });
+    try {
+      const res = await fetch(`${API}/promo/redeem`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: promo }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    setLoading(false);
-
-    if (data?.success) {
-      alert("Promo activated!");
-      setPromo("");
-      loadUser();
-    } else {
-      alert(data?.error || "Error");
+      if (data?.success) {
+        alert("Promo activated!");
+        setPromo("");
+        loadUser();
+      } else {
+        alert(data?.error || "Error");
+      }
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  /* ================= AVATAR ================= */
+  /* ================= AVATAR VALIDATION ================= */
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const uploadAvatar = async () => {
-    const res = await fetch(`${API}/profile/update-avatar`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ avatar }),
-    });
+    if (!isValidUrl(avatar)) {
+      return alert("Invalid image URL");
+    }
 
-    const data = await res.json();
+    try {
+      const res = await fetch(`${API}/profile/update-avatar`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ avatar }),
+      });
 
-    if (data?.id) {
-      setUser(data);
-      alert("Avatar updated!");
+      const data = await res.json();
+
+      if (data?.id) {
+        setUser(data);
+        setAvatar("");
+        alert("Avatar updated!");
+      }
+    } catch (e) {
+      console.log(e);
     }
   };
 
+  /* ================= LOADING ================= */
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
+      <div className="min-h-screen flex items-center justify-center text-white bg-[#0a0b0d]">
         LOADING...
       </div>
     );
   }
 
+  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
 
-      {/* HEADER */}
       <div className="max-w-4xl mx-auto">
 
+        {/* HEADER */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6">
 
           <div className="w-24 h-24 rounded-2xl bg-yellow-400 text-black flex items-center justify-center text-3xl font-black overflow-hidden">
@@ -104,10 +157,7 @@ export default function Profile() {
           <div>
             <h1 className="text-3xl font-black">{user.name}</h1>
             <p className="text-white/40">{user.email}</p>
-
-            <p className="text-sm text-white/60 mt-1">
-              ID: #{user.id}
-            </p>
+            <p className="text-sm text-white/60 mt-1">ID: #{user.id}</p>
           </div>
 
         </div>
@@ -135,9 +185,10 @@ export default function Profile() {
             ) : (
               <button
                 onClick={connectTG}
+                disabled={tgLoading}
                 className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-xl"
               >
-                Connect Telegram
+                {tgLoading ? "Connecting..." : "Connect Telegram"}
               </button>
             )}
           </div>
@@ -155,6 +206,7 @@ export default function Profile() {
           <h2 className="font-bold mb-3">Promo Code</h2>
 
           <div className="flex gap-3">
+
             <input
               value={promo}
               onChange={(e) => setPromo(e.target.value)}
@@ -168,11 +220,12 @@ export default function Profile() {
             >
               {loading ? "..." : "Apply"}
             </button>
+
           </div>
 
         </div>
 
-        {/* AVATAR UPLOAD */}
+        {/* AVATAR */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
 
           <h2 className="font-bold mb-3">Change Avatar</h2>
