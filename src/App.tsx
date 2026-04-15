@@ -11,12 +11,14 @@ export default function App() {
 
       {/* Navbar только тут */}
       <Navbar />
-
-      <Routes>
-        <Route path="/" element={<AuthPage />} />
-        <Route path="/market" element={<MarketPage />} />
-        <Route path="/profile" element={<ProfilePage />} />
-      </Routes>
+      <div className="pt-[80px] min-h-screen bg-[#050608]">
+        <Routes>
+          <Route path="/" element={<AuthPage />} />
+          <Route path="/market" element={<MarketPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Routes>
+      </div>
+      
 
     </BrowserRouter>
   );
