@@ -244,40 +244,26 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 
 const API = "https://cpmmarker.onrender.com";
 
-/* ================= GET USER ================= */
-const getUser = () => {
-  try {
-    const raw = localStorage.getItem("user");
-    if (!raw || raw === "undefined" || raw === "null") return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-};
+const getToken = () => localStorage.getItem("token");
 
-/* ================= SAFE FETCH ================= */
 const safeFetch = async (url: string, options?: any) => {
-  try {
-    const res = await fetch(url, options);
-    const text = await res.text();
+  const token = getToken();
 
-    if (!text || text.startsWith("<!DOCTYPE")) {
-      console.log("❌ NOT JSON:", text);
-      return null;
-    }
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
-    return JSON.parse(text);
-  } catch (e) {
-    console.log("❌ FETCH ERROR:", e);
-    return null;
-  }
+  return res.json();
 };
 
 export default function Profile() {
@@ -289,42 +275,25 @@ export default function Profile() {
   const [promoStatus, setPromoStatus] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* ================= LOAD PROFILE ================= */
   const loadProfile = async () => {
-    const local = getUser();
-
-    if (!local?.id) {
-      setUser(null);
-      return;
-    }
-
-    const data = await safeFetch(`${API}/profile/${local.id}`);
-
-    if (data) {
-      console.log("🔥 PROFILE UPDATED:", data);
-
-      setUser(data);
-      localStorage.setItem("user", JSON.stringify(data));
-    }
+    const data = await safeFetch(`${API}/profile/me`);
+    if (data?.id) setUser(data);
   };
 
   useEffect(() => {
     loadProfile();
   }, []);
 
-  /* ================= AVATAR ================= */
   const convertBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
+    new Promise<string>((res, rej) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
+      reader.onload = () => res(reader.result as string);
+      reader.onerror = rej;
     });
 
   const updateAvatar = async () => {
-    const local = getUser();
-
-    if (!avatarFile || !local?.id) return;
+    if (!avatarFile) return;
 
     setLoading(true);
 
@@ -332,60 +301,30 @@ export default function Profile() {
 
     const data = await safeFetch(`${API}/profile/update-avatar`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: local.id,
-        avatar: base64,
-      }),
+      body: JSON.stringify({ avatar: base64 }),
     });
 
-    if (data) {
-      await loadProfile();
-      setAvatarFile(null);
-    }
+    if (data) loadProfile();
 
     setLoading(false);
   };
 
-  /* ================= PROMO ================= */
   const applyPromo = async () => {
-    const local = getUser();
-
-    if (!local?.id) return;
-
     const data = await safeFetch(`${API}/promo/redeem`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: local.id,
-        code: promo,
-      }),
+      body: JSON.stringify({ code: promo }),
     });
 
-    if (data?.success) {
-      setPromoStatus("✅ Успешно активирован");
+    if (data.success) {
+      setPromoStatus("✅ OK");
       setPromo("");
-
-      await loadProfile(); // 🔥 обновляем профиль
+      loadProfile();
     } else {
-      setPromoStatus("❌ " + (data?.error || "Ошибка"));
+      setPromoStatus("❌ " + data.error);
     }
   };
 
-  /* ================= UI ================= */
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0a0b0d] flex items-center justify-center">
-        <div className="text-yellow-400 font-black text-2xl">
-          LOADING...
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <div>LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white pb-20">
@@ -393,92 +332,52 @@ export default function Profile() {
 
       <div className="max-w-5xl mx-auto px-6 pt-10">
 
-        {/* BACK */}
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-8 px-4 py-2 bg-white/5 rounded-full border border-white/10"
-        >
-          ← BACK
-        </button>
+        <button onClick={() => navigate(-1)}>← BACK</button>
 
         <h1 className="text-5xl font-black mb-10">MY PROFILE</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
 
-          {/* LEFT */}
-          <div className="bg-white/5 p-6 rounded-3xl border border-white/10 text-center">
+          <div className="bg-white/5 p-6 rounded-3xl text-center">
             <img
               src={user.avatar || "https://i.pravatar.cc/300"}
-              className="w-40 h-40 mx-auto rounded-2xl object-cover"
+              className="w-40 h-40 mx-auto rounded-2xl"
             />
 
-            <h2 className="mt-4 text-xl font-black">
-              {user.name}
-            </h2>
-
-            <p className="text-white/40 text-sm">
-              {user.email}
-            </p>
+            <h2>{user.name}</h2>
+            <p>{user.email}</p>
 
             <input
               type="file"
               onChange={(e) =>
                 setAvatarFile(e.target.files?.[0] || null)
               }
-              className="mt-4 text-xs"
             />
 
             {avatarFile && (
-              <button
-                onClick={updateAvatar}
-                className="mt-3 w-full bg-yellow-400 text-black py-2 rounded-xl font-bold"
-              >
+              <button onClick={updateAvatar}>
                 {loading ? "SAVING..." : "SAVE"}
               </button>
             )}
           </div>
 
-          {/* RIGHT */}
-          <div className="space-y-6">
+          <div>
 
-            {/* PROMO */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Promo Code</h3>
+            <div>
+              <h3>Promo</h3>
 
-              <div className="flex gap-2">
-                <input
-                  value={promo}
-                  onChange={(e) => setPromo(e.target.value)}
-                  className="flex-1 p-3 bg-black/40 rounded-xl"
-                  placeholder="Enter code..."
-                />
+              <input
+                value={promo}
+                onChange={(e) => setPromo(e.target.value)}
+              />
 
-                <button
-                  onClick={applyPromo}
-                  className="bg-yellow-400 text-black px-6 rounded-xl font-bold"
-                >
-                  APPLY
-                </button>
-              </div>
+              <button onClick={applyPromo}>APPLY</button>
 
-              {promoStatus && (
-                <p className="mt-3 text-sm">
-                  {promoStatus}
-                </p>
-              )}
+              {promoStatus && <p>{promoStatus}</p>}
             </div>
 
-            {/* INFO */}
-            <div className="bg-white/5 p-6 rounded-3xl border border-white/10">
-              <h3 className="font-bold mb-4">Account Info</h3>
-
-              <p className="text-sm text-white/60">
-                Discount: {user.discount || 0}%
-              </p>
-
-              <p className="text-sm text-white/60">
-                ID: {user.id}
-              </p>
+            <div>
+              <p>Discount: {user.discount || 0}%</p>
             </div>
 
           </div>

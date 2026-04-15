@@ -170,8 +170,6 @@
 
 
 
-
-
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -189,22 +187,17 @@ export default function Auth() {
 
   const isRegister = mode === "register";
 
-  /* ================= LOGIN AFTER ================= */
   const loadProfile = async (token: string) => {
-    try {
-      const res = await fetch(`${API}/profile/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const res = await fetch(`${API}/profile/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (data) {
-        localStorage.setItem("user", JSON.stringify(data));
-      }
-    } catch (e) {
-      console.log("PROFILE LOAD ERROR", e);
+    if (data) {
+      localStorage.setItem("user", JSON.stringify(data));
     }
   };
 
@@ -215,61 +208,30 @@ export default function Auth() {
       ? { name, email, password }
       : { email, password };
 
-    try {
-      const res = await fetch(`${API}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+    const res = await fetch(`${API}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-      const text = await res.text();
+    const data = await res.json();
 
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        alert("Server error (not JSON)");
-        return;
-      }
-
-      console.log("AUTH RESPONSE:", data);
-
-      if (!res.ok) {
-        alert(data?.error || "Error");
-        return;
-      }
-
-      /* ================= REGISTER ================= */
-      if (isRegister) {
-        alert("Account created!");
-        setMode("login");
-        setName("");
-        setEmail("");
-        setPassword("");
-        return;
-      }
-
-      /* ================= LOGIN ================= */
-      if (!data?.token) {
-        alert("No token from server");
-        return;
-      }
-
-      // 🔥 SAVE TOKEN ONLY
-      localStorage.setItem("token", data.token);
-
-      // 🔥 LOAD REAL USER FROM DB
-      await loadProfile(data.token);
-
-      console.log("LOGIN SUCCESS");
-
-      window.location.href = "/market";
-    } catch (err) {
-      console.error("AUTH ERROR:", err);
-      alert("Server error");
+    if (!res.ok) {
+      alert(data?.error);
+      return;
     }
+
+    if (isRegister) {
+      alert("Account created!");
+      setMode("login");
+      return;
+    }
+
+    localStorage.setItem("token", data.token);
+
+    await loadProfile(data.token);
+
+    window.location.href = "/market";
   };
 
   return (
@@ -280,7 +242,6 @@ export default function Auth() {
           CPM MARKET
         </h1>
 
-        {/* TABS */}
         <div className="flex mb-6 bg-black/40 rounded-xl p-1">
           <button
             onClick={() => setMode("login")}
@@ -305,15 +266,13 @@ export default function Auth() {
           </button>
         </div>
 
-        {/* INPUTS */}
         <div className="space-y-3">
-
           {isRegister && (
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Username"
-              className="w-full p-4 rounded-xl bg-black/40 border border-white/10 outline-none"
+              className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
             />
           )}
 
@@ -321,7 +280,7 @@ export default function Auth() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="w-full p-4 rounded-xl bg-black/40 border border-white/10 outline-none"
+            className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
           />
 
           <div className="relative">
@@ -330,20 +289,19 @@ export default function Auth() {
               onChange={(e) => setPassword(e.target.value)}
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              className="w-full p-4 rounded-xl bg-black/40 border border-white/10 outline-none"
+              className="w-full p-4 rounded-xl bg-black/40 border border-white/10"
             />
 
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-white/40"
+              className="absolute right-3 top-3"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
         </div>
 
-        {/* BUTTON */}
         <button
           onClick={handleAuth}
           className="w-full mt-6 py-4 bg-yellow-500 text-black font-black rounded-xl"
