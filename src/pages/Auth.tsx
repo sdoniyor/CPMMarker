@@ -12,11 +12,10 @@
 //   const [email, setEmail] = useState("");
 //   const [password, setPassword] = useState("");
 
-//   // ✅ FIX: ОБЯЗАТЕЛЬНО внутри компонента
 //   const isRegister = mode === "register";
 
 //   const handleAuth = async () => {
-//     const endpoint = isRegister ? "/register" : "/login";
+//     const endpoint = isRegister ? "/auth/register" : "/auth/login";
 
 //     const body = isRegister
 //       ? { name, email, password }
@@ -34,38 +33,50 @@
 //         }
 //       );
 
-//       const data = await res.json();
+//       // 🔥 FIX: защита от пустого ответа
+//       let data = null;
+//       try {
+//         data = await res.json();
+//       } catch {
+//         alert("Server returned empty response");
+//         return;
+//       }
 
 //       console.log("AUTH RESPONSE:", data);
 
 //       if (!res.ok) {
-//         alert(data.error || "Error");
+//         alert(data?.error || "Error");
 //         return;
 //       }
 
-//       // ================= REGISTER =================
+//       /* ================= REGISTER ================= */
 //       if (isRegister) {
 //         alert("Account created!");
+
 //         setMode("login");
 //         setName("");
 //         setEmail("");
 //         setPassword("");
+
 //         return;
 //       }
 
-//       // ================= LOGIN =================
-//       if (!data) {
-//         alert("Empty response");
+//       /* ================= LOGIN ================= */
+//       if (!data || !data.user) {
+//         alert("Invalid server response");
 //         return;
 //       }
 
-//       // сохраняем пользователя
-//       localStorage.setItem("user", JSON.stringify(data));
+//       // ✅ ГЛАВНЫЙ ФИКС
+//       localStorage.setItem("user", JSON.stringify(data.user));
 //       localStorage.setItem("token", data.token || "");
 
+//       console.log("LOGIN USER:", data.user);
+
 //       window.location.href = "/market";
+
 //     } catch (err) {
-//       console.error(err);
+//       console.error("AUTH ERROR:", err);
 //       alert("Server error");
 //     }
 //   };
@@ -148,6 +159,7 @@
 //         >
 //           {isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
 //         </button>
+
 //       </div>
 //     </div>
 //   );
@@ -156,10 +168,16 @@
 
 
 
+
+
+
+
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 type Mode = "login" | "register";
+
+const API = "https://cpmmarker.onrender.com";
 
 export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
@@ -171,6 +189,25 @@ export default function Auth() {
 
   const isRegister = mode === "register";
 
+  /* ================= LOGIN AFTER ================= */
+  const loadProfile = async (token: string) => {
+    try {
+      const res = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+
+      if (data) {
+        localStorage.setItem("user", JSON.stringify(data));
+      }
+    } catch (e) {
+      console.log("PROFILE LOAD ERROR", e);
+    }
+  };
+
   const handleAuth = async () => {
     const endpoint = isRegister ? "/auth/register" : "/auth/login";
 
@@ -179,23 +216,21 @@ export default function Auth() {
       : { email, password };
 
     try {
-      const res = await fetch(
-        `https://cpmmarker.onrender.com${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const res = await fetch(`${API}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
-      // 🔥 FIX: защита от пустого ответа
-      let data = null;
+      const text = await res.text();
+
+      let data;
       try {
-        data = await res.json();
+        data = JSON.parse(text);
       } catch {
-        alert("Server returned empty response");
+        alert("Server error (not JSON)");
         return;
       }
 
@@ -209,29 +244,28 @@ export default function Auth() {
       /* ================= REGISTER ================= */
       if (isRegister) {
         alert("Account created!");
-
         setMode("login");
         setName("");
         setEmail("");
         setPassword("");
-
         return;
       }
 
       /* ================= LOGIN ================= */
-      if (!data || !data.user) {
-        alert("Invalid server response");
+      if (!data?.token) {
+        alert("No token from server");
         return;
       }
 
-      // ✅ ГЛАВНЫЙ ФИКС
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("token", data.token || "");
+      // 🔥 SAVE TOKEN ONLY
+      localStorage.setItem("token", data.token);
 
-      console.log("LOGIN USER:", data.user);
+      // 🔥 LOAD REAL USER FROM DB
+      await loadProfile(data.token);
+
+      console.log("LOGIN SUCCESS");
 
       window.location.href = "/market";
-
     } catch (err) {
       console.error("AUTH ERROR:", err);
       alert("Server error");

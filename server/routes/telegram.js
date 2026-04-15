@@ -1,84 +1,58 @@
 const express = require("express");
-const TelegramBot = require("node-telegram-bot-api");
 const { q } = require("../db");
+const auth = require("../middleware/auth");
+const bot = require("../bot/telegramBot");
 
 const router = express.Router();
 
-/* ================= BOT INIT ================= */
-const bot = new TelegramBot(process.env.BOT_TOKEN, {
-  polling: true,
-});
-
-/* ================= CONNECT TELEGRAM ================= */
-bot.onText(/\/start (.+)/, async (msg, match) => {
+/* ================= ORDER TO TG (JWT SECURE) ================= */
+router.post("/order-to-tg", auth, async (req, res) => {
   try {
-    const userId = match?.[1];
+    const userId = req.userId;
+    const { car, configs, total } = req.body;
 
-    if (!userId) return;
-
-    const telegram_id = msg.from.id;
-    const username = msg.from.username || null;
-
-    await q(
-      `
-      UPDATE users 
-      SET telegram_id = $1,
-          telegram_username = $2
-      WHERE id = $3
-      `,
-      [telegram_id, username, userId]
+    const userRes = await q(
+      "SELECT * FROM users WHERE id=$1",
+      [userId]
     );
 
-    bot.sendMessage(telegram_id, "✅ Telegram connected successfully!");
-  } catch (e) {
-    console.log("TG CONNECT ERROR:", e);
-  }
-});
+    const user = userRes.rows[0];
 
-/* ================= ORDER FROM FRONTEND ================= */
-router.post("/order-to-tg", async (req, res) => {
-  try {
-    const { user, car, configs, total } = req.body;
-
-    if (!user || !car) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing data",
-      });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
 
     const message =
       `🚗 NEW ORDER\n\n` +
-      `👤 User: ${user.name || "-"}\n` +
-      `📧 Email: ${user.email || "-"}\n` +
-      `🆔 TG ID: ${user.tg_id || "-"}\n` +
-      `🔗 Username: @${user.username || "-"}\n\n` +
-      `🚘 Car: ${car.brand || ""} ${car.name || ""}\n\n` +
+      `👤 User: ${user.name}\n` +
+      `📧 Email: ${user.email}\n` +
+      `🆔 TG ID: ${user.telegram_id || "-"}\n` +
+      `🔗 Username: @${user.telegram_username || "-"}\n\n` +
+      `🚘 Car: ${car.brand} ${car.name}\n\n` +
       `⚙️ Configs:\n` +
       `${configs?.length ? configs.map(c => "• " + c).join("\n") : "No configs"}\n\n` +
       `💰 TOTAL: $${total || 0}`;
 
-    // отправка в админ чат
     await bot.sendMessage(process.env.CHAT_ID, message);
 
     res.json({ success: true });
   } catch (e) {
     console.log("ORDER ERROR:", e);
-    res.status(500).json({
-      success: false,
-      error: "Telegram send failed",
-    });
+    res.status(500).json({ error: "Telegram error" });
   }
 });
 
-/* ================= SIMPLE ORDER (OLD SUPPORT) ================= */
-router.post("/order", async (req, res) => {
+/* ================= SIMPLE ORDER ================= */
+router.post("/order", auth, async (req, res) => {
   try {
-    const { user, car } = req.body;
+    const userId = req.userId;
+    const { car } = req.body;
+
+    const user = await q("SELECT * FROM users WHERE id=$1", [userId]);
 
     await bot.sendMessage(
       process.env.CHAT_ID,
-      `🚗 ${user?.name} bought ${car?.name}`
+      `🚗 ${user.rows[0].name} bought ${car.name}`
     );
 
     res.json({ success: true });
