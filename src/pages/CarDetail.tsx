@@ -412,6 +412,7 @@ export default function CarDetail() {
     load();
   }, [id]);
 
+  /* ================= HANDLERS ================= */
   const handleOpenPay = () => {
     const pass = Math.floor(1000 + Math.random() * 9000).toString(); 
     setRandomPass(pass);
@@ -438,15 +439,16 @@ export default function CarDetail() {
 
   /* ================= SEND ORDER TO TG ================= */
   const sendToTelegram = async () => {
-    // FIX: Гварды для TypeScript (убирают ошибку TS18047)
+    // Проверка для TypeScript и логики
     if (!car || !user) {
-      alert("Ошибка данных");
+      alert("Ошибка: Данные не загружены");
       return;
     }
 
     try {
       setSending(true);
-      
+      const token = localStorage.getItem("token");
+
       const payload = {
         user: { 
           id: user.id, 
@@ -469,22 +471,29 @@ export default function CarDetail() {
 
       const res = await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : "" // Исправляем ошибку 401
+        },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         alert("ЗАКАЗ ОТПРАВЛЕН В ТЕЛЕГРАМ! ✅");
         navigate("/market");
+      } else if (res.status === 401) {
+        alert("Ошибка: Сессия истекла. Перезайдите в аккаунт.");
+      } else {
+        alert("Ошибка при отправке заказа сервером.");
       }
     } catch (e) {
-      alert("Ошибка сети");
+      alert("Ошибка сети. Проверьте соединение.");
     } finally {
       setSending(false);
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black italic">LOADING...</div>;
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black italic tracking-tighter">LOADING...</div>;
   if (!car) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500 text-2xl font-black">CAR NOT FOUND</div>;
 
   return (
@@ -492,12 +501,12 @@ export default function CarDetail() {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 pt-24">
-        <button onClick={() => navigate("/market")} className="text-white/30 mb-6 text-sm font-bold hover:text-white transition">
+        <button onClick={() => navigate("/market")} className="text-white/30 mb-6 text-sm font-bold hover:text-white transition flex items-center gap-2">
           ← BACK TO MARKET
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* LEFT IMAGE */}
+          {/* LEFT: IMAGE */}
           <div>
             <h1 className="text-5xl font-black uppercase leading-none">
               <span className="text-yellow-400 text-sm block mb-2 tracking-[0.2em] font-bold">{car.brand}</span>
@@ -506,14 +515,14 @@ export default function CarDetail() {
             <div className="relative mt-6 group">
               <img src={car.image_url} alt={car.name} className="w-full rounded-[2rem] border border-white/5 shadow-2xl transition-all" />
               {finalDiscountPercent > 0 && (
-                <div className="absolute top-6 left-6 bg-red-600 text-white font-black px-5 py-2 rounded-full animate-pulse">
+                <div className="absolute top-6 left-6 bg-red-600 text-white font-black px-5 py-2 rounded-full animate-pulse shadow-lg">
                   -{finalDiscountPercent}% OFF
                 </div>
               )}
             </div>
           </div>
 
-          {/* RIGHT CONFIGS */}
+          {/* RIGHT: CONFIGS */}
           <div className="flex flex-col gap-6">
             <ConfigGroup title="ENGINE POWER" items={configs.power} selected={selectedHp} onSelect={setSelectedHp} />
             <ConfigGroup title="VISUAL TUNING" items={configs.tuning} selected={selectedTuning} onSelect={setSelectedTuning} />
@@ -521,14 +530,14 @@ export default function CarDetail() {
 
             <div className="bg-yellow-400 text-black p-8 rounded-[2rem] mt-4 shadow-xl">
               <div className="flex justify-between items-end">
-                <span className="font-black text-xl tracking-tighter uppercase font-black">Итого</span>
+                <span className="font-black text-xl tracking-tighter uppercase">Итого</span>
                 <div className="text-right leading-none">
                   {finalDiscountPercent > 0 && <div className="text-black/40 line-through text-lg font-bold mb-1">${basePrice + configPrice}</div>}
                   <div className="text-5xl font-black tracking-tighter">${totalPrice}</div>
                 </div>
               </div>
-              <button onClick={handleOpenPay} className="w-full mt-8 bg-black text-white py-5 rounded-2xl font-black text-lg hover:bg-zinc-900 transition-all">
-                ОФОРМИТЬ ЗАКАЗ
+              <button onClick={handleOpenPay} className="w-full mt-8 bg-black text-white py-5 rounded-2xl font-black text-lg hover:bg-zinc-900 transition-all active:scale-[0.98] uppercase">
+                Оформить заказ
               </button>
             </div>
           </div>
@@ -538,7 +547,7 @@ export default function CarDetail() {
       {/* MODAL WINDOW */}
       {showPay && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
-          <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl">
+          <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300">
             <h2 className="text-yellow-400 text-center text-3xl font-black mb-8 tracking-tighter">ДЕТАЛИ ЗАКАЗА</h2>
 
             <div className="space-y-3 mb-6 bg-white/5 p-5 rounded-2xl border border-white/5">
@@ -548,16 +557,17 @@ export default function CarDetail() {
               </div>
               <div className="h-[1px] bg-white/10 my-2" />
               <div className="flex justify-between text-2xl font-black">
-                <span className="tracking-tighter uppercase font-black">К ОПЛАТЕ:</span>
+                <span className="tracking-tighter uppercase">К ОПЛАТЕ:</span>
                 <span className="text-yellow-400">${totalPrice}</span>
               </div>
             </div>
 
+            {/* PAYMENT & DYNAMIC SERVER INFO */}
             <div className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/5 space-y-6">
               <div className="text-center">
-                <div className="text-white/30 text-[9px] uppercase font-black tracking-[0.2em] mb-2">Номер карты для теста</div>
+                <div className="text-white/30 text-[9px] uppercase font-black tracking-[0.2em] mb-2">Карта для оплаты</div>
                 <div className="text-white font-mono text-xl tracking-[0.15em] font-bold">9860 3501 xxxx xxxx</div>
-                <div className="text-yellow-400/50 text-[11px] font-bold mt-2 italic tracking-widest uppercase font-black text-center">test mode</div>
+                <div className="text-yellow-400/50 text-[11px] font-bold mt-2 italic tracking-widest uppercase">test mode</div>
               </div>
 
               <div className="pt-4 border-t border-white/10 flex justify-around text-center">
@@ -578,7 +588,7 @@ export default function CarDetail() {
             <button 
               onClick={sendToTelegram} 
               disabled={sending} 
-              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-lg uppercase"
+              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-[0_10px_30px_rgba(250,204,21,0.2)] uppercase"
             >
               {sending ? "ОТПРАВЛЯЕМ..." : "ПОДТВЕРДИТЬ И КУПИТЬ"}
             </button>
@@ -593,6 +603,7 @@ export default function CarDetail() {
   );
 }
 
+/* ================= HELPER COMPONENT ================= */
 function ConfigGroup({ title, items, selected, onSelect }: {
   title: string;
   items: ConfigItem[];
@@ -605,7 +616,7 @@ function ConfigGroup({ title, items, selected, onSelect }: {
       <div className="text-yellow-400 text-[10px] font-black tracking-[0.2em] mb-4 uppercase">{title}</div>
       <div className="grid grid-cols-2 gap-3">
         {items.map((item) => (
-          <button key={item.id} onClick={() => onSelect(item)} className={`p-4 rounded-2xl text-sm font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+          <button key={item.id} onClick={() => onSelect(item)} className={`p-4 rounded-2xl text-sm font-bold transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
               selected?.id === item.id ? "bg-yellow-400 text-black shadow-lg scale-[1.02]" : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
             }`}>
             <span>{item.name}</span>
