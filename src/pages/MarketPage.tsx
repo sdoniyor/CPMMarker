@@ -83,23 +83,24 @@ export default function Market() {
   };
 
 /* ================= PRICE ================= */
-    const getPrice = (car: Car) => {
-      const base = Number(car.price) || 0;
-      const discount = Number(user?.discount) || 0;
+const getPrice = (car: Car) => {
+  const base = Number(car.price) || 0;
+  const discount = Number(user?.discount) || 0;
 
-      // Если скидки нет, возвращаем обычную цену
-      if (discount <= 0) {
-        return { old: null, new: base };
-      }
+  // 1. Если скидки у пользователя нет в принципе, возвращаем базу
+  // 2. ВАЖНО: Проверяем, входит ли эта конкретная машина в список разрешенных
+  if (discount <= 0 || !hasPromoAccess(car)) {
+    return { old: null, new: base };
+  }
 
-      // Считаем новую цену для любой машины
-      const newPrice = Math.floor(base - (base * discount) / 100);
+  // Считаем новую цену только если проверка выше пройдена
+  const newPrice = Math.floor(base - (base * discount) / 100);
 
-      return {
-        old: base,
-        new: newPrice,
-      };
-    };
+  return {
+    old: base,
+    new: newPrice,
+  };
+};
 
   /* ================= FILTER ================= */
   const filteredCars = (cars || [])
