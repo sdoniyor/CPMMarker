@@ -6,17 +6,38 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await apiFetch("/profile/me");
-        if (data?.id) setUser(data);
-      } catch (e) {
-        console.log("Navbar load error", e);
-      }
-    };
+  const loadUser = async () => {
+    try {
+      const data = await apiFetch("/profile/me");
+      if (data?.id) {
+        setUser(data);
 
-    load();
+        // 🔥 кеш синхронизация
+        localStorage.setItem("user", JSON.stringify(data));
+      }
+    } catch (e) {
+      console.log("Navbar load error", e);
+    }
+  };
+
+  /* ================= FIRST LOAD ================= */
+  useEffect(() => {
+    const cached = localStorage.getItem("user");
+
+    if (cached) {
+      setUser(JSON.parse(cached));
+    }
+
+    loadUser();
+  }, []);
+
+  /* ================= LIVE SYNC ================= */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadUser();
+    }, 5000); // обновление каждые 5 сек
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -58,7 +79,7 @@ export default function Navbar() {
           <div className="w-9 h-9 rounded-full overflow-hidden bg-white/10 border border-white/10">
             {user?.avatar ? (
               <img
-                src={user.avatar}
+                src={`${user.avatar}?t=${Date.now()}`}
                 className="w-full h-full object-cover"
               />
             ) : (

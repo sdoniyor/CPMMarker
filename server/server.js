@@ -23,7 +23,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ================= UPLOADS STATIC ================= */
-/* ⚠️ ВАЖНО: папка uploads должна существовать */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= ROUTES ================= */

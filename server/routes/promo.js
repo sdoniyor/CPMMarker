@@ -4,19 +4,20 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-/* ================= RESET EXPIRED PROMO ================= */
-const resetIfExpired = async (user) => {
-  if (!user.promo_used_at) return;
+/* ================= GET USER ================= */
+const getUser = async (id) => {
+  const res = await q("SELECT * FROM users WHERE id=$1", [id]);
+  return res.rows[0];
+};
+
+/* ================= EXPIRE CHECK ================= */
+const isExpired = (user) => {
+  if (!user.promo_used_at) return false;
 
   const diff = Date.now() - new Date(user.promo_used_at).getTime();
   const hours = diff / (1000 * 60 * 60);
 
-  if (hours >= 24) {
-    await q(
-      "UPDATE users SET promo_code=NULL, promo_used_at=NULL WHERE id=$1",
-      [user.id]
-    );
-  }
+  return hours >= 24;
 };
 
 /* ================= REDEEM PROMO ================= */
@@ -29,21 +30,23 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(400).json({ error: "No code" });
     }
 
-    /* ================= USER ================= */
-    const userRes = await q(
-      "SELECT * FROM users WHERE id=$1",
-      [userId]
-    );
-
-    const user = userRes.rows[0];
+    let user = await getUser(userId);
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    await resetIfExpired(user);
+    /* ================= RESET EXPIRED ================= */
+    if (isExpired(user)) {
+      await q(
+        "UPDATE users SET active_promo=NULL, promo_used_at=NULL, discount=0 WHERE id=$1",
+        [userId]
+      );
 
-    /* ================= PROMO ================= */
+      user = await getUser(userId);
+    }
+
+    /* ================= GET PROMO ================= */
     const promoRes = await q(
       "SELECT * FROM promo_codes WHERE code=$1",
       [code]
@@ -52,69 +55,55 @@ router.post("/redeem", auth, async (req, res) => {
     const promo = promoRes.rows[0];
 
     if (!promo) {
-      return res.status(404).json({ error: "Invalid code" });
+      return res.status(404).json({ error: "Invalid promo" });
     }
 
-    /* ================= CHECK CAR ================= */
+    /* ================= CAR RESTRICTION ================= */
     if (promo.car_ids) {
-      const allowed = promo.car_ids.split(",");
+      const allowed = promo.car_ids.split(",").map(Number);
 
-      if (car_id && !allowed.includes(String(car_id))) {
+      if (car_id && !allowed.includes(Number(car_id))) {
         return res.status(400).json({
           error: "Promo not valid for this car"
         });
       }
     }
 
-    /* ================= 24H CHECK ================= */
+    /* ================= COOLDOWN ================= */
     if (
-      user.promo_code === code &&
-      user.promo_used_at
+      user.active_promo === code &&
+      user.promo_used_at &&
+      !isExpired(user)
     ) {
-      const diff =
-        Date.now() -
-        new Date(user.promo_used_at).getTime();
-
-      const hours = diff / (1000 * 60 * 60);
-
-      if (hours < 24) {
-        return res.status(400).json({
-          error: "Promo cooldown 24h"
-        });
-      }
+      return res.status(400).json({
+        error: "Promo cooldown 24h"
+      });
     }
 
-    /* ================= PURCHASE HISTORY BLOCK ================= */
+    /* ================= ONE CAR ONE PROMO CHECK ================= */
     if (car_id) {
-      const checkOrder = await q(
+      const check = await q(
         "SELECT * FROM orders WHERE user_id=$1 AND car_id=$2 AND promo_code=$3",
         [userId, car_id, code]
       );
 
-      if (checkOrder.rows.length > 0) {
+      if (check.rows.length > 0) {
         return res.status(400).json({
-          error: "Already used promo on this car"
+          error: "Promo already used on this car"
         });
       }
     }
 
     /* ================= APPLY PROMO ================= */
-
-    // сбрасываем старый промо (если есть другой)
     await q(
-      "UPDATE users SET promo_code=$1, promo_used_at=NOW() WHERE id=$2",
-      [code, userId]
-    );
-
-    // применяем скидку
-    await q(
-      "UPDATE users SET discount=$1 WHERE id=$2",
-      [promo.discount, userId]
+      "UPDATE users SET active_promo=$1, promo_used_at=NOW(), discount=$2 WHERE id=$3",
+      [code, promo.discount, userId]
     );
 
     res.json({
       success: true,
-      discount: promo.discount
+      discount: promo.discount,
+      car_ids: promo.car_ids || null
     });
 
   } catch (e) {
