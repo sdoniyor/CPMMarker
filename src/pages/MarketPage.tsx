@@ -52,31 +52,40 @@ export default function Market() {
   }, []);
 
   /* ================= CHECK PROMO ACCESS ================= */
-  const hasPromoAccess = (car: any) => {
+    const hasPromoAccess = (car: any) => {
     if (!user?.promo_car_ids) return false;
 
-    const ids = user.promo_car_ids.split(",").map((x: string) => Number(x));
+    let ids: number[] = [];
+
+    try {
+      if (typeof user.promo_car_ids === "string") {
+        ids = user.promo_car_ids.split(",").map(Number);
+      } else if (Array.isArray(user.promo_car_ids)) {
+        ids = user.promo_car_ids.map(Number);
+      }
+    } catch {
+      return false;
+    }
 
     return ids.includes(car.id);
   };
-
   /* ================= PRICE ================= */
-  const getPrice = (car: any) => {
-    const discount = user?.discount || 0;
+const getPrice = (car: any) => {
+  const base = Number(car.price) || 0;
 
-    const base = car.price;
+  const discount = Number(user?.discount) || 0;
 
-    if (discount <= 0) return { old: null, new: base };
+  if (!hasPromoAccess(car) || discount <= 0) {
+    return { old: null, new: base };
+  }
 
-    if (!hasPromoAccess(car)) return { old: null, new: base };
+  const newPrice = Math.floor(base - (base * discount) / 100);
 
-    const newPrice = Math.floor(base - (base * discount) / 100);
-
-    return {
-      old: base,
-      new: newPrice,
-    };
+  return {
+    old: base,
+    new: newPrice,
   };
+};
 
   /* ================= FILTER ================= */
   const filteredCars = (cars || [])
