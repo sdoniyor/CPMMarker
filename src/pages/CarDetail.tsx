@@ -355,12 +355,12 @@ type User = {
   name: string;
   email?: string;
   discount?: number;
-  discount_cars?: string | number[];
+  discount_cars?: number[];
   telegram_username?: string;
   telegram_id?: string;
 };
 
-/* ================= USER FROM LOCALSTORAGE ================= */
+/* ================= USER ================= */
 const getUser = (): User | null => {
   try {
     const raw = localStorage.getItem("user");
@@ -398,7 +398,7 @@ export default function CarDetail() {
   const [showPay, setShowPay] = useState(false);
   const [sending, setSending] = useState(false);
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD ================= */
   useEffect(() => {
     const load = async () => {
       try {
@@ -431,13 +431,17 @@ export default function CarDetail() {
           cfg.wheels?.find((i: ConfigItem) => Number(i.price) === 0) || null
         );
 
-        const localUser = getUser();
+        /* ================= FIXED PROFILE ================= */
+        const token = localStorage.getItem("token");
 
-        if (localUser?.id) {
-          const userRes = await fetch(`${API}/profile/${localUser.id}`);
-          const userData = await userRes.json();
-          setUser(userData || null);
-        }
+        const userRes = await fetch(`${API}/profile/me`, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        });
+
+        const userData = await userRes.json();
+        setUser(userData || null);
       } catch (err) {
         console.log("LOAD ERROR:", err);
       } finally {
@@ -469,7 +473,7 @@ export default function CarDetail() {
   const discount = Number(user?.discount) || 0;
 
   const allowedCars: number[] = Array.isArray(user?.discount_cars)
-    ? (user.discount_cars as number[])
+    ? user!.discount_cars
     : [];
 
   const hasDiscount = allowedCars.includes(Number(id));
@@ -616,7 +620,7 @@ export default function CarDetail() {
             </h2>
 
             <div className="text-center text-xs mb-4">
-              {selectedConfigs.map((c, i: number) => (
+              {selectedConfigs.map((c, i) => (
                 <div key={i}>• {c}</div>
               ))}
             </div>
