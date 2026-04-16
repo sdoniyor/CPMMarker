@@ -437,9 +437,8 @@ export default function CarDetail() {
     `Диски: ${selectedWheels?.name || "None"}`
   ];
 
-  /* ================= SEND ORDER TO TG ================= */
+/* ================= SEND ORDER TO TG ================= */
   const sendToTelegram = async () => {
-    // Проверка для TypeScript и логики
     if (!car || !user) {
       alert("Ошибка: Данные не загружены");
       return;
@@ -449,45 +448,41 @@ export default function CarDetail() {
       setSending(true);
       const token = localStorage.getItem("token");
 
+      // Формируем плоскую структуру, чтобы бэкенду было проще прочитать поля
       const payload = {
-        user: { 
-          id: user.id, 
-          name: user.name, 
-          email: user.email || "No email",
-          username: user.telegram_username || "Unknown", 
-          tg_id: user.telegram_id || "None" 
-        },
-        car: { 
-          brand: car.brand, 
-          name: car.name 
-        },
-        configs: selectedConfigs,
-        server_info: {
-            server: `тест${selectedHp?.name || ""}`,
-            password: randomPass
-        },
-        total: totalPrice,
+        user_id: user.id,
+        user_name: user.name,
+        user_email: user.email || "No email",
+        user_tg: user.telegram_username || "Unknown",
+        user_tg_id: user.telegram_id || "None",
+        
+        car_name: `${car.brand} ${car.name}`,
+        configs: selectedConfigs.join(", "), // Превращаем массив в строку
+        
+        // Передаем эти поля напрямую в корень объекта
+        server: `тест${selectedHp?.name || ""}`, 
+        password: randomPass, 
+        
+        total_price: totalPrice,
       };
 
       const res = await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : "" // Исправляем ошибку 401
+          "Authorization": token ? `Bearer ${token}` : "" 
         },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        alert("ЗАКАЗ ОТПРАВЛЕН В ТЕЛЕГРАМ! ✅");
+        alert(`ЗАКАЗ ОТПРАВЛЕН! ✅\nПароль: ${randomPass}`);
         navigate("/market");
-      } else if (res.status === 401) {
-        alert("Ошибка: Сессия истекла. Перезайдите в аккаунт.");
       } else {
-        alert("Ошибка при отправке заказа сервером.");
+        alert("Ошибка сервера при отправке в ТГ.");
       }
     } catch (e) {
-      alert("Ошибка сети. Проверьте соединение.");
+      alert("Ошибка сети.");
     } finally {
       setSending(false);
     }
