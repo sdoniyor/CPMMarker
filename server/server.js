@@ -15,10 +15,15 @@ const orderRoutes = require("./routes/order");
 const app = express();
 
 /* ================= MIDDLEWARE ================= */
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: "*",
+}));
 
-/* 🔥 СТАТИКА ДЛЯ АВАТАРОВ */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/* ================= UPLOADS STATIC ================= */
+/* ⚠️ ВАЖНО: папка uploads должна существовать */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* ================= ROUTES ================= */
@@ -28,7 +33,7 @@ app.use("/market", marketRoutes);
 app.use("/promo", promoRoutes);
 app.use("/order", orderRoutes);
 
-/* ================= HEALTH ================= */
+/* ================= HEALTH CHECK ================= */
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -36,22 +41,24 @@ app.get("/", (req, res) => {
   });
 });
 
-/* ================= 404 ================= */
+/* ================= 404 HANDLER ================= */
 app.use((req, res) => {
   res.status(404).json({
     error: "Route not found",
+    path: req.originalUrl,
   });
 });
 
-/* ================= ERROR ================= */
+/* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
-  console.error("SERVER ERROR:", err);
+  console.error("🔥 SERVER ERROR:", err);
+
   res.status(500).json({
     error: "Internal server error",
   });
 });
 
-/* ================= START ================= */
+/* ================= START SERVER ================= */
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

@@ -47,13 +47,6 @@ export default function Navbar() {
           >
             Market
           </button>
-
-          <button
-            onClick={() => navigate("/profile")}
-            className="hover:text-white transition"
-          >
-            Profile
-          </button>
         </div>
 
         {/* RIGHT USER */}
