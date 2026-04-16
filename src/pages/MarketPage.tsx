@@ -17,7 +17,6 @@ const safeFetch = async (url: string, options: any = {}) => {
     });
 
     const text = await res.text();
-
     if (!text || text.startsWith("<!DOCTYPE")) return null;
 
     return JSON.parse(text);
@@ -26,33 +25,46 @@ const safeFetch = async (url: string, options: any = {}) => {
   }
 };
 
+type Car = {
+  id: number;
+  name: string;
+  brand: string;
+  price: number;
+  image_url: string;
+  premium?: boolean;
+};
+
+type User = {
+  id: number;
+  discount?: number;
+  promo_car_ids?: string | number[] | null;
+};
+
 export default function Market() {
-  const [cars, setCars] = useState<any[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [cars, setCars] = useState<Car[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [search, setSearch] = useState("");
   const [onlyPremium, setOnlyPremium] = useState(false);
 
   const navigate = useNavigate();
 
-  /* ================= LOAD USER ================= */
-  const loadUser = async () => {
-    const data = await safeFetch(`${API}/profile/me`);
-    if (data?.id) setUser(data);
-  };
-
-  /* ================= LOAD CARS ================= */
-  const loadCars = async () => {
-    const data = await safeFetch(`${API}/market/cars`);
-    if (Array.isArray(data)) setCars(data);
-  };
-
+  /* ================= LOAD ================= */
   useEffect(() => {
-    loadCars();
-    loadUser();
+    const load = async () => {
+      const [carsData, userData] = await Promise.all([
+        safeFetch(`${API}/market/cars`),
+        safeFetch(`${API}/profile/me`),
+      ]);
+
+      setCars(Array.isArray(carsData) ? carsData : []);
+      setUser(userData || null);
+    };
+
+    load();
   }, []);
 
-  /* ================= CHECK PROMO ACCESS ================= */
-    const hasPromoAccess = (car: any) => {
+  /* ================= PROMO CHECK ================= */
+  const hasPromoAccess = (car: Car) => {
     if (!user?.promo_car_ids) return false;
 
     let ids: number[] = [];
@@ -69,23 +81,25 @@ export default function Market() {
 
     return ids.includes(car.id);
   };
+
   /* ================= PRICE ================= */
-const getPrice = (car: any) => {
-  const base = Number(car.price) || 0;
+  const getPrice = (car: Car) => {
+    const base = Number(car.price) || 0;
+    const discount = Number(user?.discount) || 0;
 
-  const discount = Number(user?.discount) || 0;
+    const allowed = hasPromoAccess(car);
 
-  if (!hasPromoAccess(car) || discount <= 0) {
-    return { old: null, new: base };
-  }
+    if (!allowed || discount <= 0) {
+      return { old: null, new: base };
+    }
 
-  const newPrice = Math.floor(base - (base * discount) / 100);
+    const newPrice = Math.floor(base - (base * discount) / 100);
 
-  return {
-    old: base,
-    new: newPrice,
+    return {
+      old: base,
+      new: newPrice,
+    };
   };
-};
 
   /* ================= FILTER ================= */
   const filteredCars = (cars || [])
@@ -101,23 +115,18 @@ const getPrice = (car: any) => {
   /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#050608] text-white">
-
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-10">
-
           <div>
             <h1 className="text-5xl font-black">
               AUTO <span className="text-yellow-400">MARKET</span>
             </h1>
-            <p className="text-white/40 text-sm">
-              Choose your car
-            </p>
+            <p className="text-white/40 text-sm">Choose your car</p>
           </div>
 
           <div className="flex gap-3">
-
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -128,20 +137,16 @@ const getPrice = (car: any) => {
             <button
               onClick={() => setOnlyPremium(!onlyPremium)}
               className={`px-4 py-2 rounded-xl ${
-                onlyPremium
-                  ? "bg-yellow-400 text-black"
-                  : "bg-white/10"
+                onlyPremium ? "bg-yellow-400 text-black" : "bg-white/10"
               }`}
             >
               👑 Premium
             </button>
-
           </div>
         </div>
 
         {/* CARS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
           {filteredCars.map((car) => {
             const price = getPrice(car);
 
@@ -151,7 +156,6 @@ const getPrice = (car: any) => {
                 onClick={() => navigate(`/car/${car.id}`)}
                 className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
               >
-
                 <img
                   src={car.image_url}
                   className="w-full h-40 object-contain"
@@ -163,7 +167,6 @@ const getPrice = (car: any) => {
 
                 {/* PRICE */}
                 <div className="mt-2 flex items-center gap-2">
-
                   {price.old && (
                     <span className="text-white/40 line-through">
                       ${price.old}
@@ -173,20 +176,17 @@ const getPrice = (car: any) => {
                   <span className="text-green-400 font-bold text-lg">
                     ${price.new}
                   </span>
-
                 </div>
 
                 {/* BADGE */}
-                {hasPromoAccess(car) && user?.discount > 0 && (
+                {hasPromoAccess(car) && (user?.discount || 0) > 0 && (
                   <div className="mt-2 text-xs text-yellow-400">
-                    🔥 Promo active -{user.discount}%
+                    🔥 Promo active -{user?.discount}%
                   </div>
                 )}
-
               </div>
             );
           })}
-
         </div>
 
         {/* EMPTY */}
@@ -195,7 +195,6 @@ const getPrice = (car: any) => {
             No cars found
           </div>
         )}
-
       </div>
     </div>
   );
