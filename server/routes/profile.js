@@ -2,7 +2,23 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const { q } = require("../db");
 
+const multer = require("multer");
+const path = require("path");
+
 const router = express.Router();
+
+/* ================= MULTER CONFIG ================= */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, "avatar-" + Date.now() + ext);
+  },
+});
+
+const upload = multer({ storage });
 
 /* ================= GET MY PROFILE ================= */
 router.get("/me", auth, async (req, res) => {
@@ -24,7 +40,7 @@ router.get("/me", auth, async (req, res) => {
   }
 });
 
-/* ================= CREATE TELEGRAM LINK ================= */
+/* ================= TELEGRAM LINK ================= */
 router.post("/telegram/link", auth, async (req, res) => {
   try {
     const userId = req.userId;
@@ -46,5 +62,34 @@ router.post("/telegram/link", auth, async (req, res) => {
     res.status(500).json({ error: "Failed to create telegram link" });
   }
 });
+
+/* ================= UPLOAD AVATAR ================= */
+router.post(
+  "/upload-avatar",
+  auth,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const filePath = `/uploads/${req.file.filename}`;
+
+      const r = await q(
+        "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
+        [filePath, req.userId]
+      );
+
+      const user = r.rows[0];
+      delete user.password;
+
+      res.json(user);
+    } catch (e) {
+      console.log("UPLOAD ERROR:", e);
+      res.status(500).json({ error: "Upload error" });
+    }
+  }
+);
 
 module.exports = router;
