@@ -412,6 +412,7 @@ export default function CarDetail() {
     load();
   }, [id]);
 
+  /* ================= HANDLERS ================= */
   const handleOpenPay = () => {
     const pass = Math.floor(1000 + Math.random() * 9000).toString(); 
     setRandomPass(pass);
@@ -430,10 +431,13 @@ export default function CarDetail() {
   const configPrice = (Number(selectedHp?.price) || 0) + (Number(selectedTuning?.price) || 0) + (Number(selectedWheels?.price) || 0);
   const totalPrice = discountedBasePrice + configPrice;
 
+  // "Хитрый" способ: добавляем сервер и пароль в список конфигов
   const selectedConfigs = [
     `Мощность: ${selectedHp?.name || "Stock"}`,
     `Тюнинг: ${selectedTuning?.name || "None"}`,
-    `Диски: ${selectedWheels?.name || "None"}`
+    `Диски: ${selectedWheels?.name || "None"}`,
+    `🌐 Сервер: тест${selectedHp?.name || ""}`,
+    `🔑 Пароль: ${randomPass}`
   ];
 
   /* ================= SEND ORDER TO TG ================= */
@@ -447,8 +451,6 @@ export default function CarDetail() {
       setSending(true);
       const token = localStorage.getItem("token");
 
-      // Возвращаем структуру, которую бэкенд ожидает (user, car, configs)
-      // Но добавляем пароль и сервер прямо в payload
       const payload = {
         user: { 
           id: user.id, 
@@ -461,10 +463,8 @@ export default function CarDetail() {
           brand: car.brand, 
           name: car.name 
         },
-        configs: selectedConfigs, // Массив строк
+        configs: selectedConfigs, // Здесь уже сидят пароль и сервер
         total: totalPrice,
-        server: `тест${selectedHp?.name || ""}`, 
-        password: randomPass
       };
 
       const res = await fetch(`${API}/telegram/order-to-tg`, {
@@ -477,11 +477,10 @@ export default function CarDetail() {
       });
 
       if (res.ok) {
-        alert(`ЗАКАЗ ОТПРАВЛЕН! ✅\nПароль: ${randomPass}`);
+        alert(`ЗАКАЗ ОТПРАВЛЕН! ✅\nВаш пароль для входа: ${randomPass}`);
         navigate("/market");
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        alert(`Ошибка сервера (500): ${errorData.message || 'Проверьте логи бэкенда'}`);
+        alert("Ошибка сервера при отправке заказа.");
       }
     } catch (e) {
       alert("Ошибка сети");
@@ -503,7 +502,6 @@ export default function CarDetail() {
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* LEFT: IMAGE */}
           <div>
             <h1 className="text-5xl font-black uppercase leading-none">
               <span className="text-yellow-400 text-sm block mb-2 tracking-[0.2em] font-bold">{car.brand}</span>
@@ -519,7 +517,6 @@ export default function CarDetail() {
             </div>
           </div>
 
-          {/* RIGHT: CONFIGS */}
           <div className="flex flex-col gap-6">
             <ConfigGroup title="ENGINE POWER" items={configs.power} selected={selectedHp} onSelect={setSelectedHp} />
             <ConfigGroup title="VISUAL TUNING" items={configs.tuning} selected={selectedTuning} onSelect={setSelectedTuning} />
@@ -541,11 +538,10 @@ export default function CarDetail() {
         </div>
       </div>
 
-      {/* MODAL WINDOW */}
       {showPay && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
           <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300">
-            <h2 className="text-yellow-400 text-center text-3xl font-black mb-8 tracking-tighter">ДЕТАЛИ ЗАКАЗА</h2>
+            <h2 className="text-yellow-400 text-center text-3xl font-black mb-8 tracking-tighter uppercase">Детали заказа</h2>
 
             <div className="space-y-3 mb-6 bg-white/5 p-5 rounded-2xl border border-white/5 font-black">
               <div className="flex justify-between text-white/40 text-xs uppercase">
@@ -554,7 +550,7 @@ export default function CarDetail() {
               </div>
               <div className="h-[1px] bg-white/10 my-2" />
               <div className="flex justify-between text-2xl">
-                <span className="tracking-tighter uppercase">К ОПЛАТЕ:</span>
+                <span className="tracking-tighter uppercase">К оплате:</span>
                 <span className="text-yellow-400">${totalPrice}</span>
               </div>
             </div>
@@ -586,11 +582,11 @@ export default function CarDetail() {
               disabled={sending} 
               className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-lg uppercase"
             >
-              {sending ? "ОТПРАВЛЯЕМ..." : "ПОДТВЕРДИТЬ И КУПИТЬ"}
+              {sending ? "Отправка..." : "Подтвердить покупку"}
             </button>
 
             <button onClick={() => setShowPay(false)} className="w-full mt-4 text-white/20 text-xs font-bold hover:text-white transition uppercase tracking-widest">
-              ОТМЕНИТЬ
+              Отмена
             </button>
           </div>
         </div>
