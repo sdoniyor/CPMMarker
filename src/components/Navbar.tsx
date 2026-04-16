@@ -151,19 +151,16 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
-  /* ================= ЛОГИКА АВАТАРА ================= */
-  const getAvatarUrl = () => {
-    if (!user?.avatar) return null;
-    
-    // Если путь уже полный (начинается с http), используем его. 
-    // Иначе склеиваем с адресом сервера.
-    const path = user.avatar.startsWith("http") 
-      ? user.avatar 
-      : `${SERVER_URL}${user.avatar}`;
+    /* ================= ЛОГИКА АВАТАРА ================= */
+    const getAvatarUrl = (): string | undefined => {
+      if (!user?.avatar) return undefined; // Заменяем null на undefined
+      
+      const path = user.avatar.startsWith("http") 
+        ? user.avatar 
+        : `${SERVER_URL}${user.avatar}`;
 
-    // Добавляем timestamp (?t=...), чтобы браузер обновлял картинку сразу, а не брал старую из кеша
-    return `${path}?t=${new Date().getTime()}`;
-  };
+      return `${path}?t=${new Date().getTime()}`;
+    };
 
   return (
     <nav className="w-full h-[70px] fixed top-0 left-0 z-[100] 
