@@ -4,6 +4,7 @@ import Navbar from "./components/Navbar";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import MarketPage from "./pages/MarketPage";
+import CarDetail from "./pages/CarDetail";
 
 /* ================= LAYOUT ================= */
 function Layout() {
@@ -21,6 +22,7 @@ function Layout() {
           <Route path="/" element={<AuthPage />} />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/cardeteil" element={<CarDetail/>}/>
         </Routes>
       </div>
     </>
