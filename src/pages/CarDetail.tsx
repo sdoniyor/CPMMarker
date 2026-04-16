@@ -361,7 +361,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -418,7 +417,7 @@ export default function CarDetail() {
   const [showPay, setShowPay] = useState(false);
   const [sending, setSending] = useState(false);
 
-  /* ================= LOAD ================= */
+  /* ================= LOAD DATA ================= */
   useEffect(() => {
     const load = async () => {
       try {
@@ -446,7 +445,6 @@ export default function CarDetail() {
         setUser(userData || null);
         setConfigs(configsData || { power: [], tuning: [], wheels: [] });
 
-        // Установка дефолтных (бесплатных) конфигов
         if (configsData) {
           setSelectedHp(configsData.power?.find((i: ConfigItem) => Number(i.price) === 0) || null);
           setSelectedTuning(configsData.tuning?.find((i: ConfigItem) => Number(i.price) === 0) || null);
@@ -465,7 +463,7 @@ export default function CarDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black">
+      <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black italic tracking-tighter">
         LOADING...
       </div>
     );
@@ -479,22 +477,15 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= DISCOUNT LOGIC (FIXED) ================= */
-  // Берем общую скидку из профиля пользователя (например, 10)
+  /* ================= DISCOUNT LOGIC ================= */
   const userDiscount = Number(user?.discount) || 0;
-  
-  // Если бэкенд прислал список машин, проверяем его. 
-  // Если списка нет, но есть общая скидка — применяем её ко всем.
-  const hasSpecificList = Array.isArray(user?.discount_cars) && user!.discount_cars.length > 0;
+  const hasSpecificList = Array.isArray(user?.discount_cars) && user!.discount_cars!.length > 0;
   const isCarAllowed = hasSpecificList ? user!.discount_cars!.includes(Number(id)) : true;
-
   const finalDiscountPercent = isCarAllowed ? userDiscount : 0;
 
   /* ================= PRICE CALCULATIONS ================= */
   const basePrice = Number(car.price) || 0;
-
-  const discountedBasePrice =
-    finalDiscountPercent > 0
+  const discountedBasePrice = finalDiscountPercent > 0
       ? Math.floor(basePrice * (1 - finalDiscountPercent / 100))
       : basePrice;
 
@@ -522,10 +513,7 @@ export default function CarDetail() {
           username: user?.telegram_username,
           tg_id: user?.telegram_id,
         },
-        car: {
-          brand: car.brand,
-          name: car.name,
-        },
+        car: { brand: car.brand, name: car.name },
         configs: selectedConfigs,
         total: totalPrice,
       };
@@ -553,27 +541,27 @@ export default function CarDetail() {
     <div className="min-h-screen bg-[#050608] text-white pb-10">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-4 pt-24">
         <button
           onClick={() => navigate("/market")}
-          className="text-white/30 mb-4 text-sm font-bold hover:text-white transition"
+          className="text-white/30 mb-6 text-sm font-bold hover:text-white transition flex items-center gap-2"
         >
-          ← BACK TO MARKET
+          <span>←</span> BACK TO MARKET
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* LEFT: IMAGE & INFO */}
           <div>
-            <h1 className="text-4xl font-black uppercase">
-              <span className="text-yellow-400 text-sm block mb-1">{car.brand}</span>
+            <h1 className="text-5xl font-black uppercase leading-none">
+              <span className="text-yellow-400 text-sm block mb-2 tracking-[0.2em] font-bold">{car.brand}</span>
               {car.name}
             </h1>
 
-            <div className="relative mt-4">
-              <img src={car.image_url} alt={car.name} className="w-full rounded-3xl border border-white/5" />
+            <div className="relative mt-6 group">
+              <img src={car.image_url} alt={car.name} className="w-full rounded-[2rem] border border-white/5 shadow-2xl transition-transform duration-500 group-hover:scale-[1.01]" />
               {finalDiscountPercent > 0 && (
-                <div className="absolute top-4 left-4 bg-red-600 text-white font-bold px-4 py-2 rounded-full shadow-lg">
-                  -{finalDiscountPercent}% PROMO
+                <div className="absolute top-6 left-6 bg-red-600 text-white font-black px-5 py-2 rounded-full shadow-xl animate-pulse">
+                  -{finalDiscountPercent}% OFF
                 </div>
               )}
             </div>
@@ -581,44 +569,29 @@ export default function CarDetail() {
 
           {/* RIGHT: CONFIGURATOR */}
           <div className="flex flex-col gap-6">
-            <ConfigGroup
-              title="ENGINE POWER"
-              items={configs.power}
-              selected={selectedHp}
-              onSelect={setSelectedHp}
-            />
-            <ConfigGroup
-              title="VISUAL TUNING"
-              items={configs.tuning}
-              selected={selectedTuning}
-              onSelect={setSelectedTuning}
-            />
-            <ConfigGroup
-              title="WHEELS"
-              items={configs.wheels}
-              selected={selectedWheels}
-              onSelect={setSelectedWheels}
-            />
+            <ConfigGroup title="ENGINE POWER" items={configs.power} selected={selectedHp} onSelect={setSelectedHp} />
+            <ConfigGroup title="VISUAL TUNING" items={configs.tuning} selected={selectedTuning} onSelect={setSelectedTuning} />
+            <ConfigGroup title="WHEELS" items={configs.wheels} selected={selectedWheels} onSelect={setSelectedWheels} />
 
             {/* TOTAL PRICE BLOCK */}
-            <div className="bg-yellow-400 text-black p-6 rounded-3xl mt-4">
+            <div className="bg-yellow-400 text-black p-8 rounded-[2rem] mt-4 shadow-[0_20px_50px_rgba(250,204,21,0.1)]">
               <div className="flex justify-between items-end">
-                <span className="font-black text-xl">TOTAL PRICE</span>
-                <div className="text-right">
+                <span className="font-black text-xl tracking-tighter">TOTAL AMOUNT</span>
+                <div className="text-right leading-none">
                   {finalDiscountPercent > 0 && (
-                    <div className="text-black/50 line-through text-sm">
+                    <div className="text-black/40 line-through text-lg font-bold mb-1">
                       ${basePrice + configPrice}
                     </div>
                   )}
-                  <div className="text-4xl font-black">${totalPrice}</div>
+                  <div className="text-5xl font-black tracking-tighter">${totalPrice}</div>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowPay(true)}
-                className="w-full mt-6 bg-black text-white py-4 rounded-2xl font-black hover:scale-[1.02] transition active:scale-95"
+                className="w-full mt-8 bg-black text-white py-5 rounded-2xl font-black text-lg hover:bg-zinc-900 transition-all active:scale-[0.98]"
               >
-                ORDER NOW
+                PROCEED TO BUY
               </button>
             </div>
           </div>
@@ -627,43 +600,65 @@ export default function CarDetail() {
 
       {/* MODAL WINDOW */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#0c0c0c] p-8 rounded-3xl w-full max-w-md border border-white/10">
-            <h2 className="text-yellow-400 text-center text-2xl font-black mb-6">
-              ORDER SUMMARY
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
+          <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300">
+            <h2 className="text-yellow-400 text-center text-3xl font-black mb-8 tracking-tighter">
+              ORDER INFO
             </h2>
 
-            <div className="space-y-3 mb-8">
-              <div className="flex justify-between text-white/60">
-                <span>Car:</span>
+            {/* PRODUCT SUMMARY */}
+            <div className="space-y-3 mb-6 bg-white/5 p-5 rounded-2xl border border-white/5">
+              <div className="flex justify-between text-white/40 text-xs uppercase font-black">
+                <span>Vehicle:</span>
                 <span className="text-white">{car.brand} {car.name}</span>
               </div>
               {selectedConfigs.map((c, i) => (
-                <div key={i} className="flex justify-between text-white/60">
+                <div key={i} className="flex justify-between text-white/40 text-[10px] uppercase font-bold">
                   <span>Option:</span>
-                  <span className="text-white">{c}</span>
+                  <span className="text-white/80">{c}</span>
                 </div>
               ))}
-              <div className="h-[1px] bg-white/10 my-4" />
-              <div className="flex justify-between text-xl font-black">
-                <span>TOTAL:</span>
+              <div className="h-[1px] bg-white/10 my-2" />
+              <div className="flex justify-between text-2xl font-black">
+                <span className="tracking-tighter">TOTAL:</span>
                 <span className="text-yellow-400">${totalPrice}</span>
+              </div>
+            </div>
+
+            {/* PAYMENT DETAILS SECTION */}
+            <div className="bg-white/5 rounded-2xl p-5 mb-8 border border-white/5 space-y-5">
+              <div className="text-center">
+                <div className="text-white/30 text-[9px] uppercase font-black tracking-[0.2em] mb-2">Payment Card</div>
+                <div className="text-white font-mono text-xl tracking-[0.15em] font-bold">9860 3501 xxxx xxxx</div>
+                <div className="text-yellow-400/50 text-[11px] font-bold mt-2 italic tracking-widest">тест</div>
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex justify-around text-center">
+                <div>
+                  <div className="text-white/30 text-[9px] uppercase font-black tracking-widest mb-1">Server</div>
+                  <div className="text-yellow-400 text-sm font-black uppercase">маркет</div>
+                </div>
+                <div className="w-[1px] bg-white/10 h-8" />
+                <div>
+                  <div className="text-white/30 text-[9px] uppercase font-black tracking-widest mb-1">Password</div>
+                  <div className="text-white text-sm font-black">123</div>
+                </div>
               </div>
             </div>
 
             <button
               onClick={sendToTelegram}
               disabled={sending}
-              className="w-full bg-yellow-400 py-4 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50"
+              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-[0_10px_30px_rgba(250,204,21,0.2)]"
             >
-              {sending ? "PROCESSING..." : "CONFIRM & PAY"}
+              {sending ? "SENDING..." : "CONFIRM ORDER"}
             </button>
 
             <button
               onClick={() => setShowPay(false)}
-              className="w-full mt-4 text-white/30 text-sm font-bold hover:text-white"
+              className="w-full mt-4 text-white/20 text-xs font-bold hover:text-white transition uppercase tracking-widest"
             >
-              CANCEL
+              Cancel Transaction
             </button>
           </div>
         </div>
@@ -673,12 +668,7 @@ export default function CarDetail() {
 }
 
 /* ================= HELPER COMPONENT ================= */
-function ConfigGroup({
-  title,
-  items,
-  selected,
-  onSelect,
-}: {
+function ConfigGroup({ title, items, selected, onSelect }: {
   title: string;
   items: ConfigItem[];
   selected: ConfigItem | null;
@@ -687,21 +677,21 @@ function ConfigGroup({
   if (!items?.length) return null;
 
   return (
-    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-      <div className="text-yellow-400 text-[10px] font-black tracking-widest mb-3 uppercase">{title}</div>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="bg-white/5 p-5 rounded-3xl border border-white/5">
+      <div className="text-yellow-400 text-[10px] font-black tracking-[0.2em] mb-4 uppercase">{title}</div>
+      <div className="grid grid-cols-2 gap-3">
         {items.map((item) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className={`p-3 rounded-xl text-sm font-bold transition-all ${
+            className={`p-4 rounded-2xl text-sm font-bold transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
               selected?.id === item.id
-                ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
-                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                ? "bg-yellow-400 text-black shadow-[0_10px_20px_rgba(250,204,21,0.2)] scale-[1.02]"
+                : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white"
             }`}
           >
-            {item.name}
-            {Number(item.price) > 0 && <span className="block text-[10px] opacity-60">+${item.price}</span>}
+            <span>{item.name}</span>
+            {Number(item.price) > 0 && <span className={`text-[10px] ${selected?.id === item.id ? "text-black/60" : "text-yellow-400/60"}`}>+${item.price}</span>}
           </button>
         ))}
       </div>
