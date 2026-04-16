@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
 
 const API = "https://cpmmarker.onrender.com";
-
-/* ================= GET TOKEN ================= */
-const getToken = () => localStorage.getItem("token");
 
 /* ================= SAFE FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
   try {
-    const token = getToken();
+    const token = localStorage.getItem("token");
 
     const res = await fetch(url, {
       ...options,
@@ -22,14 +18,10 @@ const safeFetch = async (url: string, options: any = {}) => {
 
     const text = await res.text();
 
-    if (!text || text.startsWith("<!DOCTYPE")) {
-      console.log("❌ NOT JSON:", text);
-      return null;
-    }
+    if (!text || text.startsWith("<!DOCTYPE")) return null;
 
     return JSON.parse(text);
-  } catch (e) {
-    console.log("FETCH ERROR:", e);
+  } catch {
     return null;
   }
 };
@@ -45,21 +37,13 @@ export default function Market() {
   /* ================= LOAD USER ================= */
   const loadUser = async () => {
     const data = await safeFetch(`${API}/profile/me`);
-
-    if (data?.id) {
-      setUser(data);
-    }
+    if (data?.id) setUser(data);
   };
 
   /* ================= LOAD CARS ================= */
   const loadCars = async () => {
     const data = await safeFetch(`${API}/market/cars`);
-
-    if (Array.isArray(data)) {
-      setCars(data);
-    } else {
-      setCars([]);
-    }
+    if (Array.isArray(data)) setCars(data);
   };
 
   useEffect(() => {
@@ -67,25 +51,41 @@ export default function Market() {
     loadUser();
   }, []);
 
-  /* ================= PRICE LOGIC ================= */
+  /* ================= CHECK PROMO ACCESS ================= */
+  const hasPromoAccess = (car: any) => {
+    if (!user?.promo_car_ids) return false;
+
+    const ids = user.promo_car_ids.split(",").map((x: string) => Number(x));
+
+    return ids.includes(car.id);
+  };
+
+  /* ================= PRICE ================= */
   const getPrice = (car: any) => {
     const discount = user?.discount || 0;
 
-    if (!discount) return car.price;
+    const base = car.price;
 
-    return Math.floor(
-      car.price - (car.price * discount) / 100
-    );
+    if (discount <= 0) return { old: null, new: base };
+
+    if (!hasPromoAccess(car)) return { old: null, new: base };
+
+    const newPrice = Math.floor(base - (base * discount) / 100);
+
+    return {
+      old: base,
+      new: newPrice,
+    };
   };
 
-  /* ================= SAFE FILTER ================= */
+  /* ================= FILTER ================= */
   const filteredCars = (cars || [])
     .filter((car) => {
-      const name = car?.name?.toLowerCase() || "";
-      const brand = car?.brand?.toLowerCase() || "";
       const s = search.toLowerCase();
-
-      return name.includes(s) || brand.includes(s);
+      return (
+        car?.name?.toLowerCase().includes(s) ||
+        car?.brand?.toLowerCase().includes(s)
+      );
     })
     .filter((car) => (onlyPremium ? car?.premium : true));
 
@@ -93,12 +93,10 @@ export default function Market() {
   return (
     <div className="min-h-screen bg-[#050608] text-white">
 
-      {/* <Navbar /> */}
-
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 
         {/* HEADER */}
-        <div className="flex flex-col lg:flex-row justify-between gap-6 mb-10">
+        <div className="flex justify-between items-center mb-10">
 
           <div>
             <h1 className="text-5xl font-black">
@@ -109,7 +107,7 @@ export default function Market() {
             </p>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-3">
 
             <input
               value={search}
@@ -135,35 +133,57 @@ export default function Market() {
         {/* CARS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          {filteredCars.map((car) => (
-            <div
-              key={car.id}
-              onClick={() => navigate(`/car/${car.id}`)}
-              className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
-            >
+          {filteredCars.map((car) => {
+            const price = getPrice(car);
 
-              <img
-                src={car.image_url}
-                className="w-full h-40 object-contain"
-              />
+            return (
+              <div
+                key={car.id}
+                onClick={() => navigate(`/car/${car.id}`)}
+                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border border-transparent hover:border-yellow-400 transition"
+              >
 
-              <h2 className="text-xl font-bold mt-2">
-                {car?.brand} {car?.name}
-              </h2>
+                <img
+                  src={car.image_url}
+                  className="w-full h-40 object-contain"
+                />
 
-              <div className="mt-2 text-green-400 font-bold text-lg">
-                ${getPrice(car)}
+                <h2 className="text-xl font-bold mt-2">
+                  {car.brand} {car.name}
+                </h2>
+
+                {/* PRICE */}
+                <div className="mt-2 flex items-center gap-2">
+
+                  {price.old && (
+                    <span className="text-white/40 line-through">
+                      ${price.old}
+                    </span>
+                  )}
+
+                  <span className="text-green-400 font-bold text-lg">
+                    ${price.new}
+                  </span>
+
+                </div>
+
+                {/* BADGE */}
+                {hasPromoAccess(car) && user?.discount > 0 && (
+                  <div className="mt-2 text-xs text-yellow-400">
+                    🔥 Promo active -{user.discount}%
+                  </div>
+                )}
+
               </div>
-
-            </div>
-          ))}
+            );
+          })}
 
         </div>
 
-        {/* EMPTY STATE */}
+        {/* EMPTY */}
         {filteredCars.length === 0 && (
           <div className="text-center mt-20 text-white/30">
-            Loading cars...
+            No cars found
           </div>
         )}
 
