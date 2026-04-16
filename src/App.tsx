@@ -22,7 +22,7 @@ function Layout() {
           <Route path="/" element={<AuthPage />} />
           <Route path="/market" element={<MarketPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/cardeteil" element={<CarDetail/>}/>
+          <Route path="/car/:id" element={<CarDetail />} />
         </Routes>
       </div>
     </>
