@@ -221,7 +221,6 @@ const safeFetch = async (url: string, options: any = {}) => {
     });
 
     const text = await res.text();
-    // Проверка на пустой ответ или HTML (ошибку сервера)
     if (!text || text.startsWith("<!DOCTYPE")) return null;
 
     return JSON.parse(text);
@@ -243,6 +242,8 @@ type Car = {
 type User = {
   id: number;
   discount?: number;
+  // Проверяем оба варианта названия поля из БД
+  discount_cars?: string | number[] | null;
   promo_car_ids?: string | number[] | null;
 };
 
@@ -254,7 +255,7 @@ export default function Market() {
 
   const navigate = useNavigate();
 
-  /* ================= LOAD ================= */
+  /* ================= LOAD DATA ================= */
   useEffect(() => {
     const load = async () => {
       const [carsData, userData] = await Promise.all([
@@ -262,7 +263,7 @@ export default function Market() {
         safeFetch(`${API}/profile/me`),
       ]);
       
-      console.log("Загруженные данные пользователя:", userData);
+      console.log("Данные юзера из БД:", userData); // ПРОВЕРЬ НАЗВАНИЕ ПОЛЯ ТУТ
       setCars(Array.isArray(carsData) ? carsData : []);
       setUser(userData || null);
     };
@@ -272,25 +273,33 @@ export default function Market() {
 
   /* ================= PROMO CHECK ================= */
   const hasPromoAccess = (car: Car) => {
-    // Если списка машин нет в профиле, доступа нет
-    if (!user || !user.promo_car_ids) return false;
+    if (!user) return false;
 
-    let ids: number[] = [];
+    // Пытаемся достать данные из любого возможного поля
+    const rawData = user.discount_cars || user.promo_car_ids;
+    
+    if (!rawData) return false;
+
+    let allowedIds: number[] = [];
 
     try {
-      // Парсим строку (например "1,2,3") или используем массив
-      if (typeof user.promo_car_ids === "string") {
-        ids = user.promo_car_ids.split(",").map(val => Number(val.trim()));
-      } else if (Array.isArray(user.promo_car_ids)) {
-        ids = user.promo_car_ids.map(Number);
+      if (typeof rawData === "string") {
+        allowedIds = rawData.split(",").map(id => Number(id.trim())).filter(id => !isNaN(id));
+      } else if (Array.isArray(rawData)) {
+        allowedIds = rawData.map(Number);
       }
-    } catch (e) {
-      console.error("Ошибка парсинга промо-ID:", e);
+    } catch (err) {
       return false;
     }
 
-    // Возвращаем true только если ID текущей машины есть в списке
-    return ids.includes(Number(car.id));
+    const isAllowed = allowedIds.includes(Number(car.id));
+    
+    // Этот лог покажет в консоли, почему скидка не сработала
+    if (search === "" && car.id === cars[0]?.id) {
+        console.log(`Проверка: ID авто ${car.id}, Список разрешенных:`, allowedIds, "Итог:", isAllowed);
+    }
+
+    return isAllowed;
   };
 
   /* ================= PRICE CALCULATION ================= */
@@ -298,7 +307,7 @@ export default function Market() {
     const base = Number(car.price) || 0;
     const discount = Number(user?.discount) || 0;
 
-    // Скидка работает ТОЛЬКО если она > 0 И машина в белом списке
+    // Скидка только если она есть в профиле И машина в списке
     if (discount <= 0 || !hasPromoAccess(car)) {
       return { old: null, new: base };
     }
@@ -311,7 +320,7 @@ export default function Market() {
     };
   };
 
-  /* ================= FILTER ================= */
+  /* ================= FILTERING ================= */
   const filteredCars = (cars || [])
     .filter((car) => {
       const s = search.toLowerCase();
@@ -328,28 +337,25 @@ export default function Market() {
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-12">
           <div>
-            <h1 className="text-5xl font-black tracking-tighter uppercase italic">
+            <h1 className="text-6xl font-black italic tracking-tighter uppercase">
               AUTO <span className="text-yellow-400">MARKET</span>
             </h1>
-            <p className="text-white/40 text-sm font-bold uppercase tracking-widest mt-1">Car Parking Multiplayer</p>
+            <p className="text-white/30 text-xs font-bold tracking-[0.3em] uppercase mt-2">Exclusive CPM Vehicles</p>
           </div>
 
-          <div className="flex gap-3 w-full md:w-auto">
+          <div className="flex gap-4 w-full md:w-auto">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search brand or model..."
-              className="flex-1 md:w-64 px-5 py-3 bg-white/5 border border-white/10 rounded-2xl focus:border-yellow-400 outline-none transition font-bold"
+              placeholder="Марка или модель..."
+              className="flex-1 md:w-80 px-6 py-4 bg-white/5 border border-white/10 rounded-2xl focus:border-yellow-400 outline-none transition-all font-bold text-sm"
             />
-
             <button
               onClick={() => setOnlyPremium(!onlyPremium)}
-              className={`px-6 py-3 rounded-2xl font-black transition-all ${
-                onlyPremium 
-                ? "bg-yellow-400 text-black shadow-[0_0_20px_rgba(250,204,21,0.3)]" 
-                : "bg-white/5 text-white/40 hover:bg-white/10"
+              className={`px-8 py-4 rounded-2xl font-black transition-all text-sm ${
+                onlyPremium ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/20" : "bg-white/5 text-white/40 hover:bg-white/10"
               }`}
             >
               👑 PREMIUM
@@ -357,59 +363,63 @@ export default function Market() {
           </div>
         </div>
 
-        {/* CARS GRID */}
+        {/* GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {filteredCars.map((car) => {
             const price = getPrice(car);
-            const isPromoActive = hasPromoAccess(car) && (user?.discount || 0) > 0;
+            const isPromo = hasPromoAccess(car) && (user?.discount || 0) > 0;
 
             return (
               <div
                 key={car.id}
                 onClick={() => navigate(`/car/${car.id}`)}
-                className="group bg-[#0c0c0c] p-5 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-yellow-400/50 transition-all duration-500 hover:translate-y-[-8px]"
+                className="group bg-[#0a0b0d] p-6 rounded-[2.5rem] cursor-pointer border border-white/5 hover:border-yellow-400/40 transition-all duration-500 hover:-translate-y-2 shadow-2xl"
               >
-                <div className="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-b from-white/5 to-transparent p-6">
+                <div className="relative rounded-[2rem] bg-[#111215] p-6 mb-6 overflow-hidden">
                   <img
                     src={car.image_url}
                     alt={car.name}
-                    className="w-full h-40 object-contain group-hover:scale-110 transition-transform duration-500"
+                    className="w-full h-40 object-contain group-hover:scale-110 transition-transform duration-700"
                   />
                   {car.premium && (
-                    <span className="absolute top-3 right-3 bg-yellow-400 text-black text-[10px] font-black px-2 py-1 rounded">PREMIUM</span>
-                  )}
-                </div>
-
-                <div className="mt-5">
-                  <p className="text-yellow-400 text-[10px] font-black tracking-[0.2em] uppercase">{car.brand}</p>
-                  <h2 className="text-2xl font-black uppercase truncate leading-none">{car.name}</h2>
-                </div>
-
-                {/* PRICE AREA */}
-                <div className="mt-5 flex items-end justify-between">
-                  <div className="flex flex-col">
-                    {price.old && (
-                      <span className="text-white/20 line-through text-xs font-bold mb-1">
-                        ${price.old.toLocaleString()}
-                      </span>
-                    )}
-                    <span className="text-3xl font-black tracking-tighter text-white">
-                      ${price.new.toLocaleString()}
-                    </span>
-                  </div>
-                  
-                  {isPromoActive && (
-                    <div className="bg-red-500/10 text-red-500 text-[11px] font-black px-3 py-1.5 rounded-full border border-red-500/20">
-                      -{user?.discount}%
+                    <div className="absolute top-4 right-4 bg-yellow-400 text-black text-[10px] font-black px-2 py-1 rounded-lg uppercase shadow-lg">
+                      Premium
                     </div>
                   )}
                 </div>
 
-                {/* PROMO BADGE */}
-                {isPromoActive && (
-                  <div className="mt-4 pt-4 border-t border-white/5 text-[10px] text-yellow-400 font-black uppercase tracking-tighter animate-pulse flex items-center gap-2">
-                    <span className="w-2 h-2 bg-yellow-400 rounded-full"></span>
-                    Promo price active
+                <div className="space-y-1">
+                  <p className="text-yellow-400 text-[10px] font-black tracking-widest uppercase opacity-80">{car.brand}</p>
+                  <h2 className="text-2xl font-black uppercase tracking-tighter truncate">{car.name}</h2>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    {price.old && (
+                      <span className="text-white/20 line-through text-[11px] font-black mb-1">
+                        ${price.old.toLocaleString()}
+                      </span>
+                    )}
+                    <span className={`text-3xl font-black tracking-tighter ${isPromo ? "text-green-400" : "text-white"}`}>
+                      ${price.new.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {isPromo && (
+                    <div className="flex flex-col items-end">
+                       <span className="bg-red-500 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse shadow-lg shadow-red-500/20">
+                        -{user?.discount}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {isPromo && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <div className="text-[9px] text-yellow-400 font-black uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping"></span>
+                      Special Offer Active
+                    </div>
                   </div>
                 )}
               </div>
@@ -417,11 +427,11 @@ export default function Market() {
           })}
         </div>
 
-        {/* EMPTY STATE */}
+        {/* NO RESULTS */}
         {filteredCars.length === 0 && (
-          <div className="text-center mt-32">
-            <div className="text-6xl mb-6 opacity-20">🏎️💨</div>
-            <div className="text-white/20 font-black uppercase tracking-[0.3em] text-sm">No vehicles found</div>
+          <div className="text-center py-40">
+             <div className="text-white/10 text-8xl mb-4 font-black uppercase italic">Empty</div>
+             <p className="text-white/30 font-bold uppercase tracking-widest">No matching vehicles found</p>
           </div>
         )}
       </div>
