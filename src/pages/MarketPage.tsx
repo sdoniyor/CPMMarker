@@ -55,7 +55,7 @@ export default function Market() {
         safeFetch(`${API}/market/cars`),
         safeFetch(`${API}/profile/me`),
       ]);
-
+      console.log("Данные пользователя из API:", userData);
       setCars(Array.isArray(carsData) ? carsData : []);
       setUser(userData || null);
     };
