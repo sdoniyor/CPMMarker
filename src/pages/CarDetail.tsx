@@ -345,16 +345,11 @@ type User = {
   telegram_id?: string;
 };
 
-/* ================= SAFE USER PARSER ================= */
+/* ================= SAFE PARSE ================= */
 const parseDiscountCars = (value: any): number[] => {
   if (!value) return [];
-
   if (Array.isArray(value)) return value.map(Number);
-
-  if (typeof value === "string") {
-    return value.split(",").map(Number);
-  }
-
+  if (typeof value === "string") return value.split(",").map(Number);
   return [];
 };
 
@@ -384,7 +379,7 @@ export default function CarDetail() {
   const [sending, setSending] = useState(false);
   const [randomPass, setRandomPass] = useState("");
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD ================= */
   useEffect(() => {
     const load = async () => {
       try {
@@ -418,8 +413,8 @@ export default function CarDetail() {
         setSelectedHp(cfg.power?.find((i: ConfigItem) => Number(i.price) === 0) || null);
         setSelectedTuning(cfg.tuning?.find((i: ConfigItem) => Number(i.price) === 0) || null);
         setSelectedWheels(cfg.wheels?.find((i: ConfigItem) => Number(i.price) === 0) || null);
-      } catch (err) {
-        console.error("LOAD ERROR:", err);
+      } catch (e) {
+        console.log(e);
       } finally {
         setLoading(false);
       }
@@ -428,22 +423,20 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= OPEN PAY ================= */
+  /* ================= OPEN MODAL ================= */
   const handleOpenPay = () => {
     const pass = Math.floor(1000 + Math.random() * 9000).toString();
     setRandomPass(pass);
     setShowPay(true);
   };
 
-  /* ================= DISCOUNT LOGIC ================= */
-  const userDiscount = Number(user?.discount) || 0;
-
+  /* ================= DISCOUNT ================= */
   const discountCars = parseDiscountCars(user?.discount_cars);
 
   const isCarAllowed =
     discountCars.length === 0 ? true : discountCars.includes(Number(id));
 
-  const finalDiscount = isCarAllowed ? userDiscount : 0;
+  const finalDiscount = isCarAllowed ? Number(user?.discount) || 0 : 0;
 
   /* ================= PRICE ================= */
   const basePrice = car ? Number(car.price) : 0;
@@ -466,7 +459,7 @@ export default function CarDetail() {
     selectedWheels?.name,
   ].filter(Boolean);
 
-  /* ================= SEND TO TELEGRAM ================= */
+  /* ================= SEND ================= */
   const sendToTelegram = async () => {
     if (!car || !user) return;
 
@@ -504,17 +497,17 @@ export default function CarDetail() {
         alert("ORDER SENT 🚀");
         navigate("/market");
       } else {
-        alert("Telegram error / route not found");
+        alert("Telegram endpoint not found (404)");
       }
     } catch (e) {
-      console.error(e);
+      console.log(e);
       alert("Server error");
     } finally {
       setSending(false);
     }
   };
 
-  /* ================= LOADING ================= */
+  /* ================= UI ================= */
   if (loading)
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black">
@@ -529,7 +522,6 @@ export default function CarDetail() {
       </div>
     );
 
-  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-10">
       <Navbar />
@@ -539,7 +531,7 @@ export default function CarDetail() {
           onClick={() => navigate("/market")}
           className="text-white/30 mb-6 text-sm font-bold"
         >
-          ← BACK
+          ← BACK TO MARKET
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -552,10 +544,7 @@ export default function CarDetail() {
               {car.name}
             </h1>
 
-            <img
-              src={car.image_url}
-              className="w-full rounded-3xl mt-6"
-            />
+            <img src={car.image_url} className="w-full rounded-3xl mt-6" />
 
             {finalDiscount > 0 && (
               <div className="mt-3 bg-red-600 px-4 py-2 inline-block rounded">
@@ -566,24 +555,9 @@ export default function CarDetail() {
 
           {/* RIGHT */}
           <div className="flex flex-col gap-6">
-            <ConfigGroup
-              title="POWER"
-              items={configs.power}
-              selected={selectedHp}
-              onSelect={setSelectedHp}
-            />
-            <ConfigGroup
-              title="TUNING"
-              items={configs.tuning}
-              selected={selectedTuning}
-              onSelect={setSelectedTuning}
-            />
-            <ConfigGroup
-              title="WHEELS"
-              items={configs.wheels}
-              selected={selectedWheels}
-              onSelect={setSelectedWheels}
-            />
+            <ConfigGroup title="POWER" items={configs.power} selected={selectedHp} onSelect={setSelectedHp} />
+            <ConfigGroup title="TUNING" items={configs.tuning} selected={selectedTuning} onSelect={setSelectedTuning} />
+            <ConfigGroup title="WHEELS" items={configs.wheels} selected={selectedWheels} onSelect={setSelectedWheels} />
 
             <div className="bg-yellow-400 text-black p-6 rounded-3xl">
               <div className="flex justify-between">
@@ -602,44 +576,42 @@ export default function CarDetail() {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* ================= MODAL (ВАШ ОРИГИНАЛ) ================= */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-[#0c0c0c] p-6 rounded-3xl w-full max-w-md">
-            <h2 className="text-yellow-400 text-center font-black mb-4">
-              ORDER
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[200]">
+          <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10">
+
+            <h2 className="text-yellow-400 text-center text-3xl font-black mb-8">
+              ДЕТАЛИ ЗАКАЗА
             </h2>
 
-            <div className="text-xs mb-3">
-              {selectedConfigs.map((c, i) => (
-                <div key={i}>• {c}</div>
-              ))}
+            <div className="flex justify-between text-white/40 text-xs mb-2">
+              <span>Машина:</span>
+              <span className="text-white">{car.brand} {car.name}</span>
             </div>
 
-            <div className="text-center font-bold mb-4">
-              TOTAL: ${totalPrice}
-            </div>
+            <div className="h-[1px] bg-white/10 my-4" />
 
-            <div className="text-center text-xs mb-4 text-white/40">
-              Server: test-{selectedHp?.name || ""}
-              <br />
-              Password: {randomPass}
+            <div className="flex justify-between text-2xl font-black mb-6">
+              <span>К ОПЛАТЕ:</span>
+              <span className="text-yellow-400">${totalPrice}</span>
             </div>
 
             <button
               onClick={sendToTelegram}
               disabled={sending}
-              className="w-full bg-yellow-400 py-3 text-black font-black rounded-xl"
+              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl"
             >
-              {sending ? "SENDING..." : "CONFIRM"}
+              {sending ? "ОТПРАВКА..." : "ПОДТВЕРДИТЬ И КУПИТЬ"}
             </button>
 
             <button
               onClick={() => setShowPay(false)}
-              className="w-full mt-2 text-white/40 text-xs"
+              className="w-full mt-4 text-white/20 text-xs font-bold"
             >
-              CANCEL
+              ОТМЕНИТЬ
             </button>
+
           </div>
         </div>
       )}
