@@ -5,30 +5,39 @@
 
 // const API = "https://cpmmarker.onrender.com";
 
-// /* ================= SAFE USER ================= */
-// const getUser = () => {
-//   try {
-//     const raw = localStorage.getItem("user");
-//     if (!raw || raw === "undefined" || raw === "null") return null;
-
-//     const parsed = JSON.parse(raw);
-
-//     // 🔥 ВАЖНО: фикс структуры
-//     return parsed.user || parsed;
-//   } catch {
-//     return null;
-//   }
+// /* ================= TYPES ================= */
+// type ConfigItem = {
+//   id: number;
+//   name: string;
+//   price: number;
 // };
 
-// /* ================= SAFE FETCH ================= */
-// const safeFetch = async (url: string) => {
+// type Car = {
+//   id: number;
+//   brand: string;
+//   name: string;
+//   price: number;
+//   image_url: string;
+// };
+
+// type User = {
+//   id: number;
+//   name: string;
+//   email?: string;
+//   discount?: number;
+//   discount_cars?: number[];
+//   telegram_username?: string;
+//   telegram_id?: string;
+// };
+
+// /* ================= USER ================= */
+// const getUser = (): User | null => {
 //   try {
-//     const res = await fetch(url);
-//     const text = await res.text();
+//     const raw = localStorage.getItem("user");
+//     if (!raw) return null;
 
-//     if (!text || text.startsWith("<!DOCTYPE")) return null;
-
-//     return JSON.parse(text);
+//     const parsed = JSON.parse(raw);
+//     return parsed.user || parsed;
 //   } catch {
 //     return null;
 //   }
@@ -38,75 +47,104 @@
 //   const { id } = useParams();
 //   const navigate = useNavigate();
 
-//   const [car, setCar] = useState<any>(null);
-//   const [configs, setConfigs] = useState<any>({
+//   const [car, setCar] = useState<Car | null>(null);
+//   const [user, setUser] = useState<User | null>(null);
+
+//   const [configs, setConfigs] = useState<{
+//     power: ConfigItem[];
+//     tuning: ConfigItem[];
+//     wheels: ConfigItem[];
+//   }>({
 //     power: [],
 //     tuning: [],
 //     wheels: [],
 //   });
 
-//   const [user, setUser] = useState<any>(null);
+//   const [selectedHp, setSelectedHp] = useState<ConfigItem | null>(null);
+//   const [selectedTuning, setSelectedTuning] = useState<ConfigItem | null>(null);
+//   const [selectedWheels, setSelectedWheels] = useState<ConfigItem | null>(null);
 
-//   const [selectedHp, setSelectedHp] = useState<any>(null);
-//   const [selectedTuning, setSelectedTuning] = useState<any>(null);
-//   const [selectedWheels, setSelectedWheels] = useState<any>(null);
-
+//   const [loading, setLoading] = useState(true);
 //   const [showPay, setShowPay] = useState(false);
 //   const [sending, setSending] = useState(false);
 
 //   /* ================= LOAD ================= */
-//   const load = async () => {
-//     const [carsData, configsData] = await Promise.all([
-//       safeFetch(`${API}/market/cars`),
-//       safeFetch(`${API}/market/configs`),
-//     ]);
-
-//     const cars = Array.isArray(carsData) ? carsData : [];
-//     const foundCar = cars.find((c: any) => c.id == id);
-
-//     setCar(foundCar);
-//     setConfigs(configsData || { power: [], tuning: [], wheels: [] });
-
-//     const cfg = configsData || { power: [], tuning: [], wheels: [] };
-
-//     setSelectedHp(cfg.power?.find((i: any) => Number(i.price) === 0));
-//     setSelectedTuning(cfg.tuning?.find((i: any) => Number(i.price) === 0));
-//     setSelectedWheels(cfg.wheels?.find((i: any) => Number(i.price) === 0));
-
-//     // 🔥 FIX USER
-//     const local = getUser();
-
-//     if (local?.id) {
-//       const userData = await safeFetch(`${API}/profile/${local.id}`);
-//       if (userData) setUser(userData);
-//     }
-//   };
-
 //   useEffect(() => {
+//     const load = async () => {
+//       try {
+//         setLoading(true);
+
+//         const [carsRes, configsRes] = await Promise.all([
+//           fetch(`${API}/market/cars`),
+//           fetch(`${API}/market/configs`),
+//         ]);
+
+//         const carsData = await carsRes.json();
+//         const configsData = await configsRes.json();
+
+//         const cars: Car[] = Array.isArray(carsData) ? carsData : [];
+
+//         const foundCar = cars.find((c) => String(c.id) === String(id));
+
+//         setCar(foundCar || null);
+//         setConfigs(configsData || { power: [], tuning: [], wheels: [] });
+
+//         const cfg = configsData || { power: [], tuning: [], wheels: [] };
+
+//         setSelectedHp(
+//           cfg.power?.find((i: ConfigItem) => Number(i.price) === 0) || null
+//         );
+//         setSelectedTuning(
+//           cfg.tuning?.find((i: ConfigItem) => Number(i.price) === 0) || null
+//         );
+//         setSelectedWheels(
+//           cfg.wheels?.find((i: ConfigItem) => Number(i.price) === 0) || null
+//         );
+
+//         /* ================= FIXED PROFILE ================= */
+//         const token = localStorage.getItem("token");
+
+//         const userRes = await fetch(`${API}/profile/me`, {
+//           headers: {
+//             Authorization: token ? `Bearer ${token}` : "",
+//           },
+//         });
+
+//         const userData = await userRes.json();
+//         setUser(userData || null);
+//       } catch (err) {
+//         console.log("LOAD ERROR:", err);
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+
 //     load();
 //   }, [id]);
 
-//   if (!car) {
+//   /* ================= LOADING ================= */
+//   if (loading) {
 //     return (
-//       <div className="min-h-screen bg-black flex items-center justify-center text-white font-black text-3xl">
+//       <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black">
 //         LOADING...
 //       </div>
 //     );
 //   }
 
-//   /* ================= SAFE PARSE ================= */
-//   const parseSafe = (val: any) => {
-//     try {
-//       if (!val || val === "undefined") return [];
-//       return typeof val === "string" ? JSON.parse(val) : val;
-//     } catch {
-//       return [];
-//     }
-//   };
+//   if (!car) {
+//     return (
+//       <div className="min-h-screen bg-black flex items-center justify-center text-red-500 text-2xl font-black">
+//         CAR NOT FOUND
+//       </div>
+//     );
+//   }
 
 //   /* ================= DISCOUNT ================= */
 //   const discount = Number(user?.discount) || 0;
-//   const allowedCars: number[] = parseSafe(user?.discount_cars);
+
+//   const allowedCars: number[] = Array.isArray(user?.discount_cars)
+//     ? user!.discount_cars
+//     : [];
 
 //   const hasDiscount = allowedCars.includes(Number(id));
 //   const finalDiscount = hasDiscount ? discount : 0;
@@ -126,7 +164,6 @@
 
 //   const totalPrice = discountedPrice + configPrice;
 
-//   /* ================= CONFIGS ================= */
 //   const selectedConfigs = [
 //     selectedHp?.name,
 //     selectedTuning?.name,
@@ -142,27 +179,24 @@
 //         user: {
 //           id: user?.id,
 //           name: user?.name,
-//           email: user?.email,
-
-//           // 🔥 ВАЖНО
 //           username: user?.telegram_username,
 //           tg_id: user?.telegram_id,
 //         },
 //         car: {
-//           brand: car?.brand,
-//           name: car?.name,
+//           brand: car.brand,
+//           name: car.name,
 //         },
 //         configs: selectedConfigs,
 //         total: totalPrice,
 //       };
 
-//     await fetch(`${API}/telegram/order-to-tg`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify(payload),
-//     });
+//       await fetch(`${API}/telegram/order-to-tg`, {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify(payload),
+//       });
 
 //       alert("ORDER SENT 🚀");
 //       navigate("/market");
@@ -173,6 +207,7 @@
 //     }
 //   };
 
+//   /* ================= UI ================= */
 //   return (
 //     <div className="min-h-screen bg-[#050608] text-white pb-10">
 //       <Navbar />
@@ -186,13 +221,10 @@
 //         </button>
 
 //         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-
 //           {/* LEFT */}
 //           <div>
 //             <h1 className="text-4xl font-black">
-//               <span className="text-yellow-400 text-sm">
-//                 {car.brand}
-//               </span>
+//               <span className="text-yellow-400 text-sm">{car.brand}</span>{" "}
 //               {car.name}
 //             </h1>
 
@@ -207,10 +239,24 @@
 
 //           {/* RIGHT */}
 //           <div className="flex flex-col gap-6">
-
-//             <ConfigGroup title="POWER" items={configs.power} selected={selectedHp} onSelect={setSelectedHp} />
-//             <ConfigGroup title="TUNING" items={configs.tuning} selected={selectedTuning} onSelect={setSelectedTuning} />
-//             <ConfigGroup title="WHEELS" items={configs.wheels} selected={selectedWheels} onSelect={setSelectedWheels} />
+//             <ConfigGroup
+//               title="POWER"
+//               items={configs.power}
+//               selected={selectedHp}
+//               onSelect={setSelectedHp}
+//             />
+//             <ConfigGroup
+//               title="TUNING"
+//               items={configs.tuning}
+//               selected={selectedTuning}
+//               onSelect={setSelectedTuning}
+//             />
+//             <ConfigGroup
+//               title="WHEELS"
+//               items={configs.wheels}
+//               selected={selectedWheels}
+//               onSelect={setSelectedWheels}
+//             />
 
 //             <div className="bg-yellow-500 text-black p-6 rounded-3xl">
 //               <div className="flex justify-between">
@@ -218,13 +264,9 @@
 
 //                 <div>
 //                   {finalDiscount > 0 && (
-//                     <div className="line-through">
-//                       {basePrice} $
-//                     </div>
+//                     <div className="line-through">{basePrice} $</div>
 //                   )}
-//                   <div className="text-3xl font-black">
-//                     {totalPrice} $
-//                   </div>
+//                   <div className="text-3xl font-black">{totalPrice} $</div>
 //                 </div>
 //               </div>
 
@@ -243,26 +285,11 @@
 //       {showPay && (
 //         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4">
 //           <div className="bg-[#0c0c0c] p-6 rounded-3xl w-full max-w-sm">
-
 //             <h2 className="text-yellow-400 text-center font-black mb-4">
 //               ORDER SUMMARY
 //             </h2>
 
-//             <div className="text-center font-mono mb-2">
-//               9860 3501 4889 2556
-//             </div>
-
-//             <div className="text-center text-xs text-white/30 mb-4">
-//               TEST CARD
-//             </div>
-
-//             <div className="text-xs mb-3">
-//               <div>Name: {user?.name}</div>
-//               <div>Username: @{user?.telegram_username || "none"}</div>
-//               <div>ID: {user?.telegram_id || "-"}</div>
-//             </div>
-
-//             <div className="text-xs mb-3">
+//             <div className="text-center text-xs mb-4">
 //               {selectedConfigs.map((c, i) => (
 //                 <div key={i}>• {c}</div>
 //               ))}
@@ -273,17 +300,12 @@
 //               <span>{totalPrice} $</span>
 //             </div>
 
-//             <div className="text-xs text-center mb-4">
-//               Server: CPM MARKET <br />
-//               Pass: 1234
-//             </div>
-
 //             <button
 //               onClick={sendToTelegram}
 //               disabled={sending}
 //               className="w-full bg-yellow-500 py-3 text-black font-black rounded-xl"
 //             >
-//               {sending ? "SENDING..." : "ОПЛАТИЛ"}
+//               {sending ? "SENDING..." : "PAY"}
 //             </button>
 
 //             <button
@@ -299,8 +321,18 @@
 //   );
 // }
 
-// /* ================= CONFIG ================= */
-// function ConfigGroup({ title, items, selected, onSelect }: any) {
+// /* ================= CONFIG GROUP ================= */
+// function ConfigGroup({
+//   title,
+//   items,
+//   selected,
+//   onSelect,
+// }: {
+//   title: string;
+//   items: ConfigItem[];
+//   selected: ConfigItem | null;
+//   onSelect: (item: ConfigItem) => void;
+// }) {
 //   if (!items?.length) return null;
 
 //   return (
@@ -308,7 +340,7 @@
 //       <div className="text-yellow-400 text-xs mb-2">{title}</div>
 
 //       <div className="grid grid-cols-2 gap-2">
-//         {items.map((item: any) => (
+//         {items.map((item) => (
 //           <button
 //             key={item.id}
 //             onClick={() => onSelect(item)}
@@ -325,6 +357,7 @@
 //     </div>
 //   );
 // }
+
 
 
 
@@ -360,19 +393,6 @@ type User = {
   telegram_id?: string;
 };
 
-/* ================= USER ================= */
-const getUser = (): User | null => {
-  try {
-    const raw = localStorage.getItem("user");
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-    return parsed.user || parsed;
-  } catch {
-    return null;
-  }
-};
-
 export default function CarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -403,47 +423,38 @@ export default function CarDetail() {
     const load = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem("token");
 
-        const [carsRes, configsRes] = await Promise.all([
+        const [carsRes, configsRes, userRes] = await Promise.all([
           fetch(`${API}/market/cars`),
           fetch(`${API}/market/configs`),
+          fetch(`${API}/profile/me`, {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : "",
+            },
+          }),
         ]);
 
         const carsData = await carsRes.json();
         const configsData = await configsRes.json();
+        const userData = await userRes.json();
 
         const cars: Car[] = Array.isArray(carsData) ? carsData : [];
-
         const foundCar = cars.find((c) => String(c.id) === String(id));
 
         setCar(foundCar || null);
+        setUser(userData || null);
         setConfigs(configsData || { power: [], tuning: [], wheels: [] });
 
-        const cfg = configsData || { power: [], tuning: [], wheels: [] };
+        // Установка дефолтных (бесплатных) конфигов
+        if (configsData) {
+          setSelectedHp(configsData.power?.find((i: ConfigItem) => Number(i.price) === 0) || null);
+          setSelectedTuning(configsData.tuning?.find((i: ConfigItem) => Number(i.price) === 0) || null);
+          setSelectedWheels(configsData.wheels?.find((i: ConfigItem) => Number(i.price) === 0) || null);
+        }
 
-        setSelectedHp(
-          cfg.power?.find((i: ConfigItem) => Number(i.price) === 0) || null
-        );
-        setSelectedTuning(
-          cfg.tuning?.find((i: ConfigItem) => Number(i.price) === 0) || null
-        );
-        setSelectedWheels(
-          cfg.wheels?.find((i: ConfigItem) => Number(i.price) === 0) || null
-        );
-
-        /* ================= FIXED PROFILE ================= */
-        const token = localStorage.getItem("token");
-
-        const userRes = await fetch(`${API}/profile/me`, {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        });
-
-        const userData = await userRes.json();
-        setUser(userData || null);
       } catch (err) {
-        console.log("LOAD ERROR:", err);
+        console.error("LOAD ERROR:", err);
       } finally {
         setLoading(false);
       }
@@ -452,7 +463,6 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= LOADING ================= */
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black">
@@ -469,22 +479,23 @@ export default function CarDetail() {
     );
   }
 
-  /* ================= DISCOUNT ================= */
-  const discount = Number(user?.discount) || 0;
+  /* ================= DISCOUNT LOGIC (FIXED) ================= */
+  // Берем общую скидку из профиля пользователя (например, 10)
+  const userDiscount = Number(user?.discount) || 0;
+  
+  // Если бэкенд прислал список машин, проверяем его. 
+  // Если списка нет, но есть общая скидка — применяем её ко всем.
+  const hasSpecificList = Array.isArray(user?.discount_cars) && user!.discount_cars.length > 0;
+  const isCarAllowed = hasSpecificList ? user!.discount_cars!.includes(Number(id)) : true;
 
-  const allowedCars: number[] = Array.isArray(user?.discount_cars)
-    ? user!.discount_cars
-    : [];
+  const finalDiscountPercent = isCarAllowed ? userDiscount : 0;
 
-  const hasDiscount = allowedCars.includes(Number(id));
-  const finalDiscount = hasDiscount ? discount : 0;
-
-  /* ================= PRICE ================= */
+  /* ================= PRICE CALCULATIONS ================= */
   const basePrice = Number(car.price) || 0;
 
-  const discountedPrice =
-    finalDiscount > 0
-      ? Math.floor(basePrice * (1 - finalDiscount / 100))
+  const discountedBasePrice =
+    finalDiscountPercent > 0
+      ? Math.floor(basePrice * (1 - finalDiscountPercent / 100))
       : basePrice;
 
   const configPrice =
@@ -492,7 +503,7 @@ export default function CarDetail() {
     (Number(selectedTuning?.price) || 0) +
     (Number(selectedWheels?.price) || 0);
 
-  const totalPrice = discountedPrice + configPrice;
+  const totalPrice = discountedBasePrice + configPrice;
 
   const selectedConfigs = [
     selectedHp?.name,
@@ -500,11 +511,10 @@ export default function CarDetail() {
     selectedWheels?.name,
   ].filter(Boolean);
 
-  /* ================= SEND ================= */
+  /* ================= SEND ORDER ================= */
   const sendToTelegram = async () => {
     try {
       setSending(true);
-
       const payload = {
         user: {
           id: user?.id,
@@ -520,24 +530,25 @@ export default function CarDetail() {
         total: totalPrice,
       };
 
-      await fetch(`${API}/telegram/order-to-tg`, {
+      const res = await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      alert("ORDER SENT 🚀");
-      navigate("/market");
+      if (res.ok) {
+        alert("ORDER SENT 🚀");
+        navigate("/market");
+      } else {
+        throw new Error();
+      }
     } catch {
-      alert("ERROR");
+      alert("ERROR SENDING ORDER");
     } finally {
       setSending(false);
     }
   };
 
-  /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#050608] text-white pb-10">
       <Navbar />
@@ -545,38 +556,39 @@ export default function CarDetail() {
       <div className="max-w-7xl mx-auto px-4 pt-4">
         <button
           onClick={() => navigate("/market")}
-          className="text-white/30 mb-4 text-sm font-bold"
+          className="text-white/30 mb-4 text-sm font-bold hover:text-white transition"
         >
-          ← BACK
+          ← BACK TO MARKET
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* LEFT */}
+          {/* LEFT: IMAGE & INFO */}
           <div>
-            <h1 className="text-4xl font-black">
-              <span className="text-yellow-400 text-sm">{car.brand}</span>{" "}
+            <h1 className="text-4xl font-black uppercase">
+              <span className="text-yellow-400 text-sm block mb-1">{car.brand}</span>
               {car.name}
             </h1>
 
-            <img src={car.image_url} className="rounded-3xl mt-4" />
-
-            {finalDiscount > 0 && (
-              <div className="bg-red-600 text-xs px-3 py-1 mt-2 inline-block rounded">
-                -{finalDiscount}% SALE
-              </div>
-            )}
+            <div className="relative mt-4">
+              <img src={car.image_url} alt={car.name} className="w-full rounded-3xl border border-white/5" />
+              {finalDiscountPercent > 0 && (
+                <div className="absolute top-4 left-4 bg-red-600 text-white font-bold px-4 py-2 rounded-full shadow-lg">
+                  -{finalDiscountPercent}% PROMO
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT: CONFIGURATOR */}
           <div className="flex flex-col gap-6">
             <ConfigGroup
-              title="POWER"
+              title="ENGINE POWER"
               items={configs.power}
               selected={selectedHp}
               onSelect={setSelectedHp}
             />
             <ConfigGroup
-              title="TUNING"
+              title="VISUAL TUNING"
               items={configs.tuning}
               selected={selectedTuning}
               onSelect={setSelectedTuning}
@@ -588,61 +600,70 @@ export default function CarDetail() {
               onSelect={setSelectedWheels}
             />
 
-            <div className="bg-yellow-500 text-black p-6 rounded-3xl">
-              <div className="flex justify-between">
-                <span className="font-black">TOTAL</span>
-
-                <div>
-                  {finalDiscount > 0 && (
-                    <div className="line-through">{basePrice} $</div>
+            {/* TOTAL PRICE BLOCK */}
+            <div className="bg-yellow-400 text-black p-6 rounded-3xl mt-4">
+              <div className="flex justify-between items-end">
+                <span className="font-black text-xl">TOTAL PRICE</span>
+                <div className="text-right">
+                  {finalDiscountPercent > 0 && (
+                    <div className="text-black/50 line-through text-sm">
+                      ${basePrice + configPrice}
+                    </div>
                   )}
-                  <div className="text-3xl font-black">{totalPrice} $</div>
+                  <div className="text-4xl font-black">${totalPrice}</div>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowPay(true)}
-                className="w-full mt-4 bg-black text-white py-4 rounded-xl"
+                className="w-full mt-6 bg-black text-white py-4 rounded-2xl font-black hover:scale-[1.02] transition active:scale-95"
               >
-                BUY
+                ORDER NOW
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* MODAL WINDOW */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-[#0c0c0c] p-6 rounded-3xl w-full max-w-sm">
-            <h2 className="text-yellow-400 text-center font-black mb-4">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#0c0c0c] p-8 rounded-3xl w-full max-w-md border border-white/10">
+            <h2 className="text-yellow-400 text-center text-2xl font-black mb-6">
               ORDER SUMMARY
             </h2>
 
-            <div className="text-center text-xs mb-4">
+            <div className="space-y-3 mb-8">
+              <div className="flex justify-between text-white/60">
+                <span>Car:</span>
+                <span className="text-white">{car.brand} {car.name}</span>
+              </div>
               {selectedConfigs.map((c, i) => (
-                <div key={i}>• {c}</div>
+                <div key={i} className="flex justify-between text-white/60">
+                  <span>Option:</span>
+                  <span className="text-white">{c}</span>
+                </div>
               ))}
-            </div>
-
-            <div className="flex justify-between mb-4">
-              <span>TOTAL</span>
-              <span>{totalPrice} $</span>
+              <div className="h-[1px] bg-white/10 my-4" />
+              <div className="flex justify-between text-xl font-black">
+                <span>TOTAL:</span>
+                <span className="text-yellow-400">${totalPrice}</span>
+              </div>
             </div>
 
             <button
               onClick={sendToTelegram}
               disabled={sending}
-              className="w-full bg-yellow-500 py-3 text-black font-black rounded-xl"
+              className="w-full bg-yellow-400 py-4 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50"
             >
-              {sending ? "SENDING..." : "PAY"}
+              {sending ? "PROCESSING..." : "CONFIRM & PAY"}
             </button>
 
             <button
               onClick={() => setShowPay(false)}
-              className="w-full mt-2 text-white/30 text-xs"
+              className="w-full mt-4 text-white/30 text-sm font-bold hover:text-white"
             >
-              Cancel
+              CANCEL
             </button>
           </div>
         </div>
@@ -651,7 +672,7 @@ export default function CarDetail() {
   );
 }
 
-/* ================= CONFIG GROUP ================= */
+/* ================= HELPER COMPONENT ================= */
 function ConfigGroup({
   title,
   items,
@@ -666,21 +687,21 @@ function ConfigGroup({
   if (!items?.length) return null;
 
   return (
-    <div>
-      <div className="text-yellow-400 text-xs mb-2">{title}</div>
-
+    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+      <div className="text-yellow-400 text-[10px] font-black tracking-widest mb-3 uppercase">{title}</div>
       <div className="grid grid-cols-2 gap-2">
         {items.map((item) => (
           <button
             key={item.id}
             onClick={() => onSelect(item)}
-            className={`p-3 rounded-xl ${
+            className={`p-3 rounded-xl text-sm font-bold transition-all ${
               selected?.id === item.id
-                ? "bg-yellow-500 text-black"
-                : "bg-white/5"
+                ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+                : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
             }`}
           >
             {item.name}
+            {Number(item.price) > 0 && <span className="block text-[10px] opacity-60">+${item.price}</span>}
           </button>
         ))}
       </div>
