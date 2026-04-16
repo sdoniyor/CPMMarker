@@ -412,7 +412,6 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= HANDLERS ================= */
   const handleOpenPay = () => {
     const pass = Math.floor(1000 + Math.random() * 9000).toString(); 
     setRandomPass(pass);
@@ -437,10 +436,10 @@ export default function CarDetail() {
     `Диски: ${selectedWheels?.name || "None"}`
   ];
 
-/* ================= SEND ORDER TO TG ================= */
+  /* ================= SEND ORDER TO TG ================= */
   const sendToTelegram = async () => {
     if (!car || !user) {
-      alert("Ошибка: Данные не загружены");
+      alert("Ошибка данных");
       return;
     }
 
@@ -448,22 +447,24 @@ export default function CarDetail() {
       setSending(true);
       const token = localStorage.getItem("token");
 
-      // Формируем плоскую структуру, чтобы бэкенду было проще прочитать поля
+      // Возвращаем структуру, которую бэкенд ожидает (user, car, configs)
+      // Но добавляем пароль и сервер прямо в payload
       const payload = {
-        user_id: user.id,
-        user_name: user.name,
-        user_email: user.email || "No email",
-        user_tg: user.telegram_username || "Unknown",
-        user_tg_id: user.telegram_id || "None",
-        
-        car_name: `${car.brand} ${car.name}`,
-        configs: selectedConfigs.join(", "), // Превращаем массив в строку
-        
-        // Передаем эти поля напрямую в корень объекта
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          email: user.email || "No email",
+          username: user.telegram_username || "Unknown", 
+          tg_id: user.telegram_id || "None" 
+        },
+        car: { 
+          brand: car.brand, 
+          name: car.name 
+        },
+        configs: selectedConfigs, // Массив строк
+        total: totalPrice,
         server: `тест${selectedHp?.name || ""}`, 
-        password: randomPass, 
-        
-        total_price: totalPrice,
+        password: randomPass
       };
 
       const res = await fetch(`${API}/telegram/order-to-tg`, {
@@ -479,16 +480,17 @@ export default function CarDetail() {
         alert(`ЗАКАЗ ОТПРАВЛЕН! ✅\nПароль: ${randomPass}`);
         navigate("/market");
       } else {
-        alert("Ошибка сервера при отправке в ТГ.");
+        const errorData = await res.json().catch(() => ({}));
+        alert(`Ошибка сервера (500): ${errorData.message || 'Проверьте логи бэкенда'}`);
       }
     } catch (e) {
-      alert("Ошибка сети.");
+      alert("Ошибка сети");
     } finally {
       setSending(false);
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black italic tracking-tighter">LOADING...</div>;
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white text-3xl font-black italic">LOADING...</div>;
   if (!car) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500 text-2xl font-black">CAR NOT FOUND</div>;
 
   return (
@@ -510,7 +512,7 @@ export default function CarDetail() {
             <div className="relative mt-6 group">
               <img src={car.image_url} alt={car.name} className="w-full rounded-[2rem] border border-white/5 shadow-2xl transition-all" />
               {finalDiscountPercent > 0 && (
-                <div className="absolute top-6 left-6 bg-red-600 text-white font-black px-5 py-2 rounded-full animate-pulse shadow-lg">
+                <div className="absolute top-6 left-6 bg-red-600 text-white font-black px-5 py-2 rounded-full animate-pulse">
                   -{finalDiscountPercent}% OFF
                 </div>
               )}
@@ -524,14 +526,14 @@ export default function CarDetail() {
             <ConfigGroup title="WHEELS" items={configs.wheels} selected={selectedWheels} onSelect={setSelectedWheels} />
 
             <div className="bg-yellow-400 text-black p-8 rounded-[2rem] mt-4 shadow-xl">
-              <div className="flex justify-between items-end">
-                <span className="font-black text-xl tracking-tighter uppercase">Итого</span>
+              <div className="flex justify-between items-end font-black">
+                <span className="text-xl tracking-tighter uppercase">Итого</span>
                 <div className="text-right leading-none">
-                  {finalDiscountPercent > 0 && <div className="text-black/40 line-through text-lg font-bold mb-1">${basePrice + configPrice}</div>}
-                  <div className="text-5xl font-black tracking-tighter">${totalPrice}</div>
+                  {finalDiscountPercent > 0 && <div className="text-black/40 line-through text-lg mb-1">${basePrice + configPrice}</div>}
+                  <div className="text-5xl tracking-tighter">${totalPrice}</div>
                 </div>
               </div>
-              <button onClick={handleOpenPay} className="w-full mt-8 bg-black text-white py-5 rounded-2xl font-black text-lg hover:bg-zinc-900 transition-all active:scale-[0.98] uppercase">
+              <button onClick={handleOpenPay} className="w-full mt-8 bg-black text-white py-5 rounded-2xl font-black text-lg hover:bg-zinc-900 transition-all uppercase">
                 Оформить заказ
               </button>
             </div>
@@ -545,37 +547,36 @@ export default function CarDetail() {
           <div className="bg-[#0c0c0c] p-8 rounded-[2.5rem] w-full max-w-md border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-300">
             <h2 className="text-yellow-400 text-center text-3xl font-black mb-8 tracking-tighter">ДЕТАЛИ ЗАКАЗА</h2>
 
-            <div className="space-y-3 mb-6 bg-white/5 p-5 rounded-2xl border border-white/5">
-              <div className="flex justify-between text-white/40 text-xs uppercase font-black">
+            <div className="space-y-3 mb-6 bg-white/5 p-5 rounded-2xl border border-white/5 font-black">
+              <div className="flex justify-between text-white/40 text-xs uppercase">
                 <span>Машина:</span>
                 <span className="text-white">{car.brand} {car.name}</span>
               </div>
               <div className="h-[1px] bg-white/10 my-2" />
-              <div className="flex justify-between text-2xl font-black">
+              <div className="flex justify-between text-2xl">
                 <span className="tracking-tighter uppercase">К ОПЛАТЕ:</span>
                 <span className="text-yellow-400">${totalPrice}</span>
               </div>
             </div>
 
-            {/* PAYMENT & DYNAMIC SERVER INFO */}
             <div className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/5 space-y-6">
-              <div className="text-center">
-                <div className="text-white/30 text-[9px] uppercase font-black tracking-[0.2em] mb-2">Карта для оплаты</div>
-                <div className="text-white font-mono text-xl tracking-[0.15em] font-bold">9860 3501 xxxx xxxx</div>
-                <div className="text-yellow-400/50 text-[11px] font-bold mt-2 italic tracking-widest uppercase">test mode</div>
+              <div className="text-center font-black">
+                <div className="text-white/30 text-[9px] uppercase tracking-[0.2em] mb-2">Карта для оплаты</div>
+                <div className="text-white font-mono text-xl tracking-[0.15em]">9860 3501 xxxx xxxx</div>
+                <div className="text-yellow-400/50 text-[11px] mt-2 italic tracking-widest uppercase">test mode</div>
               </div>
 
-              <div className="pt-4 border-t border-white/10 flex justify-around text-center">
+              <div className="pt-4 border-t border-white/10 flex justify-around text-center font-black">
                 <div>
-                  <div className="text-white/30 text-[9px] uppercase font-black tracking-widest mb-1">Server</div>
-                  <div className="text-yellow-400 text-sm font-black uppercase tracking-tighter">
+                  <div className="text-white/30 text-[9px] uppercase tracking-widest mb-1">Server</div>
+                  <div className="text-yellow-400 text-sm uppercase tracking-tighter">
                     тест{selectedHp?.name || ""}
                   </div>
                 </div>
                 <div className="w-[1px] bg-white/10 h-8" />
                 <div>
-                  <div className="text-white/30 text-[9px] uppercase font-black tracking-widest mb-1">Password</div>
-                  <div className="text-white text-sm font-black tracking-widest">{randomPass}</div>
+                  <div className="text-white/30 text-[9px] uppercase tracking-widest mb-1">Password</div>
+                  <div className="text-white text-sm tracking-widest">{randomPass}</div>
                 </div>
               </div>
             </div>
@@ -583,7 +584,7 @@ export default function CarDetail() {
             <button 
               onClick={sendToTelegram} 
               disabled={sending} 
-              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-[0_10px_30px_rgba(250,204,21,0.2)] uppercase"
+              className="w-full bg-yellow-400 py-5 text-black font-black rounded-2xl hover:bg-yellow-300 disabled:opacity-50 transition-all text-lg shadow-lg uppercase"
             >
               {sending ? "ОТПРАВЛЯЕМ..." : "ПОДТВЕРДИТЬ И КУПИТЬ"}
             </button>
@@ -598,7 +599,6 @@ export default function CarDetail() {
   );
 }
 
-/* ================= HELPER COMPONENT ================= */
 function ConfigGroup({ title, items, selected, onSelect }: {
   title: string;
   items: ConfigItem[];
