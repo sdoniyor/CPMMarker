@@ -82,24 +82,24 @@ export default function Market() {
     return ids.includes(car.id);
   };
 
-  /* ================= PRICE ================= */
-  const getPrice = (car: Car) => {
-    const base = Number(car.price) || 0;
-    const discount = Number(user?.discount) || 0;
+/* ================= PRICE ================= */
+    const getPrice = (car: Car) => {
+      const base = Number(car.price) || 0;
+      const discount = Number(user?.discount) || 0;
 
-    const allowed = hasPromoAccess(car);
+      // Если скидки нет, возвращаем обычную цену
+      if (discount <= 0) {
+        return { old: null, new: base };
+      }
 
-    if (!allowed || discount <= 0) {
-      return { old: null, new: base };
-    }
+      // Считаем новую цену для любой машины
+      const newPrice = Math.floor(base - (base * discount) / 100);
 
-    const newPrice = Math.floor(base - (base * discount) / 100);
-
-    return {
-      old: base,
-      new: newPrice,
+      return {
+        old: base,
+        new: newPrice,
+      };
     };
-  };
 
   /* ================= FILTER ================= */
   const filteredCars = (cars || [])
