@@ -131,27 +131,9 @@ const getUser = async (id) => {
 };
 
 /* ================= EXPIRE CHECK ================= */
-const isExpired = (user) => {
-  if (!user.promo_used_at) return false;
-
-  const diff = Date.now() - new Date(user.promo_used_at).getTime();
-  const hours = diff / (1000 * 60 * 60);
-
-  return hours >= 24;
-};
-
-/* ================= PARSE IDS ================= */
-const parseIds = (str) => {
-  if (!str) return [];
-
-  try {
-    return str
-      .split(",")
-      .map((id) => Number(id.trim()))
-      .filter((id) => !isNaN(id));
-  } catch {
-    return [];
-  }
+const isExpired = (promo) => {
+  if (!promo.expires_at) return false;
+  return new Date(promo.expires_at) < new Date();
 };
 
 /* ================= REDEEM PROMO ================= */
@@ -160,33 +142,12 @@ router.post("/redeem", auth, async (req, res) => {
     const { code, car_id } = req.body;
     const userId = req.userId;
 
-    if (!code) {
-      return res.status(400).json({ error: "No code" });
-    }
-
-    let user = await getUser(userId);
+    const user = await getUser(userId);
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    /* ================= RESET EXPIRED ================= */
-    if (isExpired(user)) {
-      await q(
-        `UPDATE users 
-         SET active_promo=NULL, 
-             promo_used_at=NULL, 
-             discount=0,
-             discount_cars=NULL
-         WHERE id=$1`,
-        [userId]
-      );
-
-      user = await getUser(userId);
-      console.log("PROMO RESET (expired)");
-    }
-
-    /* ================= GET PROMO ================= */
     const promoRes = await q(
       "SELECT * FROM promo_codes WHERE code=$1",
       [code]
@@ -195,77 +156,72 @@ router.post("/redeem", auth, async (req, res) => {
     const promo = promoRes.rows[0];
 
     if (!promo) {
-      return res.status(404).json({ error: "Invalid promo" });
+      return res.status(404).json({ error: "Invalid promo code" });
     }
 
-    console.log("PROMO FOUND:", promo);
+    /* ================= EXPIRED ================= */
+    if (isExpired(promo)) {
+      return res.status(400).json({ error: "Promo expired" });
+    }
 
-    /* ================= PARSE CAR IDS ================= */
-    const allowedCars = parseIds(promo.car_ids);
+    /* ================= MAX USES ================= */
+    if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) {
+      return res.status(400).json({ error: "Promo limit reached" });
+    }
 
-    console.log("ALLOWED CARS:", allowedCars);
+    /* ================= CAR CHECK ================= */
+    let allowedCars = [];
 
-    /* ================= CAR CHECK (если передан car_id) ================= */
+    if (promo.car_ids) {
+      allowedCars = promo.car_ids
+        .split(",")
+        .map(x => Number(x.trim()))
+        .filter(Boolean);
+    }
+
     if (car_id && allowedCars.length > 0) {
       if (!allowedCars.includes(Number(car_id))) {
         return res.status(400).json({
-          error: "Promo not valid for this car",
+          error: "Promo not valid for this car"
         });
       }
     }
 
-    /* ================= COOLDOWN ================= */
-    if (
-      user.active_promo === code &&
-      user.promo_used_at &&
-      !isExpired(user)
-    ) {
+    /* ================= ONE PROMO PER USER CHECK ================= */
+    const alreadyUsed = await q(
+      "SELECT * FROM user_promos WHERE user_id=$1 AND promo_code=$2 AND car_id=$3",
+      [userId, code, car_id || null]
+    );
+
+    if (alreadyUsed.rows.length > 0) {
       return res.status(400).json({
-        error: "Promo cooldown 24h",
+        error: "Promo already used"
       });
     }
 
-    /* ================= ONE CAR ONE PROMO ================= */
-    if (car_id) {
-      const check = await q(
-        "SELECT * FROM orders WHERE user_id=$1 AND car_id=$2 AND promo_code=$3",
-        [userId, car_id, code]
-      );
-
-      if (check.rows.length > 0) {
-        return res.status(400).json({
-          error: "Promo already used on this car",
-        });
-      }
-    }
-
-    /* ================= APPLY PROMO ================= */
+    /* ================= SAVE USER PROMO ================= */
     await q(
-      `UPDATE users 
-       SET active_promo=$1, 
-           promo_used_at=NOW(), 
-           discount=$2,
-           discount_cars=$3
-       WHERE id=$4`,
-      [
-        code,
-        promo.discount,
-        promo.car_ids || null, // 🔥 СОХРАНЯЕМ СПИСОК МАШИН
-        userId,
-      ]
+      `INSERT INTO user_promos (user_id, promo_code, car_id, discount)
+       VALUES ($1,$2,$3,$4)`,
+      [userId, code, car_id || null, promo.discount]
     );
 
-    console.log("PROMO APPLIED:", {
-      userId,
-      discount: promo.discount,
-      cars: promo.car_ids,
-    });
+    /* ================= UPDATE USER ================= */
+    await q(
+      `UPDATE users SET discount=$1 WHERE id=$2`,
+      [promo.discount, userId]
+    );
 
-    /* ================= RESPONSE ================= */
+    /* ================= UPDATE PROMO USAGE ================= */
+    await q(
+      `UPDATE promo_codes SET used_count = used_count + 1 WHERE id=$1`,
+      [promo.id]
+    );
+
     res.json({
       success: true,
       discount: promo.discount,
-      car_ids: promo.car_ids || null,
+      allowedCars
     });
 
   } catch (e) {
