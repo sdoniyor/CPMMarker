@@ -261,13 +261,23 @@
 
 
 
-
 import { useEffect, useState } from "react";
 
 const API = "https://cpmmarker.onrender.com";
 
+type User = {
+  id: number;
+  name: string;
+  email?: string;
+  discount?: number;
+  discount_cars?: string | null;
+  telegram_id?: string;
+  telegram_username?: string;
+  avatar?: string;
+};
+
 export default function Profile() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [promo, setPromo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -287,6 +297,8 @@ export default function Profile() {
       });
 
       const data = await res.json();
+
+      console.log("USER DATA:", data); // 🔥 DEBUG
 
       if (data?.id) setUser(data);
       else setUser(null);
@@ -339,20 +351,25 @@ export default function Profile() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ code: promo }),
+        body: JSON.stringify({
+          code: promo,
+        }),
       });
 
       const data = await res.json();
 
+      console.log("PROMO RESPONSE:", data); // 🔥 DEBUG
+
       if (data?.success) {
         alert("Promo activated!");
         setPromo("");
-        loadUser();
+        await loadUser(); // 🔥 ОБЯЗАТЕЛЬНО
       } else {
         alert(data?.error || "Invalid promo");
       }
     } catch (e) {
       console.log(e);
+      alert("Server error");
     } finally {
       setLoading(false);
     }
@@ -362,7 +379,6 @@ export default function Profile() {
   const handleFile = (file: File) => {
     setFile(file);
 
-    // превью
     const reader = new FileReader();
     reader.onload = () => {
       setPreview(reader.result as string);
@@ -374,10 +390,10 @@ export default function Profile() {
   const uploadAvatar = async () => {
     if (!file) return alert("Select image first");
 
-    const form = new FormData();
-    form.append("avatar", file);
-
     try {
+      const form = new FormData();
+      form.append("avatar", file);
+
       const res = await fetch(`${API}/profile/upload-avatar`, {
         method: "POST",
         headers: {
@@ -388,16 +404,19 @@ export default function Profile() {
 
       const data = await res.json();
 
+      console.log("UPLOAD RESPONSE:", data); // 🔥 DEBUG
+
       if (data?.id) {
         setUser(data);
         setFile(null);
         setPreview(null);
         alert("Avatar updated!");
       } else {
-        alert("Upload error");
+        alert(data?.error || "Upload error");
       }
     } catch (e) {
-      console.log(e);
+      console.log("UPLOAD ERROR:", e);
+      alert("Upload failed");
     }
   };
 
@@ -410,7 +429,7 @@ export default function Profile() {
     );
   }
 
-  /* ================= AVATAR SRC ================= */
+  /* ================= AVATAR ================= */
   const avatarSrc = preview
     ? preview
     : user.avatar
@@ -513,9 +532,16 @@ export default function Profile() {
             </button>
           </div>
 
+          {/* DEBUG INFO */}
+          {user.discount_cars && (
+            <div className="text-xs text-white/30 mt-2">
+              Allowed cars: {user.discount_cars}
+            </div>
+          )}
+
         </div>
 
-        {/* AVATAR UPLOAD */}
+        {/* AVATAR */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
 
           <h2 className="font-bold mb-3">Upload Avatar</h2>

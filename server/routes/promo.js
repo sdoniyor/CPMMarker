@@ -140,6 +140,20 @@ const isExpired = (user) => {
   return hours >= 24;
 };
 
+/* ================= PARSE IDS ================= */
+const parseIds = (str) => {
+  if (!str) return [];
+
+  try {
+    return str
+      .split(",")
+      .map((id) => Number(id.trim()))
+      .filter((id) => !isNaN(id));
+  } catch {
+    return [];
+  }
+};
+
 /* ================= REDEEM PROMO ================= */
 router.post("/redeem", auth, async (req, res) => {
   try {
@@ -169,6 +183,7 @@ router.post("/redeem", auth, async (req, res) => {
       );
 
       user = await getUser(userId);
+      console.log("PROMO RESET (expired)");
     }
 
     /* ================= GET PROMO ================= */
@@ -186,21 +201,12 @@ router.post("/redeem", auth, async (req, res) => {
     console.log("PROMO FOUND:", promo);
 
     /* ================= PARSE CAR IDS ================= */
-    let allowedCars = [];
+    const allowedCars = parseIds(promo.car_ids);
 
-    if (promo.car_ids) {
-      try {
-        allowedCars = promo.car_ids
-          .split(",")
-          .map((id) => Number(id.trim()))
-          .filter((id) => !isNaN(id));
-      } catch {
-        allowedCars = [];
-      }
-    }
+    console.log("ALLOWED CARS:", allowedCars);
 
-    /* ================= CAR RESTRICTION ================= */
-    if (allowedCars.length > 0 && car_id) {
+    /* ================= CAR CHECK (если передан car_id) ================= */
+    if (car_id && allowedCars.length > 0) {
       if (!allowedCars.includes(Number(car_id))) {
         return res.status(400).json({
           error: "Promo not valid for this car",
@@ -244,13 +250,18 @@ router.post("/redeem", auth, async (req, res) => {
       [
         code,
         promo.discount,
-        promo.car_ids || null, // 🔥 ВАЖНО
+        promo.car_ids || null, // 🔥 СОХРАНЯЕМ СПИСОК МАШИН
         userId,
       ]
     );
 
-    console.log("PROMO APPLIED TO USER:", userId);
+    console.log("PROMO APPLIED:", {
+      userId,
+      discount: promo.discount,
+      cars: promo.car_ids,
+    });
 
+    /* ================= RESPONSE ================= */
     res.json({
       success: true,
       discount: promo.discount,
