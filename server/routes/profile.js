@@ -31,9 +31,21 @@ router.get("/me", auth, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    delete user.password;
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
 
-    res.json(user);
+      // 🔥 ВАЖНО ДЛЯ СКИДОК
+      discount: user.discount || 0,
+      discount_cars: user.discount_cars || null,
+
+      // 👇 можно оставить если используешь
+      telegram_username: user.telegram_username,
+      telegram_id: user.telegram_id,
+    });
+
   } catch (e) {
     console.log("PROFILE ERROR:", e);
     res.status(500).json({ error: "Server error" });
