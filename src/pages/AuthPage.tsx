@@ -83,31 +83,37 @@ export default function Auth() {
 
   const isRegister = mode === "register";
 
-  /* ================= CHECK TOKEN (FIX LOOP) ================= */
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    if (token) {
-      navigate("/market", { replace: true });
-    }
-  }, []);
-
-  /* ================= REF FROM URL ================= */
+  /* ================= REF + FORCE AUTH ================= */
   useEffect(() => {
     const urlRef = new URLSearchParams(window.location.search).get("ref");
 
     if (urlRef) {
+      // 🔥 ВАЖНО: сбрасываем токен если пришли по рефералке
+      localStorage.removeItem("token");
+
       setRef(urlRef);
       setMode("register");
     }
   }, []);
 
+  /* ================= CHECK AUTH (FIXED) ================= */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    // ❌ НЕ просто проверка наличия
+    if (!token) return;
+
+    // 🔥 даём время UI не дергаться
+    const timeout = setTimeout(() => {
+      navigate("/market", { replace: true });
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, []);
+
   /* ================= AUTH ================= */
   const handleAuth = async () => {
-    if (!email || !password) {
-      alert("Fill all fields");
-      return;
-    }
+    if (!email || !password) return alert("Fill all fields");
 
     try {
       setLoading(true);
@@ -119,18 +125,13 @@ export default function Auth() {
             name,
             email,
             password,
-            referredBy: ref || null, // ✅ backend match
+            referredBy: ref || null,
           }
-        : {
-            email,
-            password,
-          };
+        : { email, password };
 
       const res = await fetch(`${API}${endpoint}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
@@ -144,10 +145,7 @@ export default function Auth() {
       if (data?.token) {
         localStorage.setItem("token", data.token);
 
-        // ✅ SAFE NAVIGATION
         navigate("/market", { replace: true });
-      } else {
-        alert("Token not received");
       }
     } catch (e) {
       console.log(e);
@@ -162,7 +160,6 @@ export default function Auth() {
 
       <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8">
 
-        {/* TITLE */}
         <h1 className="text-3xl font-black text-center mb-2">
           CPM <span className="text-yellow-400">MARKET</span>
         </h1>
@@ -171,21 +168,17 @@ export default function Auth() {
           Welcome back
         </p>
 
-        {/* REF INFO */}
         {ref && (
           <div className="mb-4 text-center text-xs text-yellow-400">
             🔥 Referral active: {ref}
           </div>
         )}
 
-        {/* SWITCH */}
         <div className="flex bg-black/40 rounded-xl p-1 mb-6">
           <button
             onClick={() => setMode("login")}
-            className={`flex-1 py-2 rounded-lg font-bold transition ${
-              mode === "login"
-                ? "bg-yellow-400 text-black"
-                : "text-white/50"
+            className={`flex-1 py-2 rounded-lg font-bold ${
+              mode === "login" ? "bg-yellow-400 text-black" : "text-white/50"
             }`}
           >
             LOGIN
@@ -193,17 +186,14 @@ export default function Auth() {
 
           <button
             onClick={() => setMode("register")}
-            className={`flex-1 py-2 rounded-lg font-bold transition ${
-              mode === "register"
-                ? "bg-yellow-400 text-black"
-                : "text-white/50"
+            className={`flex-1 py-2 rounded-lg font-bold ${
+              mode === "register" ? "bg-yellow-400 text-black" : "text-white/50"
             }`}
           >
             SIGN UP
           </button>
         </div>
 
-        {/* INPUTS */}
         <div className="space-y-3">
 
           {isRegister && (
@@ -211,7 +201,7 @@ export default function Auth() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Username"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
             />
           )}
 
@@ -219,7 +209,7 @@ export default function Auth() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
+            className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
           />
 
           <div className="relative">
@@ -228,7 +218,7 @@ export default function Auth() {
               onChange={(e) => setPassword(e.target.value)}
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
             />
 
             <button
@@ -241,17 +231,12 @@ export default function Auth() {
           </div>
         </div>
 
-        {/* BUTTON */}
         <button
           onClick={handleAuth}
           disabled={loading}
-          className="w-full mt-6 py-3 rounded-xl bg-yellow-400 text-black font-black hover:scale-[1.02] transition"
+          className="w-full mt-6 py-3 rounded-xl bg-yellow-400 text-black font-black"
         >
-          {loading
-            ? "Loading..."
-            : isRegister
-            ? "CREATE ACCOUNT"
-            : "SIGN IN"}
+          {loading ? "Loading..." : isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
         </button>
 
       </div>
