@@ -61,6 +61,7 @@
 
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
 type Mode = "login" | "register";
@@ -68,6 +69,8 @@ type Mode = "login" | "register";
 const API = "https://cpmmarker.onrender.com";
 
 export default function Auth() {
+  const navigate = useNavigate();
+
   const [mode, setMode] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -75,56 +78,89 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // 🔥 REF
   const [ref, setRef] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const isRegister = mode === "register";
 
-  /* ================= GET REF FROM URL ================= */
+  /* ================= CHECK TOKEN (FIX LOOP) ================= */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      navigate("/market", { replace: true });
+    }
+  }, []);
+
+  /* ================= REF FROM URL ================= */
   useEffect(() => {
     const urlRef = new URLSearchParams(window.location.search).get("ref");
+
     if (urlRef) {
       setRef(urlRef);
-      setMode("register"); // авто переключение на регистрацию
+      setMode("register");
     }
   }, []);
 
   /* ================= AUTH ================= */
   const handleAuth = async () => {
-    const endpoint = isRegister ? "/auth/register" : "/auth/login";
-
-    const body = isRegister
-      ? {
-          name,
-          email,
-          password,
-          referredBy: ref || null,
-        }
-      : { email, password };
-
-    const res = await fetch(`${API}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data?.error || "Error");
+    if (!email || !password) {
+      alert("Fill all fields");
       return;
     }
 
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      window.location.href = "/market";
+    try {
+      setLoading(true);
+
+      const endpoint = isRegister ? "/auth/register" : "/auth/login";
+
+      const body = isRegister
+        ? {
+            name,
+            email,
+            password,
+            referredBy: ref || null, // ✅ backend match
+          }
+        : {
+            email,
+            password,
+          };
+
+      const res = await fetch(`${API}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data?.error || "Auth error");
+        return;
+      }
+
+      if (data?.token) {
+        localStorage.setItem("token", data.token);
+
+        // ✅ SAFE NAVIGATION
+        navigate("/market", { replace: true });
+      } else {
+        alert("Token not received");
+      }
+    } catch (e) {
+      console.log(e);
+      alert("Server error");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0b0d] text-white px-4">
 
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
+      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8">
 
         {/* TITLE */}
         <h1 className="text-3xl font-black text-center mb-2">
@@ -132,13 +168,13 @@ export default function Auth() {
         </h1>
 
         <p className="text-center text-white/40 mb-6 text-sm">
-          Welcome back 👋
+          Welcome back
         </p>
 
         {/* REF INFO */}
         {ref && (
           <div className="mb-4 text-center text-xs text-yellow-400">
-            🔥 Referral activated
+            🔥 Referral active: {ref}
           </div>
         )}
 
@@ -208,9 +244,14 @@ export default function Auth() {
         {/* BUTTON */}
         <button
           onClick={handleAuth}
+          disabled={loading}
           className="w-full mt-6 py-3 rounded-xl bg-yellow-400 text-black font-black hover:scale-[1.02] transition"
         >
-          {isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
+          {loading
+            ? "Loading..."
+            : isRegister
+            ? "CREATE ACCOUNT"
+            : "SIGN IN"}
         </button>
 
       </div>
