@@ -105,7 +105,7 @@
 
 const express = require("express");
 const auth = require("./middleware/auth");
-const { q } = require("../db");
+const { q } = require("./db");
 
 const multer = require("multer");
 const path = require("path");
