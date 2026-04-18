@@ -97,19 +97,19 @@ export default function Auth() {
   }, []);
 
   /* ================= CHECK AUTH (FIXED) ================= */
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+  // useEffect(() => {
+  //   const token = localStorage.getItem("token");
 
-    // ❌ НЕ просто проверка наличия
-    if (!token) return;
+  //   // ❌ НЕ просто проверка наличия
+  //   if (!token) return;
 
-    // 🔥 даём время UI не дергаться
-    const timeout = setTimeout(() => {
-      navigate("/market", { replace: true });
-    }, 300);
+  //   // 🔥 даём время UI не дергаться
+  //   const timeout = setTimeout(() => {
+  //     navigate("/market", { replace: true });
+  //   }, 300);
 
-    return () => clearTimeout(timeout);
-  }, []);
+  //   return () => clearTimeout(timeout);
+  // }, []);
 
   /* ================= AUTH ================= */
   const handleAuth = async () => {
