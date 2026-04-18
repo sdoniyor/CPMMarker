@@ -153,12 +153,9 @@ export default function Navbar() {
 
       const data = await res.json();
 
-      if (data?.id) {
-        setUser(data);
-        localStorage.setItem("user", JSON.stringify(data));
-      }
+      if (data?.id) setUser(data);
     } catch (e) {
-      console.log("navbar error", e);
+      console.log(e);
     }
   };
 
@@ -166,14 +163,16 @@ export default function Navbar() {
     loadUser();
   }, []);
 
-  const goProfile = () => {
-    // ❗ ВАЖНО: всегда проверяем токен
+  const goProfile = (e: any) => {
+    e?.preventDefault?.();   // 💥 FIX 1
+    e?.stopPropagation?.();  // 💥 FIX 2
+
     if (!token) {
-      navigate("/"); // FIX (НЕ /auth)
+      navigate("/", { replace: true });
       return;
     }
 
-    navigate("/profile");
+    navigate("/profile", { replace: false });
   };
 
   return (
@@ -187,9 +186,11 @@ export default function Navbar() {
           CPM<span className="text-yellow-400">MARKET</span>
         </div>
 
-        <div
+        {/* 💥 ВАЖНО: button вместо div */}
+        <button
+          type="button"
           onClick={goProfile}
-          className="cursor-pointer flex items-center gap-3"
+          className="flex items-center gap-3 cursor-pointer"
         >
           <div className="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-black font-black">
             {user?.name?.[0] || "U"}
@@ -198,7 +199,7 @@ export default function Navbar() {
           <div className="hidden sm:block text-white text-sm">
             {user?.name || "Guest"}
           </div>
-        </div>
+        </button>
 
       </div>
     </nav>
