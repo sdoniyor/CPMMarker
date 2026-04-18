@@ -343,39 +343,39 @@ export default function ProfilePage() {
   }, []);
 
   /* ================= UPLOAD AVATAR ================= */
-  const uploadAvatar = async () => {
-    if (!file) return alert("Выбери фото");
+ const uploadAvatar = async () => {
+  if (!file) return alert("Выбери фото");
 
-    const form = new FormData();
-    form.append("avatar", file);
+  const form = new FormData();
+  form.append("avatar", file);
 
-    try {
-      const res = await fetch(`${API}/profile/upload-avatar`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: form,
-      });
+  try {
+    const res = await fetch(`${API}/profile/upload-avatar`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`, // ❗ только это
+      },
+      body: form,
+    });
 
-      const data = await res.json();
+    const text = await res.text();
+    console.log("UPLOAD RAW RESPONSE:", text);
 
-      if (data?.avatar) {
-        setUser((prev) => ({
-          ...prev!,
-          avatar: data.avatar,
-        }));
+    const data = JSON.parse(text);
 
-        setFile(null);
-        setPreview(null);
-      } else {
-        alert(data?.error || "Upload error");
-      }
-    } catch (e) {
-      console.log(e);
-      alert("Ошибка загрузки");
+    if (data?.success) {
+      setUser(data.user);
+      setFile(null);
+      setPreview(null);
+    } else {
+      alert(data?.error || "Upload error");
     }
-  };
+
+  } catch (e) {
+    console.log(e);
+    alert("Upload failed");
+  }
+};
 
   /* ================= TELEGRAM ================= */
   const connectTelegram = async () => {

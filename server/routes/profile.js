@@ -237,11 +237,12 @@ router.post(
   upload.single("avatar"),
   async (req, res) => {
     try {
-      console.log("FILE RECEIVED:", req.file);
+      console.log("HEADERS:", req.headers);
+      console.log("FILE:", req.file);
 
       if (!req.file) {
         return res.status(400).json({
-          error: "No file uploaded",
+          error: "No file received (req.file is empty)",
         });
       }
 
@@ -261,10 +262,11 @@ router.post(
       });
 
     } catch (e) {
-      console.log("UPLOAD ERROR:", e);
+      console.log("UPLOAD ERROR FULL:", e);
 
       return res.status(500).json({
         error: "Upload failed",
+        detail: e.message,
       });
     }
   }
