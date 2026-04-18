@@ -305,6 +305,10 @@
 // }
 
 
+
+
+
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -331,7 +335,7 @@ type User = {
   name: string;
   email?: string;
   discount?: number;
-  discount_cars?: string | number[] | null;
+  discount_cars?: number[];
   telegram_username?: string;
   telegram_id?: string;
 };
@@ -404,26 +408,12 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= FIX DISCOUNT CARS ================= */
-  const parseDiscountCars = (): number[] => {
-    const raw = user?.discount_cars;
-
-    if (!raw) return [];
-
-    if (Array.isArray(raw)) {
-      return raw.map(Number).filter(Boolean);
-    }
-
-    if (typeof raw === "string") {
-      return raw.split(",").map(Number).filter(Boolean);
-    }
-
-    return [];
-  };
-
-  const discountCars = parseDiscountCars();
-
+  /* ================= FIX DISCOUNT LOGIC ================= */
   const userDiscount = Number(user?.discount) || 0;
+
+  const discountCars: number[] = Array.isArray(user?.discount_cars)
+    ? user.discount_cars.map(Number)
+    : [];
 
   const isCarAllowed =
     userDiscount > 0 &&
@@ -493,50 +483,58 @@ export default function CarDetail() {
 
       alert("Заказ отправлен!");
       navigate("/market");
-    } catch (e) {
+    } catch {
       alert("Ошибка");
     } finally {
       setSending(false);
     }
   };
 
-  if (loading) return <div className="text-white">Loading...</div>;
-  if (!car) return <div className="text-red-500">CAR NOT FOUND</div>;
+  if (loading)
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        LOADING...
+      </div>
+    );
+
+  if (!car)
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-red-500">
+        CAR NOT FOUND
+      </div>
+    );
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="min-h-screen bg-[#050608] text-white pb-10">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto pt-20">
+      <div className="max-w-7xl mx-auto px-4 pt-24">
+        <h1 className="text-5xl font-black">{car.name}</h1>
 
-        <h1 className="text-4xl font-black">{car.name}</h1>
-
-        <img src={car.image_url} className="w-full max-h-[400px] object-contain" />
+        <img src={car.image_url} className="w-full rounded-2xl mt-6" />
 
         {/* PRICE */}
         <div className="mt-6">
           {finalDiscountPercent > 0 && (
-            <p className="line-through text-gray-500">
-              ${basePrice}
-            </p>
+            <p className="line-through text-white/40">${basePrice}</p>
           )}
 
-          <p className="text-3xl text-yellow-400 font-bold">
+          <p className="text-4xl text-yellow-400 font-black">
             ${totalPrice}
           </p>
 
           {finalDiscountPercent > 0 && (
             <p className="text-green-400">
-              -{finalDiscountPercent}% discount applied
+              -{finalDiscountPercent}% discount
             </p>
           )}
         </div>
 
         <button
           onClick={handleOpenPay}
-          className="mt-6 bg-yellow-400 text-black px-6 py-3 font-bold"
+          className="mt-6 bg-yellow-400 text-black px-6 py-3 font-black"
         >
-          Buy
+          BUY
         </button>
       </div>
 
@@ -551,7 +549,7 @@ export default function CarDetail() {
 
             <button
               onClick={sendToTelegram}
-              className="w-full mt-4 bg-yellow-400 text-black py-2 font-bold"
+              className="w-full mt-4 bg-yellow-400 text-black py-2 font-black"
             >
               Confirm
             </button>
