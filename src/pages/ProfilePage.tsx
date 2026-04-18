@@ -1,172 +1,195 @@
-
-import { useState, useEffect } from "react";
-import { Eye, EyeOff } from "lucide-react";
-
-type Mode = "login" | "register";
+import { useEffect, useState } from "react";
 
 const API = "https://cpmmarker.onrender.com";
 
-export default function Auth() {
-  const [mode, setMode] = useState<Mode>("login");
-  const [showPassword, setShowPassword] = useState(false);
+type User = {
+  id: number;
+  name: string;
+  email?: string;
+  discount?: number;
+  avatar?: string;
+  ref_code?: string;
+  ref_count?: number;
+  telegram_username?: string;
+  telegram_id?: string;
+};
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export default function ProfilePage() {
+  const [user, setUser] = useState<User | null>(null);
 
-  const [ref, setRef] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
 
-  const isRegister = mode === "register";
+  const token = localStorage.getItem("token");
 
-  /* ================= GET REF ================= */
-  useEffect(() => {
-    const urlRef = new URLSearchParams(window.location.search).get("ref");
-
-    if (urlRef) {
-      setRef(urlRef);
-
-      // авто регистрация
-      setMode("register");
-    }
-  }, []);
-
-  /* ================= AUTH ================= */
-  const handleAuth = async () => {
+  /* ================= LOAD USER ================= */
+  const loadUser = async () => {
     try {
-      setLoading(true);
-
-      const endpoint = isRegister ? "/auth/register" : "/auth/login";
-
-      const body = isRegister
-        ? {
-            name,
-            email,
-            password,
-
-            // 🔥 FIX: правильное имя поля
-            referred_by: ref || null,
-          }
-        : { email, password };
-
-      const res = await fetch(`${API}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const res = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        alert(data?.error || "Auth error");
+      if (!data?.id) {
+        window.location.href = "/";
         return;
       }
 
-      if (data?.token) {
-        localStorage.setItem("token", data.token);
-        window.location.href = "/market";
-      } else {
-        alert("No token received");
-      }
+      setUser(data);
     } catch (e) {
-      console.log(e);
-      alert("Server error");
-    } finally {
-      setLoading(false);
+      console.log("PROFILE ERROR:", e);
+      window.location.href = "/";
     }
   };
 
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  /* ================= UPLOAD AVATAR ================= */
+  const uploadAvatar = async () => {
+    if (!file) return alert("Выбери фото");
+
+    const form = new FormData();
+    form.append("avatar", file);
+
+    try {
+      const res = await fetch(`${API}/profile/upload-avatar`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: form,
+      });
+
+      const data = await res.json();
+
+      if (data?.id) {
+        setUser(data);
+        setFile(null);
+        setPreview(null);
+      } else {
+        alert(data?.error || "Upload error");
+      }
+    } catch (e) {
+      alert("Ошибка загрузки");
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        Loading profile...
+      </div>
+    );
+  }
+
+  const avatarUrl =
+    preview ||
+    (user.avatar ? `${API}${user.avatar}` : null);
+
+  const refLink = `${window.location.origin}/?ref=${user.ref_code}`;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0b0d] text-white px-4">
+    <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
 
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8">
+      <div className="max-w-4xl mx-auto">
 
-        {/* TITLE */}
-        <h1 className="text-3xl font-black text-center mb-2">
-          CPM <span className="text-yellow-400">MARKET</span>
-        </h1>
+        {/* ================= HEADER ================= */}
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6">
 
-        <p className="text-center text-white/40 mb-6 text-sm">
-          Welcome
-        </p>
-
-        {/* REF */}
-        {ref && (
-          <div className="mb-4 text-center text-xs text-yellow-400">
-            🔥 Referral active: {ref}
+          <div className="w-24 h-24 rounded-2xl bg-yellow-400 text-black flex items-center justify-center overflow-hidden font-black text-3xl">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              user.name?.[0]
+            )}
           </div>
-        )}
 
-        {/* SWITCH */}
-        <div className="flex bg-black/40 rounded-xl p-1 mb-6">
-          <button
-            onClick={() => setMode("login")}
-            className={`flex-1 py-2 rounded-lg font-bold ${
-              mode === "login" ? "bg-yellow-400 text-black" : "text-white/50"
-            }`}
-          >
-            LOGIN
-          </button>
+          <div>
+            <h1 className="text-3xl font-black">{user.name}</h1>
+            <p className="text-white/40">{user.email}</p>
 
-          <button
-            onClick={() => setMode("register")}
-            className={`flex-1 py-2 rounded-lg font-bold ${
-              mode === "register" ? "bg-yellow-400 text-black" : "text-white/50"
-            }`}
-          >
-            SIGN UP
-          </button>
+            <p className="text-yellow-400 text-sm mt-1">
+              Discount: {user.discount || 0}%
+            </p>
+          </div>
+
         </div>
 
-        {/* INPUTS */}
-        <div className="space-y-3">
+        {/* ================= REF LINK ================= */}
+        <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
 
-          {isRegister && (
+          <h2 className="font-bold mb-3">Referral Link</h2>
+
+          <div className="flex gap-2">
+
             <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Username"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
-            />
-          )}
-
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
-          />
-
-          <div className="relative">
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+              value={refLink}
+              readOnly
+              className="flex-1 p-2 bg-black/40 border border-white/10 rounded-xl text-sm"
             />
 
             <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3"
+              onClick={() => navigator.clipboard.writeText(refLink)}
+              className="bg-yellow-400 text-black px-4 rounded-xl font-bold"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              Copy
             </button>
+
           </div>
+
+          <p className="text-white/40 text-sm mt-2">
+            Referrals: {user.ref_count || 0}
+          </p>
+
         </div>
 
-        {/* BUTTON */}
-        <button
-          onClick={handleAuth}
-          disabled={loading}
-          className="w-full mt-6 py-3 rounded-xl bg-yellow-400 text-black font-black"
-        >
-          {loading ? "Loading..." : isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
-        </button>
+        {/* ================= UPLOAD AVATAR ================= */}
+        <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
+
+          <h2 className="font-bold mb-3">Upload Avatar</h2>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+
+              setFile(f);
+
+              const reader = new FileReader();
+              reader.onload = () => {
+                setPreview(reader.result as string);
+              };
+              reader.readAsDataURL(f);
+            }}
+          />
+
+          {preview && (
+            <img
+              src={preview}
+              className="w-24 h-24 mt-3 rounded-xl object-cover"
+            />
+          )}
+
+          <button
+            onClick={uploadAvatar}
+            className="mt-3 bg-green-500 px-6 py-2 rounded-xl font-bold"
+          >
+            Save Avatar
+          </button>
+
+        </div>
 
       </div>
     </div>
   );
 }
-
