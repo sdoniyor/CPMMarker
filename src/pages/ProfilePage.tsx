@@ -172,6 +172,7 @@
 
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
 type Mode = "login" | "register";
@@ -179,6 +180,8 @@ type Mode = "login" | "register";
 const API = "https://cpmmarker.onrender.com";
 
 export default function Auth() {
+  const navigate = useNavigate();
+
   const [mode, setMode] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -190,6 +193,15 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
 
   const isRegister = mode === "register";
+
+  /* ================= CHECK TOKEN (FIX LOOP) ================= */
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      navigate("/market", { replace: true });
+    }
+  }, []);
 
   /* ================= REF FROM URL ================= */
   useEffect(() => {
@@ -203,6 +215,11 @@ export default function Auth() {
 
   /* ================= AUTH ================= */
   const handleAuth = async () => {
+    if (!email || !password) {
+      alert("Fill all fields");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -213,9 +230,7 @@ export default function Auth() {
             name,
             email,
             password,
-
-            // ✅ ВАЖНО: совпадает с backend (referredBy)
-            referredBy: ref || null,
+            referredBy: ref || null, // ✅ backend match
           }
         : {
             email,
@@ -240,8 +255,8 @@ export default function Auth() {
       if (data?.token) {
         localStorage.setItem("token", data.token);
 
-        // защита от белого экрана
-        window.location.href = "/market";
+        // ✅ SAFE NAVIGATION
+        navigate("/market", { replace: true });
       } else {
         alert("Token not received");
       }
@@ -264,13 +279,13 @@ export default function Auth() {
         </h1>
 
         <p className="text-center text-white/40 mb-6 text-sm">
-          Welcome to system
+          Welcome back
         </p>
 
         {/* REF INFO */}
         {ref && (
           <div className="mb-4 text-center text-xs text-yellow-400">
-            🔥 Referral activated: {ref}
+            🔥 Referral active: {ref}
           </div>
         )}
 
@@ -307,7 +322,7 @@ export default function Auth() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Username"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
             />
           )}
 
@@ -315,7 +330,7 @@ export default function Auth() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+            className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
           />
 
           <div className="relative">
@@ -324,7 +339,7 @@ export default function Auth() {
               onChange={(e) => setPassword(e.target.value)}
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10 outline-none"
             />
 
             <button
