@@ -237,13 +237,8 @@ router.post(
   upload.single("avatar"),
   async (req, res) => {
     try {
-      console.log("HEADERS:", req.headers);
-      console.log("FILE:", req.file);
-
       if (!req.file) {
-        return res.status(400).json({
-          error: "No file received (req.file is empty)",
-        });
+        return res.status(400).json({ error: "No file uploaded" });
       }
 
       const filePath = `/uploads/${req.file.filename}`;
@@ -256,18 +251,14 @@ router.post(
         [filePath, req.userId]
       );
 
-      return res.json({
+      res.json({
         success: true,
-        user: r.rows[0],
+        user: r.rows[0], // ✅ ВАЖНО
       });
 
     } catch (e) {
-      console.log("UPLOAD ERROR FULL:", e);
-
-      return res.status(500).json({
-        error: "Upload failed",
-        detail: e.message,
-      });
+      console.log("UPLOAD ERROR:", e);
+      res.status(500).json({ error: "Upload failed" });
     }
   }
 );
