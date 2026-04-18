@@ -1,17 +1,16 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import Navbar from "./components/Navbar";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import MarketPage from "./pages/MarketPage";
 import CarDetail from "./pages/CarDetail";
+import Navbar from "./components/Navbar";
 
 import RequireAuth from "./components/RequireAuth";
 
 export default function App() {
   return (
     <BrowserRouter>
-
       <Routes>
 
         {/* 🔥 DEFAULT */}
@@ -58,7 +57,6 @@ export default function App() {
         />
 
       </Routes>
-
     </BrowserRouter>
   );
 }
