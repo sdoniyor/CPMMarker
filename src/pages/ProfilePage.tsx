@@ -91,7 +91,7 @@ export default function ProfilePage() {
     preview ||
     (user.avatar ? `${API}${user.avatar}` : null);
 
-  const refLink = `${window.location.origin}/?ref=${user.ref_code}`;
+  const refLink = `${window.location.origin}/Auth?ref=${user.ref_code}`;
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
