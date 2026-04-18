@@ -140,9 +140,12 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   const loadUser = async () => {
-    const token = localStorage.getItem("token"); // 🔥 ВАЖНО ТУТ
+    const token = localStorage.getItem("token");
 
-    if (!token) return;
+    if (!token) {
+      setUser(null);
+      return;
+    }
 
     try {
       const res = await fetch(`${SERVER_URL}/profile/me`, {
@@ -155,17 +158,26 @@ export default function Navbar() {
 
       if (data?.id) {
         setUser(data);
-        localStorage.setItem("user", JSON.stringify(data));
+      } else {
+        setUser(null);
       }
-    } catch {}
+    } catch {
+      setUser(null);
+    }
   };
 
   useEffect(() => {
     loadUser();
+
+    // 🔥 авто-обновление при изменении localStorage
+    const interval = setInterval(loadUser, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const goProfile = () => {
-    const token = localStorage.getItem("token"); // 🔥 ВАЖНО ТУТ
+    const token = localStorage.getItem("token");
+
+    console.log("TOKEN CHECK:", token);
 
     if (!token) {
       navigate("/auth");
@@ -179,25 +191,17 @@ export default function Navbar() {
     <nav className="w-full h-[70px] fixed top-0 left-0 z-[100] bg-[#0a0a0a] border-b border-white/5">
       <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between">
 
-        <div
-          onClick={() => navigate("/market")}
-          className="text-white font-black cursor-pointer"
-        >
+        <div onClick={() => navigate("/market")} className="text-white font-black cursor-pointer">
           CPM<span className="text-yellow-400">MARKET</span>
         </div>
 
-        <div
-          onClick={goProfile}
-          className="cursor-pointer flex items-center gap-3"
-        >
+        <div onClick={goProfile} className="cursor-pointer flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-black font-black">
             {user?.name?.[0] || "U"}
           </div>
 
-          <div className="hidden sm:block">
-            <div className="text-white text-sm">
-              {user?.name || "Guest"}
-            </div>
+          <div className="hidden sm:block text-white text-sm">
+            {user?.name || "Guest"}
           </div>
         </div>
 
