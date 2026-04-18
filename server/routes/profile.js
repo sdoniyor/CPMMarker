@@ -150,12 +150,12 @@ const fs = require("fs");
 
 const router = express.Router();
 
-/* ================= UPLOAD DIR (FIXED FOR RENDER) ================= */
-const uploadDir = path.join(__dirname, "../uploads");
+/* ================= RENDER SAFE UPLOAD ================= */
+const uploadDir = "/tmp/uploads"; // 🔥 FIX FOR RENDER
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log("📁 uploads folder ready:", uploadDir);
+  console.log("📁 uploads ready:", uploadDir);
 }
 
 /* ================= MULTER ================= */
@@ -189,7 +189,7 @@ router.get("/me", auth, async (req, res) => {
       [req.userId]
     );
 
-    res.json({
+    return res.json({
       id: user.id,
       name: user.name,
       email: user.email || null,
@@ -203,7 +203,7 @@ router.get("/me", auth, async (req, res) => {
 
   } catch (e) {
     console.log("PROFILE ERROR:", e);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -219,13 +219,14 @@ router.post("/telegram/link", auth, async (req, res) => {
 
     const bot = process.env.BOT_USERNAME || "CPMMarket_bot";
 
-    res.json({
+    return res.json({
       link: `https://t.me/${bot}?start=${code}`,
       code,
     });
+
   } catch (e) {
     console.log("TG LINK ERROR:", e);
-    res.status(500).json({ error: "Failed to create link" });
+    return res.status(500).json({ error: "Failed to create link" });
   }
 });
 
@@ -236,10 +237,12 @@ router.post(
   upload.single("avatar"),
   async (req, res) => {
     try {
-      console.log("FILE:", req.file);
+      console.log("FILE RECEIVED:", req.file);
 
       if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
+        return res.status(400).json({
+          error: "No file uploaded",
+        });
       }
 
       const filePath = `/uploads/${req.file.filename}`;
@@ -252,10 +255,17 @@ router.post(
         [filePath, req.userId]
       );
 
-      res.json(r.rows[0]);
+      return res.json({
+        success: true,
+        user: r.rows[0],
+      });
+
     } catch (e) {
       console.log("UPLOAD ERROR:", e);
-      res.status(500).json({ error: "Upload failed" });
+
+      return res.status(500).json({
+        error: "Upload failed",
+      });
     }
   }
 );
