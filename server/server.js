@@ -5,7 +5,6 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
-/* ================= ROUTES ================= */
 const authRoutes = require("./routes/auth");
 const profileRoutes = require("./routes/profile");
 const marketRoutes = require("./routes/market");
@@ -13,10 +12,9 @@ const promoRoutes = require("./routes/promo");
 const orderRoutes = require("./routes/order");
 const telegramRoutes = require("./routes/telegram");
 
-/* ================= INIT ================= */
 const app = express();
 
-/* ================= CREATE UPLOADS FOLDER ================= */
+/* ================= UPLOADS ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadDir)) {
@@ -24,26 +22,34 @@ if (!fs.existsSync(uploadDir)) {
   console.log("📁 uploads folder created");
 }
 
-/* ================= CORS ================= */
+/* ================= CORS (FIXED) ================= */
 app.use(
   cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "https://cpmmarker.onrender.com",
+    ],
+    credentials: true,
   })
 );
 
-/* ================= BODY LIMIT PROTECTION ================= */
+/* ================= BODY ================= */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-/* ================= STATIC FILES ================= */
+/* ================= STATIC ================= */
 app.use("/uploads", express.static(uploadDir));
 
-/* ================= REQUEST LOG ================= */
+/* ================= LOGGING ================= */
 app.use((req, res, next) => {
   console.log(`➡️ ${req.method} ${req.url}`);
   next();
 });
+
+/* ================= SAFE ROUTE WRAPPER ================= */
+const safe = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
 /* ================= ROUTES ================= */
 app.use("/auth", authRoutes);
@@ -53,7 +59,7 @@ app.use("/promo", promoRoutes);
 app.use("/order", orderRoutes);
 app.use("/telegram", telegramRoutes);
 
-/* ================= HEALTH CHECK ================= */
+/* ================= HEALTH ================= */
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -70,7 +76,7 @@ app.use((req, res) => {
   });
 });
 
-/* ================= ERROR HANDLER ================= */
+/* ================= GLOBAL ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
   console.error("🔥 SERVER ERROR:", err);
 
@@ -79,7 +85,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-/* ================= START SERVER ================= */
+/* ================= START ================= */
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

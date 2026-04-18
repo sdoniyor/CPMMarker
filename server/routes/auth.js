@@ -5,16 +5,24 @@ const { q } = require("../db");
 
 const router = express.Router();
 
+/* ================= GENERATE REF CODE ================= */
+const generateRef = () =>
+  Math.random().toString(36).substring(2, 8);
+
 /* ================= REGISTER ================= */
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, referredBy } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const exist = await q("SELECT id FROM users WHERE email=$1", [email]);
+    /* ===== CHECK EMAIL ===== */
+    const exist = await q(
+      "SELECT id FROM users WHERE email=$1",
+      [email]
+    );
 
     if (exist.rows.length > 0) {
       return res.status(400).json({ error: "Email already exists" });
@@ -22,11 +30,42 @@ router.post("/register", async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
+    /* ===== FIND REFERRER ===== */
+    let referredUserId = null;
+
+    if (referredBy) {
+      const refUser = await q(
+        "SELECT id FROM users WHERE ref_code=$1",
+        [referredBy]
+      );
+
+      if (refUser.rows.length > 0) {
+        referredUserId = refUser.rows[0].id;
+      }
+    }
+
+    /* ===== GENERATE UNIQUE REF CODE ===== */
+    let refCode;
+    while (true) {
+      refCode = generateRef();
+
+      const check = await q(
+        "SELECT id FROM users WHERE ref_code=$1",
+        [refCode]
+      );
+
+      if (check.rows.length === 0) break;
+    }
+
+    /* ===== INSERT USER ===== */
     const r = await q(
-      "INSERT INTO users (name,email,password) VALUES ($1,$2,$3) RETURNING id",
-      [name, email, hash]
+      `INSERT INTO users (name, email, password, ref_code, referred_by)
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING id`,
+      [name, email, hash, refCode, referredUserId]
     );
 
+    /* ===== TOKEN ===== */
     const token = jwt.sign(
       { id: r.rows[0].id },
       process.env.JWT_SECRET,
@@ -50,7 +89,11 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const r = await q("SELECT * FROM users WHERE email=$1", [email]);
+    const r = await q(
+      "SELECT * FROM users WHERE email=$1",
+      [email]
+    );
+
     const user = r.rows[0];
 
     if (!user) {

@@ -143,7 +143,6 @@ router.post("/redeem", auth, async (req, res) => {
     const userId = req.userId;
 
     const user = await getUser(userId);
-
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -154,7 +153,6 @@ router.post("/redeem", auth, async (req, res) => {
     );
 
     const promo = promoRes.rows[0];
-
     if (!promo) {
       return res.status(404).json({ error: "Invalid promo code" });
     }
@@ -175,27 +173,27 @@ router.post("/redeem", auth, async (req, res) => {
     if (promo.car_ids) {
       allowedCars = promo.car_ids
         .split(",")
-        .map(x => Number(x.trim()))
+        .map((x) => Number(x.trim()))
         .filter(Boolean);
     }
 
     if (car_id && allowedCars.length > 0) {
       if (!allowedCars.includes(Number(car_id))) {
         return res.status(400).json({
-          error: "Promo not valid for this car"
+          error: "Promo not valid for this car",
         });
       }
     }
 
-    /* ================= ONE PROMO PER USER CHECK ================= */
+    /* ================= ONE PROMO PER USER ================= */
     const alreadyUsed = await q(
-      "SELECT * FROM user_promos WHERE user_id=$1 AND promo_code=$2 AND car_id=$3",
-      [userId, code, car_id || null]
+      "SELECT * FROM user_promos WHERE user_id=$1 AND promo_code=$2",
+      [userId, code]
     );
 
     if (alreadyUsed.rows.length > 0) {
       return res.status(400).json({
-        error: "Promo already used"
+        error: "Promo already used",
       });
     }
 
@@ -206,22 +204,31 @@ router.post("/redeem", auth, async (req, res) => {
       [userId, code, car_id || null, promo.discount]
     );
 
-    /* ================= UPDATE USER ================= */
+    /* ================= 🔥 FIX HERE ================= */
     await q(
-      `UPDATE users SET discount=$1 WHERE id=$2`,
-      [promo.discount, userId]
+      `UPDATE users 
+       SET discount=$1, discount_cars=$2 
+       WHERE id=$3`,
+      [
+        promo.discount,
+        promo.car_ids || null, // 🔥 ВАЖНО
+        userId,
+      ]
     );
 
     /* ================= UPDATE PROMO USAGE ================= */
     await q(
-      `UPDATE promo_codes SET used_count = used_count + 1 WHERE id=$1`,
+      `UPDATE promo_codes 
+       SET used_count = used_count + 1 
+       WHERE id=$1`,
       [promo.id]
     );
 
+    /* ================= RESPONSE ================= */
     res.json({
       success: true,
       discount: promo.discount,
-      allowedCars
+      allowedCars,
     });
 
   } catch (e) {

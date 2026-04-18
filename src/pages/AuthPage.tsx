@@ -60,7 +60,7 @@
 
 
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 type Mode = "login" | "register";
@@ -75,13 +75,31 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // 🔥 REF
+  const [ref, setRef] = useState<string | null>(null);
+
   const isRegister = mode === "register";
 
+  /* ================= GET REF FROM URL ================= */
+  useEffect(() => {
+    const urlRef = new URLSearchParams(window.location.search).get("ref");
+    if (urlRef) {
+      setRef(urlRef);
+      setMode("register"); // авто переключение на регистрацию
+    }
+  }, []);
+
+  /* ================= AUTH ================= */
   const handleAuth = async () => {
     const endpoint = isRegister ? "/auth/register" : "/auth/login";
 
     const body = isRegister
-      ? { name, email, password }
+      ? {
+          name,
+          email,
+          password,
+          referredBy: ref, // 🔥 ВАЖНО
+        }
       : { email, password };
 
     const res = await fetch(`${API}${endpoint}`, {
@@ -105,7 +123,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0b0d] text-white px-4">
-      
+
       <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
 
         {/* TITLE */}
@@ -116,6 +134,13 @@ export default function Auth() {
         <p className="text-center text-white/40 mb-6 text-sm">
           Welcome back 👋
         </p>
+
+        {/* REF INFO */}
+        {ref && (
+          <div className="mb-4 text-center text-xs text-yellow-400">
+            🔥 Referral activated
+          </div>
+        )}
 
         {/* SWITCH */}
         <div className="flex bg-black/40 rounded-xl p-1 mb-6">

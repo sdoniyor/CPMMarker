@@ -23,7 +23,10 @@ const upload = multer({ storage });
 /* ================= GET MY PROFILE ================= */
 router.get("/me", auth, async (req, res) => {
   try {
-    const r = await q("SELECT * FROM users WHERE id=$1", [req.userId]);
+    const r = await q(
+      "SELECT * FROM users WHERE id=$1",
+      [req.userId]
+    );
 
     const user = r.rows[0];
 
@@ -31,19 +34,29 @@ router.get("/me", auth, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    /* ================= REFERRALS ================= */
+    const refs = await q(
+      "SELECT COUNT(*) FROM users WHERE referred_by=$1",
+      [req.userId]
+    );
+
     res.json({
       id: user.id,
       name: user.name,
       email: user.email,
       avatar: user.avatar,
 
-      // 🔥 ВАЖНО ДЛЯ СКИДОК
+      /* ===== DISCOUNT ===== */
       discount: user.discount || 0,
       discount_cars: user.discount_cars || null,
 
-      // 👇 можно оставить если используешь
+      /* ===== TELEGRAM ===== */
       telegram_username: user.telegram_username,
       telegram_id: user.telegram_id,
+
+      /* ===== 🔥 REF SYSTEM ===== */
+      ref_code: user.ref_code,
+      ref_count: Number(refs.rows[0].count),
     });
 
   } catch (e) {
