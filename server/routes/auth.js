@@ -132,7 +132,7 @@ const router = express.Router();
 
 /* ================= REF CODE ================= */
 const generateRef = () =>
-  Math.random().toString(36).substring(2, 8);
+  Math.random().toString(36).substring(2, 8).toUpperCase();
 
 /* ================= REGISTER ================= */
 router.post("/register", async (req, res) => {
@@ -143,7 +143,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    /* CHECK EMAIL */
+    /* ================= CHECK EMAIL ================= */
     const exist = await q(
       "SELECT id FROM users WHERE email=$1",
       [email]
@@ -155,27 +155,21 @@ router.post("/register", async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
-    /* REF USER */
+    /* ================= FIND REFERRER ================= */
     let referredUserId = null;
 
-    if (referredBy) {
+    if (referredBy && typeof referredBy === "string") {
       const refUser = await q(
         "SELECT id FROM users WHERE ref_code=$1",
-        [referredBy]
+        [referredBy.trim()]
       );
 
       if (refUser.rows.length > 0) {
         referredUserId = refUser.rows[0].id;
-
-        // 🔥 BONUS (если хочешь можно добавить бонус)
-        await q(
-          "UPDATE users SET discount = COALESCE(discount,0) + 5 WHERE id=$1",
-          [referredUserId]
-        );
       }
     }
 
-    /* UNIQUE REF CODE */
+    /* ================= UNIQUE REF CODE ================= */
     let refCode;
 
     while (true) {
@@ -189,7 +183,7 @@ router.post("/register", async (req, res) => {
       if (check.rows.length === 0) break;
     }
 
-    /* INSERT USER */
+    /* ================= CREATE USER ================= */
     const r = await q(
       `INSERT INTO users (name, email, password, ref_code, referred_by)
        VALUES ($1,$2,$3,$4,$5)
@@ -197,18 +191,26 @@ router.post("/register", async (req, res) => {
       [name, email, hash, refCode, referredUserId]
     );
 
-    const user = r.rows[0];
+    const newUser = r.rows[0];
 
-    /* TOKEN */
+    /* ================= SAVE REF EVENT ================= */
+    if (referredUserId) {
+      await q(
+        "INSERT INTO referrals (referrer_id, user_id) VALUES ($1,$2)",
+        [referredUserId, newUser.id]
+      );
+    }
+
+    /* ================= TOKEN ================= */
     const token = jwt.sign(
-      { id: user.id },
+      { id: newUser.id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
     res.json({
       token,
-      user, // 🔥 FIX: теперь фронт сразу получает user
+      user: newUser,
     });
 
   } catch (e) {
@@ -221,6 +223,10 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing fields" });
+    }
 
     const r = await q(
       "SELECT * FROM users WHERE email=$1",
