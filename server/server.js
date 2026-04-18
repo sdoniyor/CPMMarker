@@ -49,7 +49,7 @@ app.use(
 );
 
 /* 🔥 IMPORTANT: preflight support */
-app.options("*", cors());
+app.options("/*", cors());
 
 /* ================= BODY ================= */
 app.use(express.json({ limit: "10mb" }));
