@@ -139,9 +139,9 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
 
-  const token = localStorage.getItem("token");
-
   const loadUser = async () => {
+    const token = localStorage.getItem("token"); // 🔥 ВАЖНО ТУТ
+
     if (!token) return;
 
     try {
@@ -165,10 +165,13 @@ export default function Navbar() {
   }, []);
 
   const goProfile = () => {
+    const token = localStorage.getItem("token"); // 🔥 ВАЖНО ТУТ
+
     if (!token) {
-      navigate("/auth"); // ❗ вместо белого экрана
+      navigate("/auth");
       return;
     }
+
     navigate("/profile");
   };
 
@@ -176,7 +179,10 @@ export default function Navbar() {
     <nav className="w-full h-[70px] fixed top-0 left-0 z-[100] bg-[#0a0a0a] border-b border-white/5">
       <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between">
 
-        <div onClick={() => navigate("/market")} className="text-white font-black cursor-pointer">
+        <div
+          onClick={() => navigate("/market")}
+          className="text-white font-black cursor-pointer"
+        >
           CPM<span className="text-yellow-400">MARKET</span>
         </div>
 
@@ -189,7 +195,9 @@ export default function Navbar() {
           </div>
 
           <div className="hidden sm:block">
-            <div className="text-white text-sm">{user?.name || "Guest"}</div>
+            <div className="text-white text-sm">
+              {user?.name || "Guest"}
+            </div>
           </div>
         </div>
 
