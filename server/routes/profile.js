@@ -1,16 +1,25 @@
+
 // const express = require("express");
 // const auth = require("../middleware/auth");
 // const { q } = require("../db");
 
 // const multer = require("multer");
 // const path = require("path");
+// const fs = require("fs");
 
 // const router = express.Router();
+
+// /* ================= CREATE UPLOADS FOLDER SAFETY ================= */
+// const uploadDir = path.join(__dirname, "../uploads");
+
+// if (!fs.existsSync(uploadDir)) {
+//   fs.mkdirSync(uploadDir, { recursive: true });
+// }
 
 // /* ================= MULTER CONFIG ================= */
 // const storage = multer.diskStorage({
 //   destination: (req, file, cb) => {
-//     cb(null, "uploads/");
+//     cb(null, uploadDir);
 //   },
 //   filename: (req, file, cb) => {
 //     const ext = path.extname(file.originalname);
@@ -18,15 +27,15 @@
 //   },
 // });
 
-// const upload = multer({ storage });
+// const upload = multer({
+//   storage,
+//   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB защита
+// });
 
 // /* ================= GET MY PROFILE ================= */
 // router.get("/me", auth, async (req, res) => {
 //   try {
-//     const r = await q(
-//       "SELECT * FROM users WHERE id=$1",
-//       [req.userId]
-//     );
+//     const r = await q("SELECT * FROM users WHERE id=$1", [req.userId]);
 
 //     const user = r.rows[0];
 
@@ -34,7 +43,7 @@
 //       return res.status(404).json({ error: "User not found" });
 //     }
 
-//     /* ================= REFERRALS ================= */
+//     /* REF COUNT */
 //     const refs = await q(
 //       "SELECT COUNT(*) FROM users WHERE referred_by=$1",
 //       [req.userId]
@@ -43,22 +52,24 @@
 //     res.json({
 //       id: user.id,
 //       name: user.name,
-//       email: user.email,
-//       avatar: user.avatar,
+//       email: user.email || null,
+//       avatar: user.avatar || null,
 
-//       /* ===== DISCOUNT ===== */
-//       discount: user.discount || 0,
-//       discount_cars: user.discount_cars || null,
+//       discount: Number(user.discount) || 0,
 
-//       /* ===== TELEGRAM ===== */
-//       telegram_username: user.telegram_username,
-//       telegram_id: user.telegram_id,
+//       /* ⚠️ ВАЖНО: всегда нормализуем */
+//       discount_cars: user.discount_cars
+//         ? typeof user.discount_cars === "string"
+//           ? user.discount_cars.split(",").map(Number)
+//           : user.discount_cars
+//         : [],
 
-//       /* ===== 🔥 REF SYSTEM ===== */
-//       ref_code: user.ref_code,
-//       ref_count: Number(refs.rows[0].count),
+//       telegram_username: user.telegram_username || null,
+//       telegram_id: user.telegram_id || null,
+
+//       ref_code: user.ref_code || null,
+//       ref_count: Number(refs.rows?.[0]?.count || 0),
 //     });
-
 //   } catch (e) {
 //     console.log("PROFILE ERROR:", e);
 //     res.status(500).json({ error: "Server error" });
@@ -79,43 +90,41 @@
 
 //     const botUsername = process.env.BOT_USERNAME || "CPMMarket_bot";
 
-//     const link = `https://t.me/${botUsername}?start=${code}`;
-
-//     res.json({ link, code });
+//     res.json({
+//       link: `https://t.me/${botUsername}?start=${code}`,
+//       code,
+//     });
 //   } catch (e) {
 //     console.log("TG LINK ERROR:", e);
 //     res.status(500).json({ error: "Failed to create telegram link" });
 //   }
 // });
 
-// /* ================= UPLOAD AVATAR ================= */
-// router.post(
-//   "/upload-avatar",
-//   auth,
-//   upload.single("avatar"),
-//   async (req, res) => {
-//     try {
-//       if (!req.file) {
-//         return res.status(400).json({ error: "No file uploaded" });
-//       }
-
-//       const filePath = `/uploads/${req.file.filename}`;
-
-//       const r = await q(
-//         "UPDATE users SET avatar=$1 WHERE id=$2 RETURNING *",
-//         [filePath, req.userId]
-//       );
-
-//       const user = r.rows[0];
-//       delete user.password;
-
-//       res.json(user);
-//     } catch (e) {
-//       console.log("UPLOAD ERROR:", e);
-//       res.status(500).json({ error: "Upload error" });
+// /* ================= UPLOAD AVATAR FIX ================= */
+// router.post("/upload-avatar", auth, upload.single("avatar"), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ error: "No file uploaded" });
 //     }
+
+//     const filePath = `/uploads/${req.file.filename}`;
+
+//     const r = await q(
+//       `UPDATE users 
+//        SET avatar=$1 
+//        WHERE id=$2 
+//        RETURNING id, name, email, avatar`,
+//       [filePath, req.userId]
+//     );
+
+//     const user = r.rows[0];
+
+//     res.json(user);
+//   } catch (e) {
+//     console.log("UPLOAD ERROR:", e);
+//     res.status(500).json({ error: "Upload error" });
 //   }
-// );
+// });
 
 // module.exports = router;
 
@@ -132,11 +141,14 @@ const fs = require("fs");
 
 const router = express.Router();
 
-/* ================= CREATE UPLOADS FOLDER SAFETY ================= */
-const uploadDir = path.join(__dirname, "../uploads");
+/* ================= UPLOAD DIR (FIXED) ================= */
+/* uploads ВНУТРИ server */
+const uploadDir = path.join(__dirname, "uploads");
 
+/* создаём папку если нет */
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("📁 uploads created:", uploadDir);
 }
 
 /* ================= MULTER CONFIG ================= */
@@ -152,21 +164,19 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB защита
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-/* ================= GET MY PROFILE ================= */
+/* ================= GET PROFILE ================= */
 router.get("/me", auth, async (req, res) => {
   try {
     const r = await q("SELECT * FROM users WHERE id=$1", [req.userId]);
-
     const user = r.rows[0];
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    /* REF COUNT */
     const refs = await q(
       "SELECT COUNT(*) FROM users WHERE referred_by=$1",
       [req.userId]
@@ -180,10 +190,10 @@ router.get("/me", auth, async (req, res) => {
 
       discount: Number(user.discount) || 0,
 
-      /* ⚠️ ВАЖНО: всегда нормализуем */
+      /* FIXED SAFE PARSE */
       discount_cars: user.discount_cars
         ? typeof user.discount_cars === "string"
-          ? user.discount_cars.split(",").map(Number)
+          ? user.discount_cars.split(",").map((x) => Number(x))
           : user.discount_cars
         : [],
 
@@ -202,13 +212,11 @@ router.get("/me", auth, async (req, res) => {
 /* ================= TELEGRAM LINK ================= */
 router.post("/telegram/link", auth, async (req, res) => {
   try {
-    const userId = req.userId;
-
     const code = Math.random().toString(36).substring(2, 10);
 
     await q(
       "INSERT INTO telegram_links (user_id, code, used) VALUES ($1,$2,false)",
-      [userId, code]
+      [req.userId, code]
     );
 
     const botUsername = process.env.BOT_USERNAME || "CPMMarket_bot";
@@ -223,30 +231,35 @@ router.post("/telegram/link", auth, async (req, res) => {
   }
 });
 
-/* ================= UPLOAD AVATAR FIX ================= */
-router.post("/upload-avatar", auth, upload.single("avatar"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+/* ================= UPLOAD AVATAR ================= */
+router.post(
+  "/upload-avatar",
+  auth,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      console.log("FILE:", req.file);
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const filePath = `/uploads/${req.file.filename}`;
+
+      const r = await q(
+        `UPDATE users 
+         SET avatar=$1 
+         WHERE id=$2 
+         RETURNING id, name, email, avatar`,
+        [filePath, req.userId]
+      );
+
+      res.json(r.rows[0]);
+    } catch (e) {
+      console.log("UPLOAD ERROR:", e);
+      res.status(500).json({ error: "Upload error" });
     }
-
-    const filePath = `/uploads/${req.file.filename}`;
-
-    const r = await q(
-      `UPDATE users 
-       SET avatar=$1 
-       WHERE id=$2 
-       RETURNING id, name, email, avatar`,
-      [filePath, req.userId]
-    );
-
-    const user = r.rows[0];
-
-    res.json(user);
-  } catch (e) {
-    console.log("UPLOAD ERROR:", e);
-    res.status(500).json({ error: "Upload error" });
   }
-});
+);
 
 module.exports = router;
