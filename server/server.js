@@ -22,17 +22,34 @@ if (!fs.existsSync(uploadDir)) {
   console.log("📁 uploads folder created");
 }
 
-/* ================= CORS (FIXED) ================= */
+/* ================= CORS (FULL FIX) ================= */
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://cpmmarker.onrender.com",
+  "https://cpm-marker.vercel.app",
+];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "https://cpmmarker.onrender.com",
-    ],
+    origin: function (origin, callback) {
+      // allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS blocked: " + origin));
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
+/* 🔥 IMPORTANT: preflight support */
+app.options("*", cors());
 
 /* ================= BODY ================= */
 app.use(express.json({ limit: "10mb" }));
@@ -47,10 +64,6 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ================= SAFE ROUTE WRAPPER ================= */
-const safe = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
-
 /* ================= ROUTES ================= */
 app.use("/auth", authRoutes);
 app.use("/profile", profileRoutes);
@@ -59,7 +72,7 @@ app.use("/promo", promoRoutes);
 app.use("/order", orderRoutes);
 app.use("/telegram", telegramRoutes);
 
-/* ================= HEALTH ================= */
+/* ================= HEALTH CHECK ================= */
 app.get("/", (req, res) => {
   res.json({
     ok: true,
@@ -76,7 +89,7 @@ app.use((req, res) => {
   });
 });
 
-/* ================= GLOBAL ERROR HANDLER ================= */
+/* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
   console.error("🔥 SERVER ERROR:", err);
 
