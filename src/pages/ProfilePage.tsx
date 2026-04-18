@@ -1,312 +1,331 @@
-import { useEffect, useState } from "react";
+
+// import { useEffect, useState } from "react";
+
+// const API = "https://cpmmarker.onrender.com";
+
+// type User = {
+//   id: number;
+//   name: string;
+//   email?: string;
+//   discount?: number;
+//   discount_cars?: number[];
+//   telegram_id?: string;
+//   telegram_username?: string;
+//   avatar?: string;
+//   ref_code?: string;
+//   ref_count?: number;
+// };
+
+// export default function Profile() {
+//   const [user, setUser] = useState<User | null>(null);
+//   const [file, setFile] = useState<File | null>(null);
+//   const [preview, setPreview] = useState<string | null>(null);
+
+//   const token = localStorage.getItem("token");
+
+//   /* ================= LOAD ================= */
+//   const loadUser = async () => {
+//     try {
+//       const res = await fetch(`${API}/profile/me`, {
+//         headers: { Authorization: `Bearer ${token}` },
+//       });
+
+//       const data = await res.json();
+
+//       if (data?.id) setUser(data);
+//     } catch (e) {
+//       console.log(e);
+//     }
+//   };
+
+//   useEffect(() => {
+//     loadUser();
+//   }, []);
+
+//   /* ================= FILE ================= */
+//   const handleFile = (f: File) => {
+//     setFile(f);
+
+//     const reader = new FileReader();
+//     reader.onload = () => setPreview(reader.result as string);
+//     reader.readAsDataURL(f);
+//   };
+
+//   /* ================= UPLOAD ================= */
+//   const uploadAvatar = async () => {
+//     if (!file) return alert("Select file");
+
+//     const form = new FormData();
+//     form.append("avatar", file);
+
+//     const res = await fetch(`${API}/profile/upload-avatar`, {
+//       method: "POST",
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//       body: form,
+//     });
+
+//     const data = await res.json();
+
+//     if (data?.id) {
+//       setUser(data);
+//       setFile(null);
+//       setPreview(null);
+//     } else {
+//       alert("Upload error");
+//     }
+//   };
+
+//   if (!user) return <div className="text-white">Loading...</div>;
+
+//   const avatar = preview
+//     ? preview
+//     : user.avatar
+//     ? `${API}${user.avatar}`
+//     : null;
+
+//   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
+
+//   return (
+//     <div className="min-h-screen bg-black text-white p-6">
+
+//       {/* USER */}
+//       <div className="flex gap-4 items-center">
+//         <div className="w-20 h-20 rounded-xl overflow-hidden bg-yellow-400 flex items-center justify-center text-black font-black">
+//           {avatar ? <img src={avatar} className="w-full h-full object-cover" /> : user.name[0]}
+//         </div>
+
+//         <div>
+//           <h1 className="text-2xl font-bold">{user.name}</h1>
+//           <p className="text-white/40">{user.email}</p>
+//         </div>
+//       </div>
+
+//       {/* REF */}
+//       <div className="mt-6 bg-white/10 p-4 rounded-xl">
+//         <p>Referral link:</p>
+
+//         <div className="flex gap-2 mt-2">
+//           <input
+//             value={refLink}
+//             readOnly
+//             className="flex-1 bg-black p-2 rounded"
+//           />
+//           <button
+//             onClick={() => navigator.clipboard.writeText(refLink)}
+//             className="bg-yellow-400 text-black px-4 rounded"
+//           >
+//             Copy
+//           </button>
+//         </div>
+
+//         <p className="text-sm text-white/40 mt-2">
+//           Ref count: {user.ref_count}
+//         </p>
+//       </div>
+
+//       {/* UPLOAD */}
+//       <div className="mt-6">
+//         <input
+//           type="file"
+//           accept="image/*"
+//           onChange={(e) => e.target.files && handleFile(e.target.files[0])}
+//         />
+
+//         {preview && (
+//           <img src={preview} className="w-20 h-20 mt-2 rounded-xl" />
+//         )}
+
+//         <button
+//           onClick={uploadAvatar}
+//           className="mt-3 bg-green-500 px-4 py-2 rounded"
+//         >
+//           Upload avatar
+//         </button>
+//       </div>
+
+//       {/* DISCOUNT */}
+//       <div className="mt-6">
+//         <p>Discount: {user.discount}%</p>
+//         <p className="text-white/40">
+//           Cars: {JSON.stringify(user.discount_cars)}
+//         </p>
+//       </div>
+
+//     </div>
+//   );
+// }
+
+
+
+
+
+import { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
+
+type Mode = "login" | "register";
 
 const API = "https://cpmmarker.onrender.com";
 
-type User = {
-  id: number;
-  name: string;
-  email?: string;
-  discount?: number;
-  discount_cars?: string | null;
+export default function Auth() {
+  const [mode, setMode] = useState<Mode>("login");
+  const [showPassword, setShowPassword] = useState(false);
 
-  telegram_id?: string;
-  telegram_username?: string;
-  avatar?: string;
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  // 🔥 ДОБАВИЛ
-  ref_code?: string;
-  ref_count?: number;
-};
-
-export default function Profile() {
-  const [user, setUser] = useState<User | null>(null);
-  const [promo, setPromo] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-
+  const [ref, setRef] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tgLoading, setTgLoading] = useState(false);
 
-  const token = localStorage.getItem("token");
+  const isRegister = mode === "register";
 
-  /* ================= LOAD USER ================= */
-  const loadUser = async () => {
-    try {
-      const res = await fetch(`${API}/profile/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (data?.id) setUser(data);
-      else setUser(null);
-    } catch {
-      setUser(null);
-    }
-  };
-
+  /* ================= GET REF ================= */
   useEffect(() => {
-    loadUser();
+    const urlRef = new URLSearchParams(window.location.search).get("ref");
+
+    if (urlRef) {
+      setRef(urlRef);
+
+      // авто регистрация
+      setMode("register");
+    }
   }, []);
 
-  /* ================= TELEGRAM ================= */
-  const connectTG = async () => {
+  /* ================= AUTH ================= */
+  const handleAuth = async () => {
     try {
-      setTgLoading(true);
+      setLoading(true);
 
-      const res = await fetch(`${API}/profile/telegram/link`, {
+      const endpoint = isRegister ? "/auth/register" : "/auth/login";
+
+      const body = isRegister
+        ? {
+            name,
+            email,
+            password,
+
+            // 🔥 FIX: правильное имя поля
+            referred_by: ref || null,
+          }
+        : { email, password };
+
+      const res = await fetch(`${API}${endpoint}`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
 
-      if (data?.link) {
-        window.open(data.link, "_blank");
+      if (!res.ok) {
+        alert(data?.error || "Auth error");
+        return;
       }
 
-      setTimeout(loadUser, 2000);
-    } finally {
-      setTgLoading(false);
-    }
-  };
-
-  /* ================= PROMO ================= */
-  const applyPromo = async () => {
-    if (!promo.trim()) return alert("Enter promo code");
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API}/promo/redeem`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ code: promo }),
-      });
-
-      const data = await res.json();
-
-      if (data?.success) {
-        alert("Promo activated!");
-        setPromo("");
-        await loadUser();
+      if (data?.token) {
+        localStorage.setItem("token", data.token);
+        window.location.href = "/market";
       } else {
-        alert(data?.error || "Invalid promo");
+        alert("No token received");
       }
-    } catch {
+    } catch (e) {
+      console.log(e);
       alert("Server error");
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================= FILE ================= */
-  const handleFile = (file: File) => {
-    setFile(file);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const uploadAvatar = async () => {
-    if (!file) return alert("Select image first");
-
-    try {
-      const form = new FormData();
-      form.append("avatar", file);
-
-      const res = await fetch(`${API}/profile/upload-avatar`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: form,
-      });
-
-      const data = await res.json();
-
-      if (data?.id) {
-        setUser(data);
-        setFile(null);
-        setPreview(null);
-        alert("Avatar updated!");
-      } else {
-        alert(data?.error || "Upload error");
-      }
-    } catch {
-      alert("Upload failed");
-    }
-  };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white bg-[#0a0b0d]">
-        Loading...
-      </div>
-    );
-  }
-
-  const avatarSrc = preview
-    ? preview
-    : user.avatar
-    ? user.avatar.startsWith("http")
-      ? user.avatar
-      : `${API}${user.avatar}`
-    : null;
-
-  const refLink = `${window.location.origin}/register?ref=${user.ref_code}`;
-
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0b0d] text-white px-4">
 
-        {/* HEADER */}
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6">
+      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-3xl p-8">
 
-          <div className="w-24 h-24 rounded-2xl bg-yellow-400 text-black flex items-center justify-center text-3xl font-black overflow-hidden">
-            {avatarSrc ? (
-              <img src={avatarSrc} className="w-full h-full object-cover" />
-            ) : (
-              user.name?.[0]
-            )}
+        {/* TITLE */}
+        <h1 className="text-3xl font-black text-center mb-2">
+          CPM <span className="text-yellow-400">MARKET</span>
+        </h1>
+
+        <p className="text-center text-white/40 mb-6 text-sm">
+          Welcome
+        </p>
+
+        {/* REF */}
+        {ref && (
+          <div className="mb-4 text-center text-xs text-yellow-400">
+            🔥 Referral active: {ref}
           </div>
+        )}
 
-          <div>
-            <h1 className="text-3xl font-black">{user.name}</h1>
-            <p className="text-white/40">{user.email}</p>
-            <p className="text-sm text-white/60 mt-1">
-              ID: #{user.id}
-            </p>
-          </div>
-
-        </div>
-
-        {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 mt-6">
-
-          <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
-            <p className="text-white/40 text-sm">Discount</p>
-            <p className="text-2xl font-black text-yellow-400">
-              {user.discount || 0}%
-            </p>
-          </div>
-
-          <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
-            <p className="text-white/40 text-sm">Telegram</p>
-
-            {user.telegram_id ? (
-              <div>
-                <p className="text-green-400 font-bold">Connected</p>
-                <p className="text-sm text-white/60">
-                  @{user.telegram_username}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={connectTG}
-                disabled={tgLoading}
-                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded-xl"
-              >
-                {tgLoading ? "Connecting..." : "Connect Telegram"}
-              </button>
-            )}
-          </div>
-
-          <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
-            <p className="text-white/40 text-sm">Referrals</p>
-            <p className="text-2xl font-black text-yellow-400">
-              {user.ref_count || 0}
-            </p>
-          </div>
-
-        </div>
-
-        {/* 🔥 REFERRAL BLOCK */}
-        <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <h2 className="font-bold mb-3">Referral Link</h2>
-
-          <div className="flex gap-3">
-            <input
-              value={refLink}
-              readOnly
-              className="flex-1 px-4 py-2 bg-black/40 border border-white/10 rounded-xl"
-            />
-
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(refLink);
-                alert("Copied!");
-              }}
-              className="px-4 py-2 bg-yellow-400 text-black rounded-xl font-bold"
-            >
-              Copy
-            </button>
-          </div>
-        </div>
-
-        {/* PROMO */}
-        <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <h2 className="font-bold mb-3">Promo Code</h2>
-
-          <div className="flex gap-3">
-            <input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value)}
-              placeholder="Enter promo..."
-              className="flex-1 px-4 py-2 bg-black/40 border border-white/10 rounded-xl"
-            />
-
-            <button
-              onClick={applyPromo}
-              className="px-6 py-2 bg-yellow-400 text-black font-bold rounded-xl"
-            >
-              {loading ? "..." : "Apply"}
-            </button>
-          </div>
-
-          {user.discount_cars && (
-            <div className="text-xs text-white/30 mt-2">
-              Allowed cars: {user.discount_cars}
-            </div>
-          )}
-        </div>
-
-        {/* AVATAR */}
-        <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-          <h2 className="font-bold mb-3">Upload Avatar</h2>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              e.target.files && handleFile(e.target.files[0])
-            }
-          />
-
-          {preview && (
-            <img
-              src={preview}
-              className="mt-3 w-24 h-24 object-cover rounded-xl"
-            />
-          )}
+        {/* SWITCH */}
+        <div className="flex bg-black/40 rounded-xl p-1 mb-6">
+          <button
+            onClick={() => setMode("login")}
+            className={`flex-1 py-2 rounded-lg font-bold ${
+              mode === "login" ? "bg-yellow-400 text-black" : "text-white/50"
+            }`}
+          >
+            LOGIN
+          </button>
 
           <button
-            onClick={uploadAvatar}
-            className="mt-3 px-6 py-2 bg-green-500 text-white font-bold rounded-xl"
+            onClick={() => setMode("register")}
+            className={`flex-1 py-2 rounded-lg font-bold ${
+              mode === "register" ? "bg-yellow-400 text-black" : "text-white/50"
+            }`}
           >
-            Upload
+            SIGN UP
           </button>
         </div>
+
+        {/* INPUTS */}
+        <div className="space-y-3">
+
+          {isRegister && (
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Username"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+            />
+          )}
+
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+          />
+
+          <div className="relative">
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              className="w-full p-3 rounded-xl bg-black/40 border border-white/10"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {/* BUTTON */}
+        <button
+          onClick={handleAuth}
+          disabled={loading}
+          className="w-full mt-6 py-3 rounded-xl bg-yellow-400 text-black font-black"
+        >
+          {loading ? "Loading..." : isRegister ? "CREATE ACCOUNT" : "SIGN IN"}
+        </button>
 
       </div>
     </div>
