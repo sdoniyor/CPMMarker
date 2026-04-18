@@ -139,13 +139,10 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
 
-  const loadUser = async () => {
-    const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
-    if (!token) {
-      setUser(null);
-      return;
-    }
+  const loadUser = async () => {
+    if (!token) return;
 
     try {
       const res = await fetch(`${SERVER_URL}/profile/me`, {
@@ -158,29 +155,21 @@ export default function Navbar() {
 
       if (data?.id) {
         setUser(data);
-      } else {
-        setUser(null);
+        localStorage.setItem("user", JSON.stringify(data));
       }
-    } catch {
-      setUser(null);
+    } catch (e) {
+      console.log("navbar error", e);
     }
   };
 
   useEffect(() => {
     loadUser();
-
-    // 🔥 авто-обновление при изменении localStorage
-    const interval = setInterval(loadUser, 2000);
-    return () => clearInterval(interval);
   }, []);
 
   const goProfile = () => {
-    const token = localStorage.getItem("token");
-
-    console.log("TOKEN CHECK:", token);
-
+    // ❗ ВАЖНО: всегда проверяем токен
     if (!token) {
-      navigate("/auth");
+      navigate("/"); // FIX (НЕ /auth)
       return;
     }
 
@@ -191,11 +180,17 @@ export default function Navbar() {
     <nav className="w-full h-[70px] fixed top-0 left-0 z-[100] bg-[#0a0a0a] border-b border-white/5">
       <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between">
 
-        <div onClick={() => navigate("/market")} className="text-white font-black cursor-pointer">
+        <div
+          onClick={() => navigate("/market")}
+          className="text-white font-black cursor-pointer"
+        >
           CPM<span className="text-yellow-400">MARKET</span>
         </div>
 
-        <div onClick={goProfile} className="cursor-pointer flex items-center gap-3">
+        <div
+          onClick={goProfile}
+          className="cursor-pointer flex items-center gap-3"
+        >
           <div className="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-black font-black">
             {user?.name?.[0] || "U"}
           </div>

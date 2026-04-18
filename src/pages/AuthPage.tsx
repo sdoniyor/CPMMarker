@@ -98,7 +98,7 @@ export default function Auth() {
           name,
           email,
           password,
-          referredBy: ref, // 🔥 ВАЖНО
+          referredBy: ref || null,
         }
       : { email, password };
 
