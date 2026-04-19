@@ -22,14 +22,10 @@ router.get("/configs", async (req, res) => {
 
     const rows = r.rows || [];
 
-    const power = rows.filter((i) => i.type === "power");
-    const tuning = rows.filter((i) => i.type === "tuning");
-    const wheels = rows.filter((i) => i.type === "wheels");
-
     res.json({
-      power,
-      tuning,
-      wheels,
+      power: rows.filter(i => i.type === "power"),
+      tuning: rows.filter(i => i.type === "tuning"),
+      wheels: rows.filter(i => i.type === "wheels"),
     });
 
   } catch (e) {
@@ -43,7 +39,4 @@ router.get("/configs", async (req, res) => {
   }
 });
 
-
-
 module.exports = router;
-

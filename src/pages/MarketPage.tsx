@@ -202,11 +202,30 @@
 // }
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "https://cpmmarker.onrender.com";
+
+/* ================= TYPES ================= */
+type Car = {
+  id: number;
+  name: string;
+  brand: string;
+  price: number;
+  image_url: string;
+  premium?: boolean;
+};
+
+type User = {
+  id: number;
+  discount?: number;
+};
+
+type Promo = {
+  discount: number;
+  car_ids: number[]; // ВСЕГДА массив
+};
 
 /* ================= SAFE FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
@@ -232,30 +251,9 @@ const safeFetch = async (url: string, options: any = {}) => {
   }
 };
 
-/* ================= TYPES ================= */
-type Car = {
-  id: number;
-  name: string;
-  brand: string;
-  price: number;
-  image_url: string;
-  premium?: boolean;
-};
-
-type User = {
-  id: number;
-  discount?: number;
-};
-
-type Promo = {
-  discount: number;
-  car_ids: string; // 👈 ВАЖНО: у тебя строка "1,2,3"
-};
-
-export default function Market() {
+export default function MarketPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [user, setUser] = useState<User | null>(null);
-
   const [promo, setPromo] = useState<Promo | null>(null);
 
   const [promoCode, setPromoCode] = useState("");
@@ -280,55 +278,52 @@ export default function Market() {
 
   /* ================= APPLY PROMO ================= */
   const applyPromo = async () => {
-  console.log("CLICKED PROMO");
+    console.log("🔥 APPLY PROMO CLICKED");
 
-  const res = await fetch(`${API}/promo/redeem`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: localStorage.getItem("token") || "",
-    },
-    body: JSON.stringify({ code: promoCode }),
-  });
+    const data = await safeFetch(`${API}/promo/redeem`, {
+      method: "POST",
+      body: JSON.stringify({ code: promoCode }),
+    });
 
-  const text = await res.text();
+    console.log("🔥 PROMO RESPONSE:", data);
 
-  console.log("RAW RESPONSE:", text);
-};
+    if (!data?.success) {
+      alert(data?.error || "Promo error");
+      return;
+    }
 
-  /* ================= CHECK ACCESS ================= */
+    // 🔥 FIX: всегда нормализуем car_ids в массив
+    const ids: number[] = Array.isArray(data.car_ids)
+      ? data.car_ids.map(Number)
+      : typeof data.car_ids === "string"
+      ? data.car_ids.split(",").map((x: string) => Number(x.trim()))
+      : [];
+
+    setPromo({
+      discount: Number(data.discount) || 0,
+      car_ids: ids,
+    });
+
+    setPromoCode("");
+  };
+
+  /* ================= CHECK PROMO ================= */
   const hasPromoAccess = (car: Car) => {
-    if (!promo?.car_ids) return false;
-
-    const ids = promo.car_ids
-      .split(",")
-      .map((x) => Number(x.trim()))
-      .filter(Boolean);
-
-    return ids.includes(Number(car.id));
+    if (!promo) return false;
+    return promo.car_ids.includes(car.id);
   };
 
   /* ================= PRICE ================= */
   const getPrice = (car: Car) => {
     const base = Number(car.price) || 0;
 
-    if (!promo) {
-      return { old: null, new: base };
-    }
+    if (!promo) return { old: null, new: base };
+
+    if (!hasPromoAccess(car)) return { old: null, new: base };
 
     const discount = Number(promo.discount) || 0;
 
-    if (discount <= 0) {
-      return { old: null, new: base };
-    }
-
-    if (!hasPromoAccess(car)) {
-      return { old: null, new: base };
-    }
-
-    const newPrice = Math.floor(
-      base - (base * discount) / 100
-    );
+    const newPrice = Math.floor(base - (base * discount) / 100);
 
     return {
       old: base,
@@ -337,7 +332,7 @@ export default function Market() {
   };
 
   /* ================= FILTER ================= */
-  const filteredCars = (cars || []).filter((car) =>
+  const filteredCars = cars.filter((car) =>
     car.name.toLowerCase().includes(search.toLowerCase()) ||
     car.brand.toLowerCase().includes(search.toLowerCase())
   );
@@ -345,18 +340,15 @@ export default function Market() {
   /* ================= UI ================= */
   return (
     <div className="min-h-screen bg-[#050608] text-white">
-
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 
         {/* HEADER */}
         <div className="flex justify-between mb-10">
-
           <h1 className="text-4xl font-black">
             AUTO <span className="text-yellow-400">MARKET</span>
           </h1>
 
           <div className="flex gap-2">
-
             <input
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value)}
@@ -365,22 +357,16 @@ export default function Market() {
             />
 
             <button
-                onClick={() => {
-                  console.log("CLICK PROMO BUTTON");
-                  applyPromo();
-                }}
+              onClick={applyPromo}
               className="bg-yellow-400 text-black px-4 rounded-xl font-bold"
             >
               Apply
             </button>
-
           </div>
-
         </div>
 
         {/* CARS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
           {filteredCars.map((car) => {
             const price = getPrice(car);
 
@@ -388,9 +374,8 @@ export default function Market() {
               <div
                 key={car.id}
                 onClick={() => navigate(`/car/${car.id}`)}
-                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer hover:border-yellow-400 border border-transparent"
+                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border hover:border-yellow-400"
               >
-
                 <img
                   src={car.image_url}
                   className="h-40 w-full object-contain"
@@ -400,9 +385,7 @@ export default function Market() {
                   {car.brand} {car.name}
                 </h2>
 
-                {/* PRICE */}
                 <div className="mt-2 flex gap-2">
-
                   {price.old && (
                     <span className="line-through text-white/40">
                       ${price.old}
@@ -412,20 +395,16 @@ export default function Market() {
                   <span className="text-green-400 font-bold">
                     ${price.new}
                   </span>
-
                 </div>
 
-                {/* BADGE */}
                 {promo && hasPromoAccess(car) && (
                   <div className="text-yellow-400 text-xs mt-1">
                     🔥 Promo -{promo.discount}%
                   </div>
                 )}
-
               </div>
             );
           })}
-
         </div>
 
       </div>

@@ -131,8 +131,6 @@
 // module.exports = router;
 
 
-console.log("🔥 PROMO ROUTE LOADED");
-
 const express = require("express");
 const { q } = require("../db");
 const auth = require("../middleware/auth");
@@ -158,7 +156,7 @@ const isExpired = (promo) => {
   return new Date(promo.expires_at) < new Date();
 };
 
-/* ================= REDEEM PROMO ================= */
+/* ================= REDEEM ================= */
 router.post("/redeem", auth, async (req, res) => {
   try {
     const { code } = req.body;
@@ -168,7 +166,6 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(400).json({ error: "No code provided" });
     }
 
-    /* ================= GET PROMO ================= */
     const promoRes = await q(
       "SELECT * FROM promo_codes WHERE code=$1",
       [code]
@@ -180,37 +177,43 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(404).json({ error: "Invalid promo code" });
     }
 
-    /* ================= CHECK EXPIRED ================= */
     if (isExpired(promo)) {
       return res.status(400).json({ error: "Promo expired" });
     }
 
-    /* ================= LIMIT CHECK ================= */
     if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) {
       return res.status(400).json({ error: "Promo limit reached" });
     }
 
-    /* ================= CHECK USER ALREADY USED ================= */
-    const alreadyUsed = await q(
+    /* ================= CHECK DUPLICATE ================= */
+    const used = await q(
       "SELECT id FROM user_promos WHERE user_id=$1 AND promo_code=$2",
       [userId, code]
     );
 
-    if (alreadyUsed.rows.length > 0) {
+    if (used.rows.length > 0) {
       return res.status(400).json({ error: "Promo already used" });
     }
 
-    /* ================= PARSE CARS ================= */
     const allowedCars = parseCarIds(promo.car_ids);
 
-    /* ================= SAVE USAGE ================= */
+    /* ================= SAVE USER PROMO ================= */
     await q(
       `INSERT INTO user_promos (user_id, promo_code, discount)
        VALUES ($1,$2,$3)`,
       [userId, code, promo.discount]
     );
 
-    /* ================= UPDATE PROMO COUNTER ================= */
+    /* ================= 🔥 IMPORTANT FIX ================= */
+    await q(
+      `UPDATE users 
+       SET discount=$1,
+           discount_cars=$2
+       WHERE id=$3`,
+      [promo.discount, promo.car_ids, userId]
+    );
+
+    /* ================= UPDATE COUNTER ================= */
     await q(
       `UPDATE promo_codes 
        SET used_count = used_count + 1 
@@ -218,19 +221,15 @@ router.post("/redeem", auth, async (req, res) => {
       [promo.id]
     );
 
-    /* ================= RESPONSE ================= */
     res.json({
       success: true,
-      discount: Number(promo.discount) || 0,
-      car_ids: allowedCars, // ✔ всегда массив чисел
+      discount: Number(promo.discount),
+      car_ids: allowedCars,
     });
 
   } catch (e) {
-    console.log("❌ PROMO ERROR:", e);
-
-    res.status(500).json({
-      error: "Server error",
-    });
+    console.log("PROMO ERROR:", e);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
