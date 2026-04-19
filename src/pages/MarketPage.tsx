@@ -202,11 +202,15 @@
 // }
 
 
+
+
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = "https://cpmmarker.onrender.com";
 
+/* ================= TYPES ================= */
 type Car = {
   id: number;
   name: string;
@@ -215,11 +219,12 @@ type Car = {
   image_url: string;
 };
 
-type User = {
+type Promo = {
   discount: number;
-  promo_car_ids: number[];
+  car_ids: number[];
 };
 
+/* ================= FETCH ================= */
 const safeFetch = async (url: string) => {
   try {
     const token = localStorage.getItem("token");
@@ -239,20 +244,16 @@ const safeFetch = async (url: string) => {
 
 export default function MarketPage() {
   const [cars, setCars] = useState<Car[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [promo, setPromo] = useState<Promo | null>(null);
   const [promoCode, setPromoCode] = useState("");
 
   const navigate = useNavigate();
 
+  /* ================= LOAD ================= */
   useEffect(() => {
     const load = async () => {
-      const [carsData, userData] = await Promise.all([
-        safeFetch(`${API}/market/cars`),
-        safeFetch(`${API}/profile/me`),
-      ]);
-
-      setCars(carsData || []);
-      setUser(userData || null);
+      const carsData = await safeFetch(`${API}/market/cars`);
+      setCars(Array.isArray(carsData) ? carsData : []);
     };
 
     load();
@@ -260,6 +261,8 @@ export default function MarketPage() {
 
   /* ================= APPLY PROMO ================= */
   const applyPromo = async () => {
+    console.log("🔥 APPLY CLICK");
+
     const res = await fetch(`${API}/promo/redeem`, {
       method: "POST",
       headers: {
@@ -271,37 +274,51 @@ export default function MarketPage() {
 
     const data = await res.json();
 
+    console.log("🔥 PROMO RESPONSE:", data);
+
     if (!res.ok) {
       alert(data.error);
       return;
     }
 
-    alert("Promo activated!");
+    setPromo({
+      discount: Number(data.discount),
+      car_ids: Array.isArray(data.car_ids)
+        ? data.car_ids.map(Number)
+        : [],
+    });
 
-    // 🔥 ОБНОВЛЯЕМ USER С БЭКА
-    const updatedUser = await safeFetch(`${API}/profile/me`);
-    setUser(updatedUser);
+    alert("Promo activated!");
+  };
+
+  /* ================= CHECK ================= */
+  const hasAccess = (car: Car) => {
+    if (!promo) return false;
+    return promo.car_ids.includes(car.id);
   };
 
   /* ================= PRICE ================= */
   const getPrice = (car: Car) => {
-    const base = car.price;
-    const discount = user?.discount || 0;
-    const allowed = user?.promo_car_ids || [];
+    const base = Number(car.price);
 
-    if (!discount || !allowed.includes(car.id)) {
+    if (!promo || !hasAccess(car)) {
       return { old: null, new: base };
     }
 
+    const newPrice = Math.floor(
+      base - (base * promo.discount) / 100
+    );
+
     return {
       old: base,
-      new: Math.floor(base - (base * discount) / 100),
+      new: newPrice,
     };
   };
 
   return (
     <div className="min-h-screen bg-[#050608] text-white p-6">
 
+      {/* HEADER */}
       <div className="flex justify-between mb-10">
         <h1 className="text-4xl font-bold">
           AUTO <span className="text-yellow-400">MARKET</span>
@@ -330,8 +347,15 @@ export default function MarketPage() {
           const price = getPrice(car);
 
           return (
-            <div key={car.id} className="bg-[#111] p-4 rounded">
-              <img src={car.image_url} className="h-40 w-full object-contain" />
+            <div
+              key={car.id}
+              className="bg-[#111] p-4 rounded cursor-pointer"
+              onClick={() => navigate(`/car/${car.id}`)}
+            >
+              <img
+                src={car.image_url}
+                className="h-40 w-full object-contain"
+              />
 
               <h2 className="mt-2 font-bold">
                 {car.brand} {car.name}
@@ -348,6 +372,12 @@ export default function MarketPage() {
                   ${price.new}
                 </span>
               </div>
+
+              {promo && hasAccess(car) && (
+                <div className="text-yellow-400 text-xs mt-1">
+                  🔥 -{promo.discount}%
+                </div>
+              )}
             </div>
           );
         })}
