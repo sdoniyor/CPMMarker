@@ -214,20 +214,14 @@ type Car = {
   brand: string;
   price: number;
   image_url: string;
-  premium?: boolean;
-};
-
-type User = {
-  id: number;
-  discount?: number;
 };
 
 type Promo = {
   discount: number;
-  car_ids: number[]; // ВСЕГДА массив
+  car_ids: number[];
 };
 
-/* ================= SAFE FETCH ================= */
+/* ================= FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
   try {
     const token = localStorage.getItem("token");
@@ -241,46 +235,34 @@ const safeFetch = async (url: string, options: any = {}) => {
     });
 
     const text = await res.text();
-
     if (!text || text.startsWith("<!DOCTYPE")) return null;
 
     return JSON.parse(text);
-  } catch (e) {
-    console.log("FETCH ERROR:", e);
+  } catch {
     return null;
   }
 };
 
 export default function MarketPage() {
   const [cars, setCars] = useState<Car[]>([]);
-  const [user, setUser] = useState<User | null>(null);
   const [promo, setPromo] = useState<Promo | null>(null);
-
   const [promoCode, setPromoCode] = useState("");
   const [search, setSearch] = useState("");
 
   const navigate = useNavigate();
 
-  /* ================= LOAD ================= */
+  /* ================= LOAD CARS ================= */
   useEffect(() => {
     const load = async () => {
-      const [carsData, userData] = await Promise.all([
-        safeFetch(`${API}/market/cars`),
-        safeFetch(`${API}/profile/me`),
-      ]);
-
+      const carsData = await safeFetch(`${API}/market/cars`);
       setCars(Array.isArray(carsData) ? carsData : []);
-      setUser(userData || null);
     };
 
     load();
   }, []);
 
   /* ================= APPLY PROMO ================= */
- const applyPromo = async () => {
-  console.log("🔥 CLICKED APPLY");
-
-  try {
+  const applyPromo = async () => {
     const res = await fetch(`${API}/promo/redeem`, {
       method: "POST",
       headers: {
@@ -290,46 +272,39 @@ export default function MarketPage() {
       body: JSON.stringify({ code: promoCode }),
     });
 
-    console.log("🔥 STATUS:", res.status);
-
     const data = await res.json();
 
-    console.log("🔥 PROMO RESPONSE:", data);
+    console.log("PROMO RESPONSE:", data);
 
     if (!res.ok) {
-      alert(data?.error || "Promo failed");
+      alert(data.error);
       return;
     }
 
     setPromo({
       discount: Number(data.discount),
-      car_ids: Array.isArray(data.car_ids)
-        ? data.car_ids.map(Number)
-        : [],
+      car_ids: data.car_ids || [],
     });
 
-    alert("Promo applied!");
-  } catch (e) {
-    console.log("🔥 PROMO ERROR:", e);
-  }
-};
-  /* ================= CHECK PROMO ================= */
-  const hasPromoAccess = (car: Car) => {
-    if (!promo) return false;
-    return promo.car_ids.includes(car.id);
+    alert("Promo activated!");
+  };
+
+  /* ================= CHECK ================= */
+  const hasAccess = (car: Car) => {
+    return promo?.car_ids.includes(car.id);
   };
 
   /* ================= PRICE ================= */
   const getPrice = (car: Car) => {
-    const base = Number(car.price) || 0;
+    const base = Number(car.price);
 
-    if (!promo) return { old: null, new: base };
+    if (!promo || !hasAccess(car)) {
+      return { old: null, new: base };
+    }
 
-    if (!hasPromoAccess(car)) return { old: null, new: base };
-
-    const discount = Number(promo.discount) || 0;
-
-    const newPrice = Math.floor(base - (base * discount) / 100);
+    const newPrice = Math.floor(
+      base - (base * promo.discount) / 100
+    );
 
     return {
       old: base,
@@ -337,83 +312,71 @@ export default function MarketPage() {
     };
   };
 
-  /* ================= FILTER ================= */
-  const filteredCars = cars.filter((car) =>
-    car.name.toLowerCase().includes(search.toLowerCase()) ||
-    car.brand.toLowerCase().includes(search.toLowerCase())
+  const filtered = cars.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.brand.toLowerCase().includes(search.toLowerCase())
   );
 
-  /* ================= UI ================= */
   return (
-    <div className="min-h-screen bg-[#050608] text-white">
-      <div className="max-w-[1400px] mx-auto px-6 py-10">
+    <div className="min-h-screen bg-[#050608] text-white p-6">
 
-        {/* HEADER */}
-        <div className="flex justify-between mb-10">
-          <h1 className="text-4xl font-black">
-            AUTO <span className="text-yellow-400">MARKET</span>
-          </h1>
+      {/* HEADER */}
+      <div className="flex justify-between mb-10">
+        <h1 className="text-4xl font-bold">
+          AUTO <span className="text-yellow-400">MARKET</span>
+        </h1>
 
-          <div className="flex gap-2">
-            <input
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value)}
-              placeholder="Promo code"
-              className="px-4 py-2 bg-black/40 border border-white/10 rounded-xl"
-            />
+        <div className="flex gap-2">
+          <input
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value)}
+            placeholder="Promo code"
+            className="px-3 py-2 bg-black/40 border border-white/10 rounded"
+          />
 
-            <button
-              onClick={applyPromo}
-              className="bg-yellow-400 text-black px-4 rounded-xl font-bold"
-            >
-              Apply
-            </button>
-          </div>
+          <button
+            onClick={applyPromo}
+            className="bg-yellow-400 text-black px-4 rounded font-bold"
+          >
+            Apply
+          </button>
         </div>
-
-        {/* CARS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {filteredCars.map((car) => {
-            const price = getPrice(car);
-
-            return (
-              <div
-                key={car.id}
-                onClick={() => navigate(`/car/${car.id}`)}
-                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border hover:border-yellow-400"
-              >
-                <img
-                  src={car.image_url}
-                  className="h-40 w-full object-contain"
-                />
-
-                <h2 className="text-xl font-bold mt-2">
-                  {car.brand} {car.name}
-                </h2>
-
-                <div className="mt-2 flex gap-2">
-                  {price.old && (
-                    <span className="line-through text-white/40">
-                      ${price.old}
-                    </span>
-                  )}
-
-                  <span className="text-green-400 font-bold">
-                    ${price.new}
-                  </span>
-                </div>
-
-                {promo && hasPromoAccess(car) && (
-                  <div className="text-yellow-400 text-xs mt-1">
-                    🔥 Promo -{promo.discount}%
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
       </div>
+
+      {/* CARS */}
+      <div className="grid grid-cols-3 gap-6">
+        {filtered.map((car) => {
+          const price = getPrice(car);
+
+          return (
+            <div
+              key={car.id}
+              onClick={() => navigate(`/car/${car.id}`)}
+              className="bg-[#111] p-4 rounded cursor-pointer"
+            >
+              <img src={car.image_url} className="h-40 w-full object-contain" />
+
+              <h2 className="mt-2 font-bold">
+                {car.brand} {car.name}
+              </h2>
+
+              <div className="mt-2">
+                {price.old && (
+                  <span className="line-through text-gray-400">
+                    ${price.old}
+                  </span>
+                )}
+
+                <span className="text-green-400 ml-2">
+                  ${price.new}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
     </div>
   );
 }
