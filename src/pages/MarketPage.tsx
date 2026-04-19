@@ -365,7 +365,10 @@ export default function Market() {
             />
 
             <button
-              onClick={applyPromo}
+                onClick={() => {
+                  console.log("CLICK PROMO BUTTON");
+                  applyPromo();
+                }}
               className="bg-yellow-400 text-black px-4 rounded-xl font-bold"
             >
               Apply
