@@ -343,7 +343,7 @@ export default function ProfilePage() {
   }, []);
 
   /* ================= UPLOAD AVATAR ================= */
- const uploadAvatar = async () => {
+const uploadAvatar = async () => {
   if (!file) return alert("Выбери фото");
 
   const form = new FormData();
@@ -353,7 +353,7 @@ export default function ProfilePage() {
     const res = await fetch(`${API}/profile/upload-avatar`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`, // ❗ только это
+        Authorization: `Bearer ${token}`,
       },
       body: form,
     });
@@ -361,10 +361,20 @@ export default function ProfilePage() {
     const text = await res.text();
     console.log("UPLOAD RAW RESPONSE:", text);
 
+    if (!text) {
+      alert("Пустой ответ сервера");
+      return;
+    }
+
     const data = JSON.parse(text);
 
     if (data?.success) {
-      setUser(data.user);
+      // 🔥 ВАЖНО — не затираем user
+      setUser((prev) => ({
+        ...prev,
+        ...data.user,
+      }));
+
       setFile(null);
       setPreview(null);
     } else {
