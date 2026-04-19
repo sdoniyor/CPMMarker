@@ -277,36 +277,42 @@ export default function MarketPage() {
   }, []);
 
   /* ================= APPLY PROMO ================= */
-  const applyPromo = async () => {
-    console.log("🔥 APPLY PROMO CLICKED");
+ const applyPromo = async () => {
+  console.log("🔥 CLICKED APPLY");
 
-    const data = await safeFetch(`${API}/promo/redeem`, {
+  try {
+    const res = await fetch(`${API}/promo/redeem`, {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: localStorage.getItem("token") || "",
+      },
       body: JSON.stringify({ code: promoCode }),
     });
 
+    console.log("🔥 STATUS:", res.status);
+
+    const data = await res.json();
+
     console.log("🔥 PROMO RESPONSE:", data);
 
-    if (!data?.success) {
-      alert(data?.error || "Promo error");
+    if (!res.ok) {
+      alert(data?.error || "Promo failed");
       return;
     }
 
-    // 🔥 FIX: всегда нормализуем car_ids в массив
-    const ids: number[] = Array.isArray(data.car_ids)
-      ? data.car_ids.map(Number)
-      : typeof data.car_ids === "string"
-      ? data.car_ids.split(",").map((x: string) => Number(x.trim()))
-      : [];
-
     setPromo({
-      discount: Number(data.discount) || 0,
-      car_ids: ids,
+      discount: Number(data.discount),
+      car_ids: Array.isArray(data.car_ids)
+        ? data.car_ids.map(Number)
+        : [],
     });
 
-    setPromoCode("");
-  };
-
+    alert("Promo applied!");
+  } catch (e) {
+    console.log("🔥 PROMO ERROR:", e);
+  }
+};
   /* ================= CHECK PROMO ================= */
   const hasPromoAccess = (car: Car) => {
     if (!promo) return false;
