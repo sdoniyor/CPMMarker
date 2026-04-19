@@ -207,7 +207,6 @@ import { useNavigate } from "react-router-dom";
 
 const API = "https://cpmmarker.onrender.com";
 
-/* ================= TYPES ================= */
 type Car = {
   id: number;
   name: string;
@@ -216,28 +215,23 @@ type Car = {
   image_url: string;
 };
 
-type Promo = {
+type User = {
   discount: number;
-  car_ids: number[];
+  promo_car_ids: number[];
 };
 
-/* ================= FETCH ================= */
-const safeFetch = async (url: string, options: any = {}) => {
+const safeFetch = async (url: string) => {
   try {
     const token = localStorage.getItem("token");
 
     const res = await fetch(url, {
-      ...options,
       headers: {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : "",
       },
     });
 
-    const text = await res.text();
-    if (!text || text.startsWith("<!DOCTYPE")) return null;
-
-    return JSON.parse(text);
+    return await res.json();
   } catch {
     return null;
   }
@@ -245,33 +239,23 @@ const safeFetch = async (url: string, options: any = {}) => {
 
 export default function MarketPage() {
   const [cars, setCars] = useState<Car[]>([]);
-  const [promo, setPromo] = useState<Promo | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [promoCode, setPromoCode] = useState("");
-  const [search, setSearch] = useState("");
 
   const navigate = useNavigate();
 
-  /* ================= LOAD CARS ================= */
   useEffect(() => {
     const load = async () => {
-      const carsData = await safeFetch(`${API}/market/cars`);
-      setCars(Array.isArray(carsData) ? carsData : []);
+      const [carsData, userData] = await Promise.all([
+        safeFetch(`${API}/market/cars`),
+        safeFetch(`${API}/profile/me`),
+      ]);
+
+      setCars(carsData || []);
+      setUser(userData || null);
     };
 
     load();
-  }, []);
-
-  /* ================= LOAD PROMO FROM STORAGE ================= */
-  useEffect(() => {
-    const saved = localStorage.getItem("promo");
-
-    if (saved) {
-      try {
-        setPromo(JSON.parse(saved));
-      } catch {
-        localStorage.removeItem("promo");
-      }
-    }
   }, []);
 
   /* ================= APPLY PROMO ================= */
@@ -287,61 +271,37 @@ export default function MarketPage() {
 
     const data = await res.json();
 
-    console.log("PROMO RESPONSE:", data);
-
     if (!res.ok) {
       alert(data.error);
       return;
     }
 
-    const promoData: Promo = {
-      discount: Number(data.discount),
-      car_ids: Array.isArray(data.car_ids)
-        ? data.car_ids.map(Number)
-        : [],
-    };
-
-    setPromo(promoData);
-
-    /* 🔥 SAVE TO LOCALSTORAGE */
-    localStorage.setItem("promo", JSON.stringify(promoData));
-
     alert("Promo activated!");
-  };
 
-  /* ================= CHECK ================= */
-  const hasAccess = (car: Car) => {
-    return promo?.car_ids.includes(car.id);
+    // 🔥 ОБНОВЛЯЕМ USER С БЭКА
+    const updatedUser = await safeFetch(`${API}/profile/me`);
+    setUser(updatedUser);
   };
 
   /* ================= PRICE ================= */
   const getPrice = (car: Car) => {
-    const base = Number(car.price);
+    const base = car.price;
+    const discount = user?.discount || 0;
+    const allowed = user?.promo_car_ids || [];
 
-    if (!promo || !hasAccess(car)) {
+    if (!discount || !allowed.includes(car.id)) {
       return { old: null, new: base };
     }
 
-    const newPrice = Math.floor(
-      base - (base * promo.discount) / 100
-    );
-
     return {
       old: base,
-      new: newPrice,
+      new: Math.floor(base - (base * discount) / 100),
     };
   };
-
-  const filtered = cars.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.brand.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-[#050608] text-white p-6">
 
-      {/* HEADER */}
       <div className="flex justify-between mb-10">
         <h1 className="text-4xl font-bold">
           AUTO <span className="text-yellow-400">MARKET</span>
@@ -352,7 +312,7 @@ export default function MarketPage() {
             value={promoCode}
             onChange={(e) => setPromoCode(e.target.value)}
             placeholder="Promo code"
-            className="px-3 py-2 bg-black/40 border border-white/10 rounded"
+            className="px-3 py-2 bg-black/40 border rounded"
           />
 
           <button
@@ -366,19 +326,12 @@ export default function MarketPage() {
 
       {/* CARS */}
       <div className="grid grid-cols-3 gap-6">
-        {filtered.map((car) => {
+        {cars.map((car) => {
           const price = getPrice(car);
 
           return (
-            <div
-              key={car.id}
-              onClick={() => navigate(`/car/${car.id}`)}
-              className="bg-[#111] p-4 rounded cursor-pointer"
-            >
-              <img
-                src={car.image_url}
-                className="h-40 w-full object-contain"
-              />
+            <div key={car.id} className="bg-[#111] p-4 rounded">
+              <img src={car.image_url} className="h-40 w-full object-contain" />
 
               <h2 className="mt-2 font-bold">
                 {car.brand} {car.name}
@@ -395,12 +348,6 @@ export default function MarketPage() {
                   ${price.new}
                 </span>
               </div>
-
-              {promo && hasAccess(car) && (
-                <div className="text-yellow-400 text-xs mt-1">
-                  🔥 Promo -{promo.discount}%
-                </div>
-              )}
             </div>
           );
         })}
