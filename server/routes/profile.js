@@ -204,11 +204,30 @@ router.get("/me", auth, async (req, res) => {
 
     /* ================= PROMO CARS FROM DB ================= */
     const promoRes = await q(
-      "SELECT car_id FROM user_promos WHERE user_id=$1",
-      [req.userId]
-    );
+  `SELECT pc.car_ids, pc.discount
+   FROM user_promos up
+   JOIN promo_codes pc ON pc.code = up.promo_code
+   WHERE up.user_id=$1`,
+  [req.userId]
+);
 
-    const promoCars = promoRes.rows.map((r) => Number(r.car_id));
+let promoCars = [];
+let discount = 0;
+
+if (promoRes.rows.length > 0) {
+  promoCars = promoRes.rows
+    .flatMap(r => (r.car_ids || "").split(","))
+    .map(Number)
+    .filter(Boolean);
+
+  discount = Number(promoRes.rows[0].discount) || 0;
+}
+
+res.json({
+  ...user,
+  discount,
+  promo_cars: promoCars
+});
 
     /* ================= RESPONSE ================= */
     res.json({
