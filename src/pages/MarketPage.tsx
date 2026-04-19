@@ -261,6 +261,19 @@ export default function MarketPage() {
     load();
   }, []);
 
+  /* ================= LOAD PROMO FROM STORAGE ================= */
+  useEffect(() => {
+    const saved = localStorage.getItem("promo");
+
+    if (saved) {
+      try {
+        setPromo(JSON.parse(saved));
+      } catch {
+        localStorage.removeItem("promo");
+      }
+    }
+  }, []);
+
   /* ================= APPLY PROMO ================= */
   const applyPromo = async () => {
     const res = await fetch(`${API}/promo/redeem`, {
@@ -281,10 +294,17 @@ export default function MarketPage() {
       return;
     }
 
-    setPromo({
+    const promoData: Promo = {
       discount: Number(data.discount),
-      car_ids: data.car_ids || [],
-    });
+      car_ids: Array.isArray(data.car_ids)
+        ? data.car_ids.map(Number)
+        : [],
+    };
+
+    setPromo(promoData);
+
+    /* 🔥 SAVE TO LOCALSTORAGE */
+    localStorage.setItem("promo", JSON.stringify(promoData));
 
     alert("Promo activated!");
   };
@@ -355,7 +375,10 @@ export default function MarketPage() {
               onClick={() => navigate(`/car/${car.id}`)}
               className="bg-[#111] p-4 rounded cursor-pointer"
             >
-              <img src={car.image_url} className="h-40 w-full object-contain" />
+              <img
+                src={car.image_url}
+                className="h-40 w-full object-contain"
+              />
 
               <h2 className="mt-2 font-bold">
                 {car.brand} {car.name}
@@ -372,6 +395,12 @@ export default function MarketPage() {
                   ${price.new}
                 </span>
               </div>
+
+              {promo && hasAccess(car) && (
+                <div className="text-yellow-400 text-xs mt-1">
+                  🔥 Promo -{promo.discount}%
+                </div>
+              )}
             </div>
           );
         })}
