@@ -218,8 +218,6 @@
 
 
 
-require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -234,35 +232,30 @@ const telegramRoutes = require("./routes/telegram");
 
 const app = express();
 
-/* ================= UPLOADS (FIXED) ================= */
-// 🔥 ВАЖНО: используем стабильную папку внутри сервера
+/* ================= UPLOADS ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
-// создаём если нет
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log("📁 uploads folder created:", uploadDir);
+  console.log("📁 uploads created:", uploadDir);
 }
 
-/* ================= CORS ================= */
-app.use(
-  cors({
-    origin: true, // проще и стабильнее для прод
-    credentials: true,
-  })
-);
-
-/* ================= BODY ================= */
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
 /* ================= STATIC FILES ================= */
-// 🔥 именно это даёт доступ к /uploads/...
 app.use("/uploads", express.static(uploadDir));
 
-/* ================= LOGGING ================= */
+/* ================= CORS ================= */
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
+
+/* ================= BODY ================= */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/* ================= LOG ================= */
 app.use((req, res, next) => {
-  console.log(`➡️ ${req.method} ${req.url}`);
+  console.log(req.method, req.url);
   next();
 });
 
@@ -276,30 +269,12 @@ app.use("/telegram", telegramRoutes);
 
 /* ================= HEALTH ================= */
 app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    message: "CPM Market API running 🚀",
-    time: new Date().toISOString(),
-  });
-});
-
-/* ================= 404 ================= */
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found",
-    path: req.originalUrl,
-  });
-});
-
-/* ================= ERROR HANDLER ================= */
-app.use((err, req, res, next) => {
-  console.error("🔥 SERVER ERROR:", err);
-  res.status(500).json({ error: "Internal server error" });
+  res.json({ ok: true });
 });
 
 /* ================= START ================= */
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log("Server running:", PORT);
 });
