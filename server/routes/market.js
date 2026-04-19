@@ -45,30 +45,3 @@ router.get("/configs", async (req, res) => {
 
 module.exports = router;
 
-
-
-// const express = require("express");
-// const { q } = require("../db");
-
-// const router = express.Router();
-
-// /* ================= GET CARS ================= */
-// router.get("/cars", async (req, res) => {
-//   try {
-//     const r = await q("SELECT * FROM cars");
-
-//     const cars = r.rows.map((car) => ({
-//       ...car,
-//       image_url: car.image_url?.startsWith("/uploads")
-//         ? car.image_url
-//         : `/uploads/cars/${car.image_url}`,
-//     }));
-
-//     res.json(cars);
-//   } catch (e) {
-//     console.log(e);
-//     res.status(500).json({ error: "Failed to load cars" });
-//   }
-// });
-
-// module.exports = router;
