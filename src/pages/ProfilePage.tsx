@@ -358,25 +358,16 @@ const uploadAvatar = async () => {
       body: form,
     });
 
-    const text = await res.text();
-    console.log("UPLOAD RAW RESPONSE:", text);
-
-    if (!text) {
-      alert("Пустой ответ сервера");
-      return;
-    }
-
-    const data = JSON.parse(text);
+    const data = await res.json();
 
     if (data?.success) {
-      // 🔥 ВАЖНО — не затираем user
-      setUser((prev) => ({
-        ...prev,
-        ...data.user,
-      }));
+      // ✅ ВАЖНО: полностью обновляем пользователя
+      setUser(data.user);
 
+      // 🔥 сбрасываем превью
       setFile(null);
       setPreview(null);
+
     } else {
       alert(data?.error || "Upload error");
     }
@@ -446,7 +437,7 @@ const uploadAvatar = async () => {
   }
 
   const avatarUrl =
-    preview || (user.avatar ? `${API}${user.avatar}` : null);
+    preview || (user.avatar ? `${API}${user.avatar}?t=${Date.now()}` : null);
 
   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
 
