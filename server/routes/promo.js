@@ -130,7 +130,6 @@
 
 // module.exports = router;
 
-
 const express = require("express");
 const { q } = require("../db");
 const auth = require("../middleware/auth");
@@ -140,6 +139,10 @@ const router = express.Router();
 /* ================= HELPERS ================= */
 const parseCarIds = (car_ids) => {
   if (!car_ids) return [];
+
+  if (Array.isArray(car_ids)) {
+    return car_ids.map(Number).filter(Boolean);
+  }
 
   return car_ids
     .split(",")
@@ -162,6 +165,7 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(400).json({ error: "No code provided" });
     }
 
+    /* ================= GET PROMO ================= */
     const promoRes = await q(
       "SELECT * FROM promo_codes WHERE code=$1",
       [code]
@@ -173,14 +177,27 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(404).json({ error: "Invalid promo code" });
     }
 
+    /* ================= CHECK EXPIRED ================= */
     if (isExpired(promo)) {
       return res.status(400).json({ error: "Promo expired" });
     }
 
+    /* ================= LIMIT CHECK ================= */
     if (promo.max_uses > 0 && promo.used_count >= promo.max_uses) {
       return res.status(400).json({ error: "Promo limit reached" });
     }
 
+    /* ================= CHECK USER ALREADY USED ================= */
+    const alreadyUsed = await q(
+      "SELECT id FROM user_promos WHERE user_id=$1 AND promo_code=$2",
+      [userId, code]
+    );
+
+    if (alreadyUsed.rows.length > 0) {
+      return res.status(400).json({ error: "Promo already used" });
+    }
+
+    /* ================= PARSE CARS ================= */
     const allowedCars = parseCarIds(promo.car_ids);
 
     /* ================= SAVE USAGE ================= */
@@ -190,6 +207,7 @@ router.post("/redeem", auth, async (req, res) => {
       [userId, code, promo.discount]
     );
 
+    /* ================= UPDATE PROMO COUNTER ================= */
     await q(
       `UPDATE promo_codes 
        SET used_count = used_count + 1 
@@ -197,15 +215,19 @@ router.post("/redeem", auth, async (req, res) => {
       [promo.id]
     );
 
+    /* ================= RESPONSE ================= */
     res.json({
       success: true,
-      discount: Number(promo.discount),
-      car_ids: allowedCars, // 👈 ВАЖНО: отправляем фронту
+      discount: Number(promo.discount) || 0,
+      car_ids: allowedCars, // ✔ всегда массив чисел
     });
 
   } catch (e) {
-    console.log("PROMO ERROR:", e);
-    res.status(500).json({ error: "Server error" });
+    console.log("❌ PROMO ERROR:", e);
+
+    res.status(500).json({
+      error: "Server error",
+    });
   }
 });
 
