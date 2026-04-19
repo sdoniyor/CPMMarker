@@ -255,19 +255,28 @@ export default function Market() {
 
   /* ================= LOAD ================= */
   useEffect(() => {
-    const load = async () => {
-      const [carsData, userData] = await Promise.all([
-        safeFetch(`${API}/market/cars`),
-        safeFetch(`${API}/profile/me`),
-      ]);
+  const load = async () => {
+    const [carsData, userData] = await Promise.all([
+      safeFetch(`${API}/market/cars`),
+      safeFetch(`${API}/profile/me`),
+    ]);
 
-      setCars(Array.isArray(carsData) ? carsData : []);
-      setUser(userData || null);
-    };
+    setCars(carsData || []);
+    setUser(userData || null);
+  };
 
-    load();
-  }, []);
+  load();
 
+  const onUpdate = () => load();
+
+  window.addEventListener("profile-update", onUpdate);
+  window.addEventListener("user-updated", onUpdate);
+
+  return () => {
+    window.removeEventListener("profile-update", onUpdate);
+    window.removeEventListener("user-updated", onUpdate);
+  };
+}, []);
   /* ================= PARSE IDS ================= */
   const getAllowedIds = (): number[] => {
     if (!user?.discount_cars) return [];
