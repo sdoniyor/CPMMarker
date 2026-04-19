@@ -43,5 +43,7 @@ router.get("/configs", async (req, res) => {
   }
 });
 
+console.log("PROMO STATE:", promo);
+
 module.exports = router;
 
