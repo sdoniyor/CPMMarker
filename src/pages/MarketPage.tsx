@@ -280,27 +280,21 @@ export default function Market() {
 
   /* ================= APPLY PROMO ================= */
   const applyPromo = async () => {
-    if (!promoCode.trim()) return;
+  console.log("CLICKED PROMO");
 
-    const data = await safeFetch(`${API}/promo/redeem`, {
-      method: "POST",
-      body: JSON.stringify({ code: promoCode }),
-    });
+  const res = await fetch(`${API}/promo/redeem`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: localStorage.getItem("token") || "",
+    },
+    body: JSON.stringify({ code: promoCode }),
+  });
 
-    console.log("PROMO RESPONSE:", data);
+  const text = await res.text();
 
-    if (!data?.success) {
-      alert(data?.error || "Invalid promo");
-      return;
-    }
-
-    setPromo({
-      discount: Number(data.discount) || 0,
-      car_ids: data.car_ids || "",
-    });
-
-    setPromoCode("");
-  };
+  console.log("RAW RESPONSE:", text);
+};
 
   /* ================= CHECK ACCESS ================= */
   const hasPromoAccess = (car: Car) => {
