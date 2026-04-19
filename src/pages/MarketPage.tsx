@@ -203,8 +203,6 @@
 
 
 
-
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -251,7 +249,7 @@ type User = {
 
 type Promo = {
   discount: number;
-  car_ids: number[];
+  car_ids: string; // 👈 ВАЖНО: у тебя строка "1,2,3"
 };
 
 export default function Market() {
@@ -260,9 +258,8 @@ export default function Market() {
 
   const [promo, setPromo] = useState<Promo | null>(null);
 
-  const [search, setSearch] = useState("");
-  const [onlyPremium, setOnlyPremium] = useState(false);
   const [promoCode, setPromoCode] = useState("");
+  const [search, setSearch] = useState("");
 
   const navigate = useNavigate();
 
@@ -283,10 +280,7 @@ export default function Market() {
 
   /* ================= APPLY PROMO ================= */
   const applyPromo = async () => {
-    if (!promoCode.trim()) {
-      alert("Введите промокод");
-      return;
-    }
+    if (!promoCode.trim()) return;
 
     const data = await safeFetch(`${API}/promo/redeem`, {
       method: "POST",
@@ -300,37 +294,24 @@ export default function Market() {
       return;
     }
 
-    /* ================= SAFE PARSE ================= */
-    let carIds: number[] = [];
-
-    try {
-      if (Array.isArray(data.car_ids)) {
-        carIds = data.car_ids.map(Number).filter(Boolean);
-      } else if (typeof data.car_ids === "string") {
-        carIds = data.car_ids
-          .split(",")
-          .map((x: string) => Number(x.trim()))
-          .filter(Boolean);
-      }
-    } catch (e) {
-      console.log("CAR IDS PARSE ERROR:", e);
-    }
-
     setPromo({
       discount: Number(data.discount) || 0,
-      car_ids: carIds,
+      car_ids: data.car_ids || "",
     });
 
     setPromoCode("");
-    alert("Promo activated!");
   };
 
-  /* ================= CHECK PROMO ================= */
+  /* ================= CHECK ACCESS ================= */
   const hasPromoAccess = (car: Car) => {
-    if (!promo) return false;
-    if (!Array.isArray(promo.car_ids)) return false;
+    if (!promo?.car_ids) return false;
 
-    return promo.car_ids.includes(Number(car.id));
+    const ids = promo.car_ids
+      .split(",")
+      .map((x) => Number(x.trim()))
+      .filter(Boolean);
+
+    return ids.includes(Number(car.id));
   };
 
   /* ================= PRICE ================= */
@@ -341,13 +322,13 @@ export default function Market() {
       return { old: null, new: base };
     }
 
-    if (!hasPromoAccess(car)) {
-      return { old: null, new: base };
-    }
-
     const discount = Number(promo.discount) || 0;
 
     if (discount <= 0) {
+      return { old: null, new: base };
+    }
+
+    if (!hasPromoAccess(car)) {
       return { old: null, new: base };
     }
 
@@ -362,16 +343,10 @@ export default function Market() {
   };
 
   /* ================= FILTER ================= */
-  const filteredCars = (cars || [])
-    .filter((car) => {
-      const s = search.toLowerCase();
-
-      return (
-        car?.name?.toLowerCase().includes(s) ||
-        car?.brand?.toLowerCase().includes(s)
-      );
-    })
-    .filter((car) => (onlyPremium ? car?.premium : true));
+  const filteredCars = (cars || []).filter((car) =>
+    car.name.toLowerCase().includes(search.toLowerCase()) ||
+    car.brand.toLowerCase().includes(search.toLowerCase())
+  );
 
   /* ================= UI ================= */
   return (
@@ -380,9 +355,9 @@ export default function Market() {
       <div className="max-w-[1400px] mx-auto px-6 py-10">
 
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-10">
+        <div className="flex justify-between mb-10">
 
-          <h1 className="text-5xl font-black">
+          <h1 className="text-4xl font-black">
             AUTO <span className="text-yellow-400">MARKET</span>
           </h1>
 
@@ -416,7 +391,7 @@ export default function Market() {
               <div
                 key={car.id}
                 onClick={() => navigate(`/car/${car.id}`)}
-                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer border hover:border-yellow-400"
+                className="bg-[#0c0c0c] p-4 rounded-2xl cursor-pointer hover:border-yellow-400 border border-transparent"
               >
 
                 <img
@@ -455,13 +430,6 @@ export default function Market() {
           })}
 
         </div>
-
-        {/* EMPTY */}
-        {filteredCars.length === 0 && (
-          <div className="text-center mt-20 text-white/30">
-            No cars found
-          </div>
-        )}
 
       </div>
     </div>
