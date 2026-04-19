@@ -130,6 +130,9 @@
 
 // module.exports = router;
 
+
+console.log("🔥 PROMO ROUTE LOADED");
+
 const express = require("express");
 const { q } = require("../db");
 const auth = require("../middleware/auth");
