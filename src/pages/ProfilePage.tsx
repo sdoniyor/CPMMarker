@@ -325,7 +325,7 @@ export default function ProfilePage() {
       });
 
       const data = await res.json();
-
+      console.log("USER FROM BACKEND:", data); // 👈 ВОТ СЮДА
       if (!data?.id) {
         window.location.href = "/auth";
         return;
