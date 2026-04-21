@@ -151,7 +151,11 @@ export default function Navbar() {
           <div className="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-black font-black overflow-hidden">
             {user?.avatar ? (
               <img
-                src={`${SERVER_URL}${user.avatar}?t=${Date.now()}`} // 🔥 cache fix
+                src={
+                  user.avatar.startsWith("http")
+                    ? user.avatar
+                    : `${SERVER_URL}${user.avatar}`
+                }
                 className="w-full h-full object-cover"
               />
             ) : (
