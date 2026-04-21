@@ -437,7 +437,12 @@ const uploadAvatar = async () => {
   }
 
   const avatarUrl =
-    preview || (user.avatar ? `${user.avatar}?t=${Date.now()}` : null);
+    preview ||
+    (user.avatar
+      ? user.avatar.startsWith("http")
+        ? user.avatar
+        : `${API}${user.avatar}`
+      : null);
 
   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
 
