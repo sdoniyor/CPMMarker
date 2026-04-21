@@ -254,6 +254,30 @@ res.json({
   }
 });
 
+
+/* ================= TELEGRAM LINK ================= */
+router.post("/telegram/link", auth, async (req, res) => {
+  try {
+    const code = Math.random().toString(36).substring(2, 10);
+
+    await q(
+      "INSERT INTO telegram_links (user_id, code, used) VALUES ($1,$2,false)",
+      [req.userId, code]
+    );
+
+    const bot = process.env.BOT_USERNAME || "CPMMarket_bot";
+
+    res.json({
+      link: `https://t.me/${bot}?start=${code}`,
+      code,
+    });
+  } catch (e) {
+    console.log("TG LINK ERROR:", e);
+    res.status(500).json({ error: "Failed to create link" });
+  }
+});
+
+
 /* ================= UPLOAD AVATAR ================= */
 router.post(
   "/upload-avatar",
