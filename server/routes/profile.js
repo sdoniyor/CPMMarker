@@ -423,7 +423,7 @@ router.post(
   async (req, res) => {
     try {
       const userId = req.userId;
-
+        console.log("FILE:", req.file); // 👈 ВОТ СЮДА
       const imageUrl = req.file.path; // Cloudinary URL
 
       await q(
