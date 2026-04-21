@@ -194,12 +194,17 @@ router.post("/register", async (req, res) => {
     const newUser = r.rows[0];
 
     /* ================= SAVE REF EVENT ================= */
-    if (referredUserId) {
-      await q(
-        "INSERT INTO referrals (referrer_id, user_id) VALUES ($1,$2)",
-        [referredUserId, newUser.id]
-      );
-    }
+if (referredUserId) {
+  await q(
+    "INSERT INTO referrals (referrer_id, user_id) VALUES ($1,$2)",
+    [referredUserId, newUser.id]
+  );
+
+  await q(
+    "UPDATE users SET ref_count = COALESCE(ref_count,0) + 1 WHERE id=$1",
+    [referredUserId]
+  );
+}
 
     /* ================= TOKEN ================= */
     const token = jwt.sign(
