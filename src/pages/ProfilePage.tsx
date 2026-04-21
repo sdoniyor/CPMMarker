@@ -443,7 +443,8 @@ const uploadAvatar = async () => {
         ? user.avatar
         : `${API}${user.avatar}`
       : null);
-
+  console.log("DEBUG avatar:", user.avatar);
+  console.log("DEBUG avatarUrl:", avatarUrl);
   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
 
   return (
