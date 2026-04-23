@@ -215,7 +215,6 @@ type Car = {
   brand: string;
   price: number;
   image_url: string;
-
   type: "default" | "premium" | "coin";
 };
 
@@ -261,7 +260,6 @@ const parseDiscountCars = (input: any): number[] => {
 export default function MarketPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [promoCode, setPromoCode] = useState("");
 
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "premium" | "coin">("all");
@@ -276,7 +274,6 @@ export default function MarketPage() {
         safeFetch(`${API}/profile/me`),
       ]);
 
-      // ✅ FIX: гарантируем type
       const fixedCars: Car[] = Array.isArray(carsData)
         ? carsData.map((c) => ({
             ...c,
@@ -290,30 +287,6 @@ export default function MarketPage() {
 
     load();
   }, []);
-
-  /* ================= APPLY PROMO ================= */
-  const applyPromo = async () => {
-    const res = await fetch(`${API}/promo/redeem`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: localStorage.getItem("token") || "",
-      },
-      body: JSON.stringify({ code: promoCode }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error);
-      return;
-    }
-
-    alert("Promo activated!");
-
-    const updated = await safeFetch(`${API}/profile/me`);
-    setUser(updated);
-  };
 
   /* ================= DISCOUNT ================= */
   const discountCars = parseDiscountCars(user?.promo_cars);
@@ -404,21 +377,6 @@ export default function MarketPage() {
             }`}
           >
             Coins
-          </button>
-
-          {/* PROMO */}
-          <input
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value)}
-            placeholder="Promo code"
-            className="px-3 py-2 bg-black/40 border rounded"
-          />
-
-          <button
-            onClick={applyPromo}
-            className="bg-yellow-400 text-black px-4 rounded font-bold"
-          >
-            Apply
           </button>
 
         </div>
