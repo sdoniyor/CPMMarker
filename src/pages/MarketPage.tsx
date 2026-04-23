@@ -221,7 +221,7 @@ type Car = {
 
 type User = {
   discount?: number;
-  discount_cars?: string | number[];
+  promo_cars?: string | number[] | null;
 };
 
 /* ================= FETCH ================= */
@@ -306,7 +306,7 @@ export default function MarketPage() {
   };
 
   /* ================= DISCOUNT LOGIC ================= */
-  const discountCars = parseDiscountCars(user?.discount_cars);
+  const discountCars = parseDiscountCars(user?.promo_cars);
   const discount = Number(user?.discount) || 0;
 
   const isAllowed = (carId: number) =>
