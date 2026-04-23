@@ -216,8 +216,7 @@ type Car = {
   price: number;
   image_url: string;
 
-  premium?: boolean;
-  coin?: boolean;
+  type: "default" | "premium" | "coin";
 };
 
 type User = {
@@ -277,7 +276,15 @@ export default function MarketPage() {
         safeFetch(`${API}/profile/me`),
       ]);
 
-      setCars(Array.isArray(carsData) ? carsData : []);
+      // ✅ FIX: гарантируем type
+      const fixedCars: Car[] = Array.isArray(carsData)
+        ? carsData.map((c) => ({
+            ...c,
+            type: c.type || "default",
+          }))
+        : [];
+
+      setCars(fixedCars);
       setUser(userData || null);
     };
 
@@ -338,10 +345,8 @@ export default function MarketPage() {
 
     let matchesType = true;
 
-    if (filterType === "premium") {
-      matchesType = !!car.premium;
-    } else if (filterType === "coin") {
-      matchesType = !!car.coin;
+    if (filterType !== "all") {
+      matchesType = car.type === filterType;
     }
 
     return matchesSearch && matchesType;
@@ -440,13 +445,13 @@ export default function MarketPage() {
               </h2>
 
               {/* TAGS */}
-              {car.premium && (
+              {car.type === "premium" && (
                 <div className="text-yellow-400 text-xs mt-1">
                   ⭐ PREMIUM
                 </div>
               )}
 
-              {car.coin && (
+              {car.type === "coin" && (
                 <div className="text-blue-400 text-xs">
                   🪙 COIN
                 </div>
