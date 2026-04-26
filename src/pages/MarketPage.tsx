@@ -258,7 +258,7 @@ type Car = {
 
 type User = {
   discount?: number;
-  discount_cars?: string | number[] | null;
+  promo_cars?: string | number[] | null;
 };
 
 /* ================= FETCH ================= */
@@ -280,23 +280,33 @@ const safeFetch = async (url: string, options: any = {}) => {
   }
 };
 
-/* ================= PARSER (FIXED) ================= */
+/* ================= PARSER ================= */
 const parseDiscountCars = (input: any): number[] => {
   if (!input) return [];
 
   if (Array.isArray(input)) {
-    return input.map(Number).filter((x) => !isNaN(x));
+    return input.map(Number).filter(Boolean);
   }
 
   if (typeof input === "string") {
-    return input
-      .replace(/\s/g, "")
-      .split(",")
-      .map(Number)
-      .filter((x) => !isNaN(x));
+    return input.split(",").map(Number).filter(Boolean);
   }
 
   return [];
+};
+
+/* ================= NEW FIX FUNCTION ================= */
+const isAllowedFixed = (
+  carId: number,
+  discount: number,
+  discountCars: number[]
+) => {
+  if (!discount) return false;
+
+  // если список пустой → скидка на ВСЕ машины
+  if (discountCars.length === 0) return true;
+
+  return discountCars.includes(Number(carId));
 };
 
 export default function MarketPage() {
@@ -325,18 +335,11 @@ export default function MarketPage() {
 
   /* ================= DISCOUNT ================= */
   const discount = Number(user?.discount) || 0;
-  const discountCars = parseDiscountCars(user?.discount_cars);
+  const discountCars = parseDiscountCars(user?.promo_cars);
 
-  /* 🔥 ВОТ СТАРАЯ ПРАВИЛЬНАЯ ЛОГИКА */
-  const isAllowed = (carId: number) => {
-    if (!discount) return false;
-
-    // если список пустой → скидка на ВСЕ машины
-    if (discountCars.length === 0) return true;
-
-    // иначе только выбранные
-    return discountCars.includes(Number(carId));
-  };
+  /* 🔥 FIXED WRAPPER */
+  const isAllowed = (carId: number) =>
+    isAllowedFixed(carId, discount, discountCars);
 
   const getPrice = (car: Car) => {
     const base = Number(car.price);
