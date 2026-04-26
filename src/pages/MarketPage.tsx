@@ -329,19 +329,13 @@ export default function MarketPage() {
   const discountCars = parseDiscountCars(user?.discount_cars);
   const discount = Number(user?.discount) || 0;
 
-  /* ================= FIXED LOGIC ================= */
   const hasDiscount = discount > 0;
-
-  // ❗ ВАЖНО: теперь пустой массив НЕ значит "все машины"
-  const isGlobalDiscount = false; 
-  // ↑ если хочешь "скидка на все машины", ставь true
 
   const isAllowed = (carId: number) => {
     if (!hasDiscount) return false;
 
-    if (isGlobalDiscount) return true;
-
-    if (discountCars.length === 0) return false;
+    // если массив пустой → скидка на ВСЕ машины
+    if (discountCars.length === 0) return true;
 
     return discountCars.includes(Number(carId));
   };
@@ -413,7 +407,7 @@ export default function MarketPage() {
         </div>
       </div>
 
-      {/* ACTIVE PROMO */}
+      {/* ACTIVE DISCOUNT */}
       {hasDiscount && (
         <div className="mb-6 p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
           <div className="text-yellow-400 font-bold">
@@ -421,10 +415,8 @@ export default function MarketPage() {
           </div>
 
           <div className="text-sm text-gray-300">
-            {isGlobalDiscount
+            {discountCars.length === 0
               ? "Applies to ALL cars"
-              : discountCars.length === 0
-              ? "No cars selected (discount inactive)"
               : "Applies only to selected cars"}
           </div>
         </div>
