@@ -11,8 +11,7 @@
 //   brand: string;
 //   price: number;
 //   image_url: string;
-//   premium?: boolean;
-//   coin?: boolean; // 👈 добавь в БД
+//   type: "default" | "premium" | "coin";
 // };
 
 // type User = {
@@ -57,7 +56,9 @@
 // export default function MarketPage() {
 //   const [cars, setCars] = useState<Car[]>([]);
 //   const [user, setUser] = useState<User | null>(null);
-//   const [promoCode, setPromoCode] = useState("");
+
+//   const [search, setSearch] = useState("");
+//   const [filterType, setFilterType] = useState<"all" | "premium" | "coin">("all");
 
 //   const navigate = useNavigate();
 
@@ -69,46 +70,27 @@
 //         safeFetch(`${API}/profile/me`),
 //       ]);
 
-//       setCars(Array.isArray(carsData) ? carsData : []);
+//       const fixedCars: Car[] = Array.isArray(carsData)
+//         ? carsData.map((c) => ({
+//             ...c,
+//             type: c.type || "default",
+//           }))
+//         : [];
+
+//       setCars(fixedCars);
 //       setUser(userData || null);
 //     };
 
 //     load();
 //   }, []);
 
-//   /* ================= APPLY PROMO ================= */
-//   const applyPromo = async () => {
-//     const res = await fetch(`${API}/promo/redeem`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//         Authorization: localStorage.getItem("token") || "",
-//       },
-//       body: JSON.stringify({ code: promoCode }),
-//     });
-
-//     const data = await res.json();
-
-//     if (!res.ok) {
-//       alert(data.error);
-//       return;
-//     }
-
-//     alert("Promo activated!");
-
-//     // 🔥 ОБНОВЛЯЕМ USER С БЭКА (ВАЖНО)
-//     const updated = await safeFetch(`${API}/profile/me`);
-//     setUser(updated);
-//   };
-
-//   /* ================= DISCOUNT LOGIC ================= */
+//   /* ================= DISCOUNT ================= */
 //   const discountCars = parseDiscountCars(user?.promo_cars);
 //   const discount = Number(user?.discount) || 0;
 
 //   const isAllowed = (carId: number) =>
 //     discountCars.length === 0 || discountCars.includes(carId);
 
-//   /* ================= PRICE ================= */
 //   const getPrice = (car: Car) => {
 //     const base = Number(car.price);
 
@@ -116,9 +98,7 @@
 //       return { old: null, new: base };
 //     }
 
-//     const newPrice = Math.floor(
-//       base - (base * discount) / 100
-//     );
+//     const newPrice = Math.floor(base - (base * discount) / 100);
 
 //     return {
 //       old: base,
@@ -127,31 +107,74 @@
 //   };
 
 //   /* ================= FILTER ================= */
-//   const filteredCars = cars;
+//   const filteredCars = cars.filter((car) => {
+//     const matchesSearch =
+//       car.name.toLowerCase().includes(search.toLowerCase()) ||
+//       car.brand.toLowerCase().includes(search.toLowerCase());
+
+//     let matchesType = true;
+
+//     if (filterType !== "all") {
+//       matchesType = car.type === filterType;
+//     }
+
+//     return matchesSearch && matchesType;
+//   });
 
 //   return (
 //     <div className="min-h-screen bg-[#050608] text-white p-6">
 
 //       {/* HEADER */}
-//       <div className="flex justify-between mb-10">
+//       <div className="flex flex-col gap-4 mb-10">
+
 //         <h1 className="text-4xl font-bold">
 //           AUTO <span className="text-yellow-400">MARKET</span>
 //         </h1>
 
-//         <div className="flex gap-2">
+//         <div className="flex flex-wrap gap-2">
+
+//           {/* SEARCH */}
 //           <input
-//             value={promoCode}
-//             onChange={(e) => setPromoCode(e.target.value)}
-//             placeholder="Promo code"
+//             value={search}
+//             onChange={(e) => setSearch(e.target.value)}
+//             placeholder="Search car..."
 //             className="px-3 py-2 bg-black/40 border rounded"
 //           />
 
+//           {/* FILTER */}
 //           <button
-//             onClick={applyPromo}
-//             className="bg-yellow-400 text-black px-4 rounded font-bold"
+//             onClick={() => setFilterType("all")}
+//             className={`px-3 py-2 rounded ${
+//               filterType === "all"
+//                 ? "bg-yellow-400 text-black"
+//                 : "bg-black/40"
+//             }`}
 //           >
-//             Apply
+//             All
 //           </button>
+
+//           <button
+//             onClick={() => setFilterType("premium")}
+//             className={`px-3 py-2 rounded ${
+//               filterType === "premium"
+//                 ? "bg-yellow-400 text-black"
+//                 : "bg-black/40"
+//             }`}
+//           >
+//             Premium
+//           </button>
+
+//           <button
+//             onClick={() => setFilterType("coin")}
+//             className={`px-3 py-2 rounded ${
+//               filterType === "coin"
+//                 ? "bg-yellow-400 text-black"
+//                 : "bg-black/40"
+//             }`}
+//           >
+//             Coins
+//           </button>
+
 //         </div>
 //       </div>
 
@@ -164,7 +187,7 @@
 //             <div
 //               key={car.id}
 //               onClick={() => navigate(`/car/${car.id}`)}
-//               className="bg-[#111] p-4 rounded cursor-pointer"
+//               className="bg-[#111] p-4 rounded cursor-pointer hover:scale-105 transition"
 //             >
 //               <img
 //                 src={car.image_url}
@@ -175,6 +198,20 @@
 //                 {car.brand} {car.name}
 //               </h2>
 
+//               {/* TAGS */}
+//               {car.type === "premium" && (
+//                 <div className="text-yellow-400 text-xs mt-1">
+//                   ⭐ PREMIUM
+//                 </div>
+//               )}
+
+//               {car.type === "coin" && (
+//                 <div className="text-blue-400 text-xs">
+//                   🪙 COIN
+//                 </div>
+//               )}
+
+//               {/* PRICE */}
 //               <div className="mt-2">
 //                 {price.old && (
 //                   <span className="line-through text-gray-400">
@@ -187,6 +224,7 @@
 //                 </span>
 //               </div>
 
+//               {/* DISCOUNT */}
 //               {discount > 0 && isAllowed(car.id) && (
 //                 <div className="text-yellow-400 text-xs mt-1">
 //                   🔥 -{discount}%
@@ -219,8 +257,8 @@ type Car = {
 };
 
 type User = {
-  discount?: number;
-  promo_cars?: string | number[] | null;
+  discount?: number | null;
+  discount_cars?: string | number[] | null;
 };
 
 /* ================= FETCH ================= */
@@ -251,7 +289,10 @@ const parseDiscountCars = (input: any): number[] => {
   }
 
   if (typeof input === "string") {
-    return input.split(",").map(Number).filter(Boolean);
+    return input
+      .split(",")
+      .map((x) => Number(x.trim()))
+      .filter((x) => !isNaN(x));
   }
 
   return [];
@@ -262,47 +303,56 @@ export default function MarketPage() {
   const [user, setUser] = useState<User | null>(null);
 
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "premium" | "coin">("all");
+  const [filterType, setFilterType] = useState<
+    "all" | "premium" | "coin"
+  >("all");
 
   const navigate = useNavigate();
 
   /* ================= LOAD ================= */
+  const loadData = async () => {
+    const [carsData, userData] = await Promise.all([
+      safeFetch(`${API}/market/cars`),
+      safeFetch(`${API}/profile/me`),
+    ]);
+
+    const fixedCars: Car[] = Array.isArray(carsData)
+      ? carsData.map((c) => ({
+          ...c,
+          type: c.type || "default",
+        }))
+      : [];
+
+    setCars(fixedCars);
+    setUser(userData || null);
+  };
+
   useEffect(() => {
-    const load = async () => {
-      const [carsData, userData] = await Promise.all([
-        safeFetch(`${API}/market/cars`),
-        safeFetch(`${API}/profile/me`),
-      ]);
-
-      const fixedCars: Car[] = Array.isArray(carsData)
-        ? carsData.map((c) => ({
-            ...c,
-            type: c.type || "default",
-          }))
-        : [];
-
-      setCars(fixedCars);
-      setUser(userData || null);
-    };
-
-    load();
+    loadData();
   }, []);
 
   /* ================= DISCOUNT ================= */
-  const discountCars = parseDiscountCars(user?.promo_cars);
+  const discountCars = parseDiscountCars(user?.discount_cars);
   const discount = Number(user?.discount) || 0;
 
-  const isAllowed = (carId: number) =>
-    discountCars.length === 0 || discountCars.includes(carId);
+  const isAllowed = (carId: number) => {
+    if (discountCars.length === 0) return false;
+    return discountCars.includes(Number(carId));
+  };
 
   const getPrice = (car: Car) => {
     const base = Number(car.price);
 
     if (!discount || !isAllowed(car.id)) {
-      return { old: null, new: base };
+      return {
+        old: null,
+        new: base,
+      };
     }
 
-    const newPrice = Math.floor(base - (base * discount) / 100);
+    const newPrice = Math.floor(
+      base - (base * discount) / 100
+    );
 
     return {
       old: base,
@@ -312,31 +362,27 @@ export default function MarketPage() {
 
   /* ================= FILTER ================= */
   const filteredCars = cars.filter((car) => {
+    const query = search.toLowerCase();
+
     const matchesSearch =
-      car.name.toLowerCase().includes(search.toLowerCase()) ||
-      car.brand.toLowerCase().includes(search.toLowerCase());
+      car.name.toLowerCase().includes(query) ||
+      car.brand.toLowerCase().includes(query);
 
-    let matchesType = true;
-
-    if (filterType !== "all") {
-      matchesType = car.type === filterType;
-    }
+    const matchesType =
+      filterType === "all" || car.type === filterType;
 
     return matchesSearch && matchesType;
   });
 
   return (
     <div className="min-h-screen bg-[#050608] text-white p-6">
-
       {/* HEADER */}
       <div className="flex flex-col gap-4 mb-10">
-
         <h1 className="text-4xl font-bold">
           AUTO <span className="text-yellow-400">MARKET</span>
         </h1>
 
         <div className="flex flex-wrap gap-2">
-
           {/* SEARCH */}
           <input
             value={search}
@@ -378,14 +424,26 @@ export default function MarketPage() {
           >
             Coins
           </button>
-
         </div>
       </div>
 
+      {/* ACTIVE PROMO */}
+      {discount > 0 && discountCars.length > 0 && (
+        <div className="mb-6 p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
+          <div className="text-yellow-400 font-semibold">
+            🔥 Active promo: -{discount}%
+          </div>
+          <div className="text-sm text-gray-300 mt-1">
+            Discount applies only to selected cars.
+          </div>
+        </div>
+      )}
+
       {/* CARS */}
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCars.map((car) => {
           const price = getPrice(car);
+          const discounted = !!price.old;
 
           return (
             <div
@@ -395,6 +453,7 @@ export default function MarketPage() {
             >
               <img
                 src={car.image_url}
+                alt={`${car.brand} ${car.name}`}
                 className="h-40 w-full object-contain"
               />
 
@@ -410,25 +469,25 @@ export default function MarketPage() {
               )}
 
               {car.type === "coin" && (
-                <div className="text-blue-400 text-xs">
+                <div className="text-blue-400 text-xs mt-1">
                   🪙 COIN
                 </div>
               )}
 
               {/* PRICE */}
-              <div className="mt-2">
-                {price.old && (
+              <div className="mt-2 flex items-center gap-2">
+                {discounted && (
                   <span className="line-through text-gray-400">
                     ${price.old}
                   </span>
                 )}
 
-                <span className="text-green-400 ml-2">
+                <span className="text-green-400 font-semibold">
                   ${price.new}
                 </span>
               </div>
 
-              {/* DISCOUNT */}
+              {/* DISCOUNT BADGE */}
               {discount > 0 && isAllowed(car.id) && (
                 <div className="text-yellow-400 text-xs mt-1">
                   🔥 -{discount}%
@@ -438,7 +497,6 @@ export default function MarketPage() {
           );
         })}
       </div>
-
     </div>
   );
 }
