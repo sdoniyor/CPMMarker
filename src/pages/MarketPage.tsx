@@ -262,7 +262,7 @@ type User = {
   discount_cars?: string | number[] | null;
 };
 
-/* ================= FETCH ================= */
+/* ================= SAFE FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
   try {
     const token = localStorage.getItem("token");
@@ -281,18 +281,19 @@ const safeFetch = async (url: string, options: any = {}) => {
   }
 };
 
-/* ================= PARSER ================= */
+/* ================= STRONG PARSER ================= */
 const parseDiscountCars = (input: any): number[] => {
   if (!input) return [];
 
   if (Array.isArray(input)) {
-    return input.map(Number).filter(Boolean);
+    return input.map((x) => Number(x)).filter((x) => !isNaN(x));
   }
 
   if (typeof input === "string") {
     return input
+      .replace(/\s/g, "") // 🔥 remove spaces
       .split(",")
-      .map((x) => Number(x.trim()))
+      .map((x) => Number(x))
       .filter((x) => !isNaN(x));
   }
 
@@ -325,29 +326,35 @@ export default function MarketPage() {
     loadData();
   }, []);
 
-  /* ================= DISCOUNT ================= */
-  const discountCars = parseDiscountCars(user?.discount_cars);
+  /* ================= DEBUG (REMOVE LATER IF YOU WANT) ================= */
+  console.log("USER RAW:", user);
+  console.log("DISCOUNT_CARS RAW:", user?.discount_cars);
+  console.log("PARSED:", parseDiscountCars(user?.discount_cars));
+
+  /* ================= DISCOUNT LOGIC ================= */
   const discount = Number(user?.discount) || 0;
+  const discountCars = parseDiscountCars(user?.discount_cars);
 
   const hasDiscount = discount > 0;
 
   const isAllowed = (carId: number) => {
     if (!hasDiscount) return false;
 
-    // если массив пустой → скидка на ВСЕ машины
-    if (discountCars.length === 0) return true;
+    // 🔥 safe rule:
+    // if list exists → check it
+    if (discountCars.length > 0) {
+      return discountCars.includes(Number(carId));
+    }
 
-    return discountCars.includes(Number(carId));
+    // if list is empty → ALL cars
+    return true;
   };
 
   const getPrice = (car: Car) => {
     const base = Number(car.price);
 
     if (!hasDiscount || !isAllowed(car.id)) {
-      return {
-        old: null,
-        new: base,
-      };
+      return { old: null, new: base };
     }
 
     const newPrice = Math.floor(
@@ -415,9 +422,9 @@ export default function MarketPage() {
           </div>
 
           <div className="text-sm text-gray-300">
-            {discountCars.length === 0
-              ? "Applies to ALL cars"
-              : "Applies only to selected cars"}
+            {discountCars.length > 0
+              ? "Applies only to selected cars"
+              : "Applies to ALL cars"}
           </div>
         </div>
       )}
