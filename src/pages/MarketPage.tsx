@@ -241,7 +241,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -258,11 +257,11 @@ type Car = {
 };
 
 type User = {
-  discount?: number | null;
+  discount?: number;
   discount_cars?: string | number[] | null;
 };
 
-/* ================= SAFE FETCH ================= */
+/* ================= FETCH ================= */
 const safeFetch = async (url: string, options: any = {}) => {
   try {
     const token = localStorage.getItem("token");
@@ -281,19 +280,19 @@ const safeFetch = async (url: string, options: any = {}) => {
   }
 };
 
-/* ================= STRONG PARSER ================= */
+/* ================= PARSER (FIXED) ================= */
 const parseDiscountCars = (input: any): number[] => {
   if (!input) return [];
 
   if (Array.isArray(input)) {
-    return input.map((x) => Number(x)).filter((x) => !isNaN(x));
+    return input.map(Number).filter((x) => !isNaN(x));
   }
 
   if (typeof input === "string") {
     return input
-      .replace(/\s/g, "") // 🔥 remove spaces
+      .replace(/\s/g, "")
       .split(",")
-      .map((x) => Number(x))
+      .map(Number)
       .filter((x) => !isNaN(x));
   }
 
@@ -305,55 +304,44 @@ export default function MarketPage() {
   const [user, setUser] = useState<User | null>(null);
 
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "premium" | "coin">(
-    "all"
-  );
+  const [filterType, setFilterType] = useState<"all" | "premium" | "coin">("all");
 
   const navigate = useNavigate();
 
   /* ================= LOAD ================= */
-  const loadData = async () => {
-    const [carsData, userData] = await Promise.all([
-      safeFetch(`${API}/market/cars`),
-      safeFetch(`${API}/profile/me`),
-    ]);
-
-    setCars(Array.isArray(carsData) ? carsData : []);
-    setUser(userData || null);
-  };
-
   useEffect(() => {
-    loadData();
+    const load = async () => {
+      const [carsData, userData] = await Promise.all([
+        safeFetch(`${API}/market/cars`),
+        safeFetch(`${API}/profile/me`),
+      ]);
+
+      setCars(Array.isArray(carsData) ? carsData : []);
+      setUser(userData || null);
+    };
+
+    load();
   }, []);
 
-  /* ================= DEBUG (REMOVE LATER IF YOU WANT) ================= */
-  console.log("USER RAW:", user);
-  console.log("DISCOUNT_CARS RAW:", user?.discount_cars);
-  console.log("PARSED:", parseDiscountCars(user?.discount_cars));
-
-  /* ================= DISCOUNT LOGIC ================= */
+  /* ================= DISCOUNT ================= */
   const discount = Number(user?.discount) || 0;
   const discountCars = parseDiscountCars(user?.discount_cars);
 
-  const hasDiscount = discount > 0;
-
+  /* 🔥 ВОТ СТАРАЯ ПРАВИЛЬНАЯ ЛОГИКА */
   const isAllowed = (carId: number) => {
-    if (!hasDiscount) return false;
+    if (!discount) return false;
 
-    // 🔥 safe rule:
-    // if list exists → check it
-    if (discountCars.length > 0) {
-      return discountCars.includes(Number(carId));
-    }
+    // если список пустой → скидка на ВСЕ машины
+    if (discountCars.length === 0) return true;
 
-    // if list is empty → ALL cars
-    return true;
+    // иначе только выбранные
+    return discountCars.includes(Number(carId));
   };
 
   const getPrice = (car: Car) => {
     const base = Number(car.price);
 
-    if (!hasDiscount || !isAllowed(car.id)) {
+    if (!discount || !isAllowed(car.id)) {
       return { old: null, new: base };
     }
 
@@ -414,23 +402,8 @@ export default function MarketPage() {
         </div>
       </div>
 
-      {/* ACTIVE DISCOUNT */}
-      {hasDiscount && (
-        <div className="mb-6 p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
-          <div className="text-yellow-400 font-bold">
-            🔥 Active discount: -{discount}%
-          </div>
-
-          <div className="text-sm text-gray-300">
-            {discountCars.length > 0
-              ? "Applies only to selected cars"
-              : "Applies to ALL cars"}
-          </div>
-        </div>
-      )}
-
       {/* CARS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filteredCars.map((car) => {
           const price = getPrice(car);
 
@@ -456,24 +429,24 @@ export default function MarketPage() {
               )}
 
               {car.type === "coin" && (
-                <div className="text-blue-400 text-xs mt-1">
+                <div className="text-blue-400 text-xs">
                   🪙 COIN
                 </div>
               )}
 
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2">
                 {price.old && (
                   <span className="line-through text-gray-400">
                     ${price.old}
                   </span>
                 )}
 
-                <span className="text-green-400 font-bold">
+                <span className="text-green-400 ml-2">
                   ${price.new}
                 </span>
               </div>
 
-              {hasDiscount && isAllowed(car.id) && (
+              {discount > 0 && isAllowed(car.id) && (
                 <div className="text-yellow-400 text-xs mt-1">
                   🔥 -{discount}%
                 </div>
