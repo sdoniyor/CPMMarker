@@ -241,6 +241,7 @@
 
 
 
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -303,9 +304,9 @@ export default function MarketPage() {
   const [user, setUser] = useState<User | null>(null);
 
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<
-    "all" | "premium" | "coin"
-  >("all");
+  const [filterType, setFilterType] = useState<"all" | "premium" | "coin">(
+    "all"
+  );
 
   const navigate = useNavigate();
 
@@ -316,14 +317,7 @@ export default function MarketPage() {
       safeFetch(`${API}/profile/me`),
     ]);
 
-    const fixedCars: Car[] = Array.isArray(carsData)
-      ? carsData.map((c) => ({
-          ...c,
-          type: c.type || "default",
-        }))
-      : [];
-
-    setCars(fixedCars);
+    setCars(Array.isArray(carsData) ? carsData : []);
     setUser(userData || null);
   };
 
@@ -336,7 +330,11 @@ export default function MarketPage() {
   const discount = Number(user?.discount) || 0;
 
   const isAllowed = (carId: number) => {
-    if (discountCars.length === 0) return false;
+    if (!discount) return false;
+
+    // если список пустой → скидка на ВСЕ машины
+    if (discountCars.length === 0) return true;
+
     return discountCars.includes(Number(carId));
   };
 
@@ -362,11 +360,11 @@ export default function MarketPage() {
 
   /* ================= FILTER ================= */
   const filteredCars = cars.filter((car) => {
-    const query = search.toLowerCase();
+    const q = search.toLowerCase();
 
     const matchesSearch =
-      car.name.toLowerCase().includes(query) ||
-      car.brand.toLowerCase().includes(query);
+      car.name.toLowerCase().includes(q) ||
+      car.brand.toLowerCase().includes(q);
 
     const matchesType =
       filterType === "all" || car.type === filterType;
@@ -382,59 +380,41 @@ export default function MarketPage() {
           AUTO <span className="text-yellow-400">MARKET</span>
         </h1>
 
-        <div className="flex flex-wrap gap-2">
-          {/* SEARCH */}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search car..."
-            className="px-3 py-2 bg-black/40 border rounded"
-          />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search car..."
+          className="px-3 py-2 bg-black/40 border rounded"
+        />
 
-          {/* FILTER */}
-          <button
-            onClick={() => setFilterType("all")}
-            className={`px-3 py-2 rounded ${
-              filterType === "all"
-                ? "bg-yellow-400 text-black"
-                : "bg-black/40"
-            }`}
-          >
-            All
-          </button>
-
-          <button
-            onClick={() => setFilterType("premium")}
-            className={`px-3 py-2 rounded ${
-              filterType === "premium"
-                ? "bg-yellow-400 text-black"
-                : "bg-black/40"
-            }`}
-          >
-            Premium
-          </button>
-
-          <button
-            onClick={() => setFilterType("coin")}
-            className={`px-3 py-2 rounded ${
-              filterType === "coin"
-                ? "bg-yellow-400 text-black"
-                : "bg-black/40"
-            }`}
-          >
-            Coins
-          </button>
+        <div className="flex gap-2">
+          {["all", "premium", "coin"].map((t: any) => (
+            <button
+              key={t}
+              onClick={() => setFilterType(t)}
+              className={`px-3 py-2 rounded ${
+                filterType === t
+                  ? "bg-yellow-400 text-black"
+                  : "bg-black/40"
+              }`}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* ACTIVE PROMO */}
-      {discount > 0 && discountCars.length > 0 && (
+      {discount > 0 && (
         <div className="mb-6 p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
-          <div className="text-yellow-400 font-semibold">
-            🔥 Active promo: -{discount}%
+          <div className="text-yellow-400 font-bold">
+            🔥 Active discount: -{discount}%
           </div>
-          <div className="text-sm text-gray-300 mt-1">
-            Discount applies only to selected cars.
+
+          <div className="text-sm text-gray-300">
+            {discountCars.length === 0
+              ? "Applies to all cars"
+              : "Applies only to selected cars"}
           </div>
         </div>
       )}
@@ -443,7 +423,6 @@ export default function MarketPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCars.map((car) => {
           const price = getPrice(car);
-          const discounted = !!price.old;
 
           return (
             <div
@@ -453,7 +432,6 @@ export default function MarketPage() {
             >
               <img
                 src={car.image_url}
-                alt={`${car.brand} ${car.name}`}
                 className="h-40 w-full object-contain"
               />
 
@@ -476,13 +454,13 @@ export default function MarketPage() {
 
               {/* PRICE */}
               <div className="mt-2 flex items-center gap-2">
-                {discounted && (
+                {price.old && (
                   <span className="line-through text-gray-400">
                     ${price.old}
                   </span>
                 )}
 
-                <span className="text-green-400 font-semibold">
+                <span className="text-green-400 font-bold">
                   ${price.new}
                 </span>
               </div>
