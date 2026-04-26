@@ -329,11 +329,19 @@ export default function MarketPage() {
   const discountCars = parseDiscountCars(user?.discount_cars);
   const discount = Number(user?.discount) || 0;
 
-  const isAllowed = (carId: number) => {
-    if (!discount) return false;
+  /* ================= FIXED LOGIC ================= */
+  const hasDiscount = discount > 0;
 
-    // если список пустой → скидка на ВСЕ машины
-    if (discountCars.length === 0) return true;
+  // ❗ ВАЖНО: теперь пустой массив НЕ значит "все машины"
+  const isGlobalDiscount = false; 
+  // ↑ если хочешь "скидка на все машины", ставь true
+
+  const isAllowed = (carId: number) => {
+    if (!hasDiscount) return false;
+
+    if (isGlobalDiscount) return true;
+
+    if (discountCars.length === 0) return false;
 
     return discountCars.includes(Number(carId));
   };
@@ -341,7 +349,7 @@ export default function MarketPage() {
   const getPrice = (car: Car) => {
     const base = Number(car.price);
 
-    if (!discount || !isAllowed(car.id)) {
+    if (!hasDiscount || !isAllowed(car.id)) {
       return {
         old: null,
         new: base,
@@ -374,6 +382,7 @@ export default function MarketPage() {
 
   return (
     <div className="min-h-screen bg-[#050608] text-white p-6">
+
       {/* HEADER */}
       <div className="flex flex-col gap-4 mb-10">
         <h1 className="text-4xl font-bold">
@@ -405,15 +414,17 @@ export default function MarketPage() {
       </div>
 
       {/* ACTIVE PROMO */}
-      {discount > 0 && (
+      {hasDiscount && (
         <div className="mb-6 p-4 rounded bg-yellow-500/10 border border-yellow-500/30">
           <div className="text-yellow-400 font-bold">
             🔥 Active discount: -{discount}%
           </div>
 
           <div className="text-sm text-gray-300">
-            {discountCars.length === 0
-              ? "Applies to all cars"
+            {isGlobalDiscount
+              ? "Applies to ALL cars"
+              : discountCars.length === 0
+              ? "No cars selected (discount inactive)"
               : "Applies only to selected cars"}
           </div>
         </div>
@@ -439,7 +450,6 @@ export default function MarketPage() {
                 {car.brand} {car.name}
               </h2>
 
-              {/* TAGS */}
               {car.type === "premium" && (
                 <div className="text-yellow-400 text-xs mt-1">
                   ⭐ PREMIUM
@@ -452,7 +462,6 @@ export default function MarketPage() {
                 </div>
               )}
 
-              {/* PRICE */}
               <div className="mt-2 flex items-center gap-2">
                 {price.old && (
                   <span className="line-through text-gray-400">
@@ -465,8 +474,7 @@ export default function MarketPage() {
                 </span>
               </div>
 
-              {/* DISCOUNT BADGE */}
-              {discount > 0 && isAllowed(car.id) && (
+              {hasDiscount && isAllowed(car.id) && (
                 <div className="text-yellow-400 text-xs mt-1">
                   🔥 -{discount}%
                 </div>
