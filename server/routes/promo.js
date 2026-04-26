@@ -294,7 +294,5 @@ router.post("/redeem", auth, async (req, res) => {
   }
 });
 
-module.exports = {
-  router,
-  consumeUserPromo,
-};
+module.exports = router;
+module.exports.consumeUserPromo = consumeUserPromo;
