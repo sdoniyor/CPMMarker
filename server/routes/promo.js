@@ -258,10 +258,20 @@ router.post("/redeem", auth, async (req, res) => {
 });
 
 /* ================= 💥 BUY (ВАЖНО) ================= */
+
+
 router.post("/buy", auth, async (req, res) => {
   try {
     const userId = req.userId;
     const { carId } = req.body;
+
+     // 👇 ВОТ СЮДА СРАЗУ
+    console.log("🔥 BUY REQUEST:", {
+      userId,
+      carId,
+      body: req.body
+    });
+
 
     // пример покупки
     await q(
@@ -271,7 +281,17 @@ router.post("/buy", auth, async (req, res) => {
     );
 
     // 🔥 сжигаем промо после покупки
-    await consumeUserPromo(userId, carId);
+    const consumeUserPromo = async (userId, carId) => {
+  try {
+    console.log("🧠 consumeUserPromo CALLED:", {
+      userId,
+      carId
+    });
+
+    if (!carId) {
+      console.log("❌ carId is missing → STOP");
+      return;
+    }
 
     return res.json({
       success: true,
