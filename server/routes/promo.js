@@ -133,6 +133,13 @@ const isExpired = (promo) => {
 /* ================= 🔥 CONSUME PROMO ================= */
 const consumeUserPromo = async (userId, carId) => {
   try {
+    console.log("🧠 consumeUserPromo START:", { userId, carId });
+
+    if (!carId) {
+      console.log("❌ carId missing → STOP");
+      return;
+    }
+
     const userRes = await q(
       `SELECT discount, discount_cars
        FROM users
@@ -141,16 +148,23 @@ const consumeUserPromo = async (userId, carId) => {
     );
 
     const user = userRes.rows[0];
-    if (!user || !user.discount) return;
 
-    const allowedCars = parseCarIds(user.discount_cars);
-
-    // если список НЕ пустой и машина не входит — не сжигаем
-    if (allowedCars.length > 0 && !allowedCars.includes(Number(carId))) {
+    if (!user || !user.discount) {
+      console.log("ℹ️ no active discount");
       return;
     }
 
-    // сжигаем активный промо
+    const allowedCars = parseCarIds(user.discount_cars);
+
+    console.log("📦 allowedCars:", allowedCars);
+
+    if (allowedCars.length > 0 && !allowedCars.includes(Number(carId))) {
+      console.log("🚫 car not in promo list → skip");
+      return;
+    }
+
+    console.log("🔥 REMOVING PROMO");
+
     await q(
       `UPDATE user_promos
        SET consumed=true
@@ -158,7 +172,6 @@ const consumeUserPromo = async (userId, carId) => {
       [userId]
     );
 
-    // очищаем пользователя
     await q(
       `UPDATE users
        SET discount=NULL,
@@ -167,8 +180,10 @@ const consumeUserPromo = async (userId, carId) => {
       [userId]
     );
 
+    console.log("✅ PROMO REMOVED");
+
   } catch (e) {
-    console.log("CONSUME PROMO ERROR:", e);
+    console.log("❌ CONSUME ERROR:", e);
   }
 };
 
@@ -177,6 +192,8 @@ router.post("/redeem", auth, async (req, res) => {
   try {
     const { code } = req.body;
     const userId = req.userId;
+
+    console.log("🔥 REDEEM:", { userId, code });
 
     if (!code) {
       return res.status(400).json({ error: "No code provided" });
@@ -257,45 +274,27 @@ router.post("/redeem", auth, async (req, res) => {
   }
 });
 
-/* ================= 💥 BUY (ВАЖНО) ================= */
-
-
+/* ================= 💥 BUY ================= */
 router.post("/buy", auth, async (req, res) => {
   try {
     const userId = req.userId;
     const { carId } = req.body;
 
-     // 👇 ВОТ СЮДА СРАЗУ
-    console.log("🔥 BUY REQUEST:", {
-      userId,
-      carId,
-      body: req.body
-    });
+    console.log("🛒 BUY REQUEST:", { userId, carId });
 
+    if (!carId) {
+      return res.status(400).json({ error: "carId missing" });
+    }
 
-    // пример покупки
     await q(
       `INSERT INTO user_cars (user_id, car_id)
        VALUES ($1,$2)`,
       [userId, carId]
     );
 
-    // 🔥 сжигаем промо после покупки
-    const consumeUserPromo = async (userId, carId) => {
-  try {
-    console.log("🧠 consumeUserPromo CALLED:", {
-      userId,
-      carId
-    });
+    await consumeUserPromo(userId, carId);
 
-    if (!carId) {
-      console.log("❌ carId is missing → STOP");
-      return;
-    }
-
-    return res.json({
-      success: true,
-    });
+    return res.json({ success: true });
 
   } catch (e) {
     console.log("BUY ERROR:", e);
