@@ -517,7 +517,7 @@ export default function CarDetail() {
       const token = localStorage.getItem("token");
 
       // 1. BUY (сжигает промо)
-      const buyRes = await fetch(`${API}/buy`, {
+      const buyRes = await fetch(`${API}/promo/buy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
