@@ -288,8 +288,8 @@ const isAllowedFixed = (
 ) => {
   if (!discount) return false;
 
-  // пустой список = скидка на все машины
-  if (discountCars.length === 0) return true;
+  // если список пустой — скидка не работает
+  if (discountCars.length === 0) return false;
 
   return discountCars.includes(Number(carId));
 };

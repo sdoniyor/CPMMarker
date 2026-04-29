@@ -419,8 +419,9 @@ export default function CarDetail() {
   const discountCars = parseDiscountCars(user?.discount_cars);
   const userDiscount = Number(user?.discount) || 0;
 
-  const isCarAllowed =
-    discountCars.length === 0 || discountCars.includes(Number(id));
+const isCarAllowed =
+  discountCars.length > 0 &&
+  discountCars.includes(Number(id));
 
   const finalDiscountPercent = isCarAllowed ? userDiscount : 0;
 
