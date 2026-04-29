@@ -240,6 +240,7 @@ type Car = {
 type User = {
   discount?: number;
   discount_cars?: string | number[] | null;
+   promo_cars?: string | number[] | null;
 };
 
 /* ================= FETCH ================= */
@@ -324,7 +325,9 @@ export default function MarketPage() {
   const discount = Number(user?.discount) || 0;
 
   // 🔥 FIXED FIELD
-  const discountCars = parseDiscountCars(user?.discount_cars);
+ const discountCars = parseDiscountCars(
+  user?.discount_cars || user?.promo_cars
+);
 
   const isAllowed = (carId: number) =>
     isAllowedFixed(carId, discount, discountCars);

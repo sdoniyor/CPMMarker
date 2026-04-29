@@ -320,6 +320,7 @@ type User = {
   email?: string;
   discount?: number;
   discount_cars?: string | number[] | null;
+   promo_cars?: string | number[] | null;
   telegram_username?: string;
   telegram_id?: string;
 };
@@ -416,7 +417,9 @@ export default function CarDetail() {
   };
 
   /* 🔥 FIXED */
-  const discountCars = parseDiscountCars(user?.discount_cars);
+  const discountCars = parseDiscountCars(
+  user?.discount_cars || user?.promo_cars
+);
   const userDiscount = Number(user?.discount) || 0;
 
 const isCarAllowed =
