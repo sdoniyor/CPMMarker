@@ -229,8 +229,6 @@ const isExpired = (promo) => {
 /* ================= CONSUME PROMO ================= */
 const consumeUserPromo = async (userId, carId) => {
   try {
-    if (!carId) return;
-
     const userRes = await q(
       `SELECT discount, promo_cars
        FROM users
@@ -244,11 +242,14 @@ const consumeUserPromo = async (userId, carId) => {
 
     const allowedCars = parseCarIds(user.promo_cars);
 
-    if (allowedCars.length > 0 && !allowedCars.includes(Number(carId))) {
-      return;
-    }
+    // ❗ если есть ограничение — проверяем
+    const isAllowed =
+      allowedCars.length === 0 ||
+      allowedCars.includes(Number(carId));
 
-    /* mark promo as used */
+    if (!isAllowed) return;
+
+    // 🔥 ВСЕГДА СЖИГАЕМ ПРОМО
     await q(
       `UPDATE user_promos
        SET consumed=true
@@ -256,7 +257,6 @@ const consumeUserPromo = async (userId, carId) => {
       [userId]
     );
 
-    /* clear promo */
     await q(
       `UPDATE users
        SET discount=NULL,
@@ -264,6 +264,8 @@ const consumeUserPromo = async (userId, carId) => {
        WHERE id=$1`,
       [userId]
     );
+
+    console.log("🔥 PROMO CONSUMED");
 
   } catch (e) {
     console.log("CONSUME ERROR:", e);
