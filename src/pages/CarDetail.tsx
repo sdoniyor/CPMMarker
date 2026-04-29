@@ -669,7 +669,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -787,18 +786,19 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= DISCOUNT ================= */
+  /* ================= DISCOUNT LOGIC ================= */
   const discount = Number(user?.discount) || 0;
 
   const discountCars = parseCarIds(
     user?.discount_cars || user?.promo_cars
   );
 
-  // ✔ FIX: empty = NO DISCOUNT
+  // 🔥 FIX: empty = discount for ALL cars
+  const hasRestriction = discountCars.length > 0;
+
   const isCarAllowed =
     discount > 0 &&
-    discountCars.length > 0 &&
-    discountCars.includes(Number(id));
+    (!hasRestriction || discountCars.includes(Number(id)));
 
   const finalDiscount = isCarAllowed ? discount : 0;
 
@@ -839,16 +839,14 @@ export default function CarDetail() {
 
       const token = localStorage.getItem("token");
 
-      // 1. BUY + CONSUME PROMO
+      // 1. BUY (consume promo)
       const buyRes = await fetch(`${API}/promo/buy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({
-          carId: car.id,
-        }),
+        body: JSON.stringify({ carId: car.id }),
       });
 
       const buyData = await buyRes.json();
@@ -857,7 +855,7 @@ export default function CarDetail() {
         throw new Error("BUY FAILED");
       }
 
-      // 2. refresh user (ВАЖНО)
+      // 2. refresh user (IMPORTANT FIX)
       const userRes = await fetch(`${API}/profile/me`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -884,6 +882,7 @@ export default function CarDetail() {
 
       alert("ORDER SENT");
       navigate("/market");
+
     } catch (e) {
       console.log("ORDER ERROR:", e);
       alert("ERROR");
