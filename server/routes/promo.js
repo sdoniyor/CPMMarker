@@ -222,25 +222,8 @@ const parseCarIds = (car_ids) => {
 };
 
 /* ================= CONSUME PROMO ================= */
-const consumeUserPromo = async (userId, carId) => {
+const consumeUserPromo = async (userId) => {
   try {
-    const userRes = await q(
-      `SELECT discount, promo_cars FROM users WHERE id=$1`,
-      [userId]
-    );
-
-    const user = userRes.rows[0];
-    if (!user || !user.discount) return;
-
-    const allowedCars = parseCarIds(user.promo_cars);
-
-    const isAllowed =
-      allowedCars.length === 0 ||
-      allowedCars.includes(Number(carId));
-
-    if (!isAllowed) return;
-
-    // 🔥 delete promo usage
     await q(
       `UPDATE user_promos
        SET consumed=true
@@ -248,7 +231,6 @@ const consumeUserPromo = async (userId, carId) => {
       [userId]
     );
 
-    // 🔥 remove discount from user
     await q(
       `UPDATE users
        SET discount=NULL,
@@ -258,7 +240,6 @@ const consumeUserPromo = async (userId, carId) => {
     );
 
     console.log("🔥 PROMO CONSUMED");
-
   } catch (e) {
     console.log("CONSUME ERROR:", e);
   }
@@ -280,9 +261,19 @@ router.post("/buy", auth, async (req, res) => {
       [userId, carId]
     );
 
+    // 🔥 сжигаем промо
     await consumeUserPromo(userId, carId);
 
-    return res.json({ success: true });
+    // 🔥 ВАЖНО: вернуть обновлённого пользователя
+    const userRes = await q(
+      `SELECT id, discount, promo_cars FROM users WHERE id=$1`,
+      [userId]
+    );
+
+    return res.json({
+      success: true,
+      user: userRes.rows[0],
+    });
 
   } catch (e) {
     console.log("BUY ERROR:", e);

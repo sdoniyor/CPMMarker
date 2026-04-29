@@ -517,16 +517,26 @@ export default function CarDetail() {
       const token = localStorage.getItem("token");
 
       const buyRes = await fetch(`${API}/promo/buy`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          carId: car.id,
-        }),
-      });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: token ? `Bearer ${token}` : "",
+  },
+  body: JSON.stringify({
+    carId: car.id,
+  }),
+});
 
+const data = await buyRes.json();
+
+if (!data.success) {
+  throw new Error("BUY FAILED");
+}
+
+// 🔥 ОБНОВЛЯЕМ USER СРАЗУ
+if (data.user) {
+  setUser(data.user);
+}
       const buyData = await buyRes.json();
 
       if (!buyData.success) {
