@@ -25,7 +25,8 @@
 //   name: string;
 //   email?: string;
 //   discount?: number;
-//   promo_cars?: string | number[] | null;
+//   discount_cars?: string | number[] | null;
+//    promo_cars?: string | number[] | null;
 //   telegram_username?: string;
 //   telegram_id?: string;
 // };
@@ -84,19 +85,17 @@
 //         setCar(foundCar || null);
 //         setUser(userData || null);
 
-//         /* ✅ FIX CONFIGS */
 //         setConfigs({
 //           power: Array.isArray(configsData?.power) ? configsData.power : [],
 //           tuning: Array.isArray(configsData?.tuning) ? configsData.tuning : [],
 //           wheels: Array.isArray(configsData?.wheels) ? configsData.wheels : [],
 //         });
 
-//         /* ✅ DEFAULT SELECTION */
 //         setSelectedHp(configsData?.power?.[0] || null);
 //         setSelectedTuning(configsData?.tuning?.[0] || null);
 //         setSelectedWheels(configsData?.wheels?.[0] || null);
 //       } catch (e) {
-//         console.log("LOAD ERROR", e);
+//         console.log("LOAD ERROR:", e);
 //       } finally {
 //         setLoading(false);
 //       }
@@ -105,12 +104,15 @@
 //     load();
 //   }, [id]);
 
-//   /* ================= DISCOUNT FIX ================= */
+//   /* ================= PARSE DISCOUNT CARS ================= */
 //   const parseDiscountCars = (input: any): number[] => {
 //     if (!input) return [];
 
 //     if (typeof input === "string") {
-//       return input.split(",").map(Number).filter(Boolean);
+//       return input
+//         .split(",")
+//         .map(Number)
+//         .filter(Boolean);
 //     }
 
 //     if (Array.isArray(input)) {
@@ -120,12 +122,15 @@
 //     return [];
 //   };
 
-//   const discountCars = parseDiscountCars(user?.promo_cars);
-
+//   /* 🔥 FIXED */
+//   const discountCars = parseDiscountCars(
+//   user?.discount_cars || user?.promo_cars
+// );
 //   const userDiscount = Number(user?.discount) || 0;
 
-//   const isCarAllowed =
-//     discountCars.length === 0 || discountCars.includes(Number(id));
+// const isCarAllowed =
+//   discountCars.length > 0 &&
+//   discountCars.includes(Number(id));
 
 //   const finalDiscountPercent = isCarAllowed ? userDiscount : 0;
 
@@ -162,8 +167,10 @@
 
 //     try {
 //       setSending(true);
+
 //       const token = localStorage.getItem("token");
 
+//       /* 1) отправка заказа */
 //       await fetch(`${API}/telegram/order-to-tg`, {
 //         method: "POST",
 //         headers: {
@@ -178,9 +185,22 @@
 //         }),
 //       });
 
+//       /* 2) покупка + consume promo */
+//       await fetch(`${API}/promo/buy`, {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: token ? `Bearer ${token}` : "",
+//         },
+//         body: JSON.stringify({
+//           carId: car.id,
+//         }),
+//       });
+
 //       alert("ORDER SENT");
 //       navigate("/market");
-//     } catch {
+//     } catch (e) {
+//       console.log("ORDER ERROR:", e);
 //       alert("ERROR");
 //     } finally {
 //       setSending(false);
@@ -188,19 +208,21 @@
 //   };
 
 //   /* ================= UI ================= */
-//   if (loading)
+//   if (loading) {
 //     return (
 //       <div className="min-h-screen flex items-center justify-center text-white">
 //         LOADING...
 //       </div>
 //     );
+//   }
 
-//   if (!car)
+//   if (!car) {
 //     return (
 //       <div className="min-h-screen flex items-center justify-center text-red-500">
 //         CAR NOT FOUND
 //       </div>
 //     );
+//   }
 
 //   return (
 //     <div className="min-h-screen bg-black text-white">
@@ -211,13 +233,24 @@
 //           {car.brand} {car.name}
 //         </h1>
 
-//         <img src={car.image_url} className="w-full mt-4 rounded-2xl" />
+//         <img
+//           src={car.image_url}
+//           alt={car.name}
+//           className="w-full mt-4 rounded-2xl"
+//         />
 
 //         <div className="mt-6 text-2xl font-bold">
 //           {finalDiscountPercent > 0 && (
 //             <div className="line-through text-white/40">${basePrice}</div>
 //           )}
+
 //           <div className="text-yellow-400">${totalPrice}</div>
+
+//           {finalDiscountPercent > 0 && (
+//             <div className="text-green-400 text-sm mt-2">
+//               🔥 Promo applied: -{finalDiscountPercent}%
+//             </div>
+//           )}
 //         </div>
 
 //         <button
@@ -233,7 +266,11 @@
 //             <button
 //               key={i.id}
 //               onClick={() => setSelectedHp(i)}
-//               className="p-3 bg-white/10 rounded-xl"
+//               className={`p-3 rounded-xl ${
+//                 selectedHp?.id === i.id
+//                   ? "bg-yellow-400 text-black"
+//                   : "bg-white/10"
+//               }`}
 //             >
 //               {i.name}
 //             </button>
@@ -243,7 +280,11 @@
 //             <button
 //               key={i.id}
 //               onClick={() => setSelectedTuning(i)}
-//               className="p-3 bg-white/10 rounded-xl"
+//               className={`p-3 rounded-xl ${
+//                 selectedTuning?.id === i.id
+//                   ? "bg-yellow-400 text-black"
+//                   : "bg-white/10"
+//               }`}
 //             >
 //               {i.name}
 //             </button>
@@ -253,7 +294,11 @@
 //             <button
 //               key={i.id}
 //               onClick={() => setSelectedWheels(i)}
-//               className="p-3 bg-white/10 rounded-xl"
+//               className={`p-3 rounded-xl ${
+//                 selectedWheels?.id === i.id
+//                   ? "bg-yellow-400 text-black"
+//                   : "bg-white/10"
+//               }`}
 //             >
 //               {i.name}
 //             </button>
@@ -263,20 +308,26 @@
 
 //       {/* MODAL */}
 //       {showPay && (
-//         <div className="fixed inset-0 bg-black/90 flex items-center justify-center">
+//         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
 //           <div className="bg-[#111] p-6 rounded-2xl w-[400px]">
-//             <h2 className="text-yellow-400 mb-4">ORDER</h2>
+//             <h2 className="text-yellow-400 mb-4 text-xl font-bold">ORDER</h2>
 
 //             {selectedConfigs.map((c, i) => (
-//               <div key={i}>{c}</div>
+//               <div key={i} className="mb-2">
+//                 {c}
+//               </div>
 //             ))}
+
+//             <div className="mt-4 font-bold text-green-400">
+//               TOTAL: ${totalPrice}
+//             </div>
 
 //             <button
 //               onClick={sendToTelegram}
 //               disabled={sending}
-//               className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl font-black"
+//               className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl font-black disabled:opacity-50"
 //             >
-//               CONFIRM
+//               {sending ? "SENDING..." : "CONFIRM"}
 //             </button>
 
 //             <button
@@ -291,6 +342,9 @@
 //     </div>
 //   );
 // }
+
+
+
 
 
 import { useEffect, useState } from "react";
@@ -320,9 +374,22 @@ type User = {
   email?: string;
   discount?: number;
   discount_cars?: string | number[] | null;
-   promo_cars?: string | number[] | null;
-  telegram_username?: string;
-  telegram_id?: string;
+  promo_cars?: string | number[] | null;
+};
+
+/* ================= HELPERS ================= */
+const parseCarIds = (input: any): number[] => {
+  if (!input) return [];
+
+  if (Array.isArray(input)) {
+    return input.map(Number).filter(Boolean);
+  }
+
+  if (typeof input === "string") {
+    return input.split(",").map(Number).filter(Boolean);
+  }
+
+  return [];
 };
 
 export default function CarDetail() {
@@ -380,14 +447,15 @@ export default function CarDetail() {
         setUser(userData || null);
 
         setConfigs({
-          power: Array.isArray(configsData?.power) ? configsData.power : [],
-          tuning: Array.isArray(configsData?.tuning) ? configsData.tuning : [],
-          wheels: Array.isArray(configsData?.wheels) ? configsData.wheels : [],
+          power: configsData?.power || [],
+          tuning: configsData?.tuning || [],
+          wheels: configsData?.wheels || [],
         });
 
         setSelectedHp(configsData?.power?.[0] || null);
         setSelectedTuning(configsData?.tuning?.[0] || null);
         setSelectedWheels(configsData?.wheels?.[0] || null);
+
       } catch (e) {
         console.log("LOAD ERROR:", e);
       } finally {
@@ -398,50 +466,33 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= PARSE DISCOUNT CARS ================= */
-  const parseDiscountCars = (input: any): number[] => {
-    if (!input) return [];
+  /* ================= DISCOUNT ================= */
+  const discountCars = parseCarIds(
+    user?.discount_cars || user?.promo_cars
+  );
 
-    if (typeof input === "string") {
-      return input
-        .split(",")
-        .map(Number)
-        .filter(Boolean);
-    }
+  const discount = Number(user?.discount) || 0;
 
-    if (Array.isArray(input)) {
-      return input.map(Number).filter(Boolean);
-    }
+  const isCarAllowed =
+    discountCars.length === 0 ||
+    discountCars.includes(Number(id));
 
-    return [];
-  };
-
-  /* 🔥 FIXED */
-  const discountCars = parseDiscountCars(
-  user?.discount_cars || user?.promo_cars
-);
-  const userDiscount = Number(user?.discount) || 0;
-
-const isCarAllowed =
-  discountCars.length > 0 &&
-  discountCars.includes(Number(id));
-
-  const finalDiscountPercent = isCarAllowed ? userDiscount : 0;
+  const finalDiscount = isCarAllowed ? discount : 0;
 
   /* ================= PRICE ================= */
   const basePrice = Number(car?.price) || 0;
 
   const configPrice =
-    (Number(selectedHp?.price) || 0) +
-    (Number(selectedTuning?.price) || 0) +
-    (Number(selectedWheels?.price) || 0);
+    (selectedHp?.price || 0) +
+    (selectedTuning?.price || 0) +
+    (selectedWheels?.price || 0);
 
-  const discountedBasePrice =
-    finalDiscountPercent > 0
-      ? Math.floor(basePrice - (basePrice * finalDiscountPercent) / 100)
+  const finalBasePrice =
+    finalDiscount > 0
+      ? Math.floor(basePrice - (basePrice * finalDiscount) / 100)
       : basePrice;
 
-  const totalPrice = discountedBasePrice + configPrice;
+  const totalPrice = finalBasePrice + configPrice;
 
   /* ================= ORDER ================= */
   const handleOpenPay = () => {
@@ -456,6 +507,7 @@ const isCarAllowed =
     `Password: ${randomPass}`,
   ];
 
+  /* ================= BUY ================= */
   const sendToTelegram = async () => {
     if (!car || !user) return;
 
@@ -464,7 +516,25 @@ const isCarAllowed =
 
       const token = localStorage.getItem("token");
 
-      /* 1) отправка заказа */
+      // 1. BUY (сжигает промо)
+      const buyRes = await fetch(`${API}/buy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          carId: car.id,
+        }),
+      });
+
+      const buyData = await buyRes.json();
+
+      if (!buyData.success) {
+        throw new Error("BUY FAILED");
+      }
+
+      // 2. TELEGRAM
       await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
         headers: {
@@ -479,20 +549,9 @@ const isCarAllowed =
         }),
       });
 
-      /* 2) покупка + consume promo */
-      await fetch(`${API}/promo/buy`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          carId: car.id,
-        }),
-      });
-
       alert("ORDER SENT");
       navigate("/market");
+
     } catch (e) {
       console.log("ORDER ERROR:", e);
       alert("ERROR");
@@ -527,22 +586,18 @@ const isCarAllowed =
           {car.brand} {car.name}
         </h1>
 
-        <img
-          src={car.image_url}
-          alt={car.name}
-          className="w-full mt-4 rounded-2xl"
-        />
+        <img src={car.image_url} className="w-full mt-4 rounded-2xl" />
 
         <div className="mt-6 text-2xl font-bold">
-          {finalDiscountPercent > 0 && (
+          {finalDiscount > 0 && (
             <div className="line-through text-white/40">${basePrice}</div>
           )}
 
           <div className="text-yellow-400">${totalPrice}</div>
 
-          {finalDiscountPercent > 0 && (
+          {finalDiscount > 0 && (
             <div className="text-green-400 text-sm mt-2">
-              🔥 Promo applied: -{finalDiscountPercent}%
+              🔥 -{finalDiscount}%
             </div>
           )}
         </div>
@@ -560,11 +615,7 @@ const isCarAllowed =
             <button
               key={i.id}
               onClick={() => setSelectedHp(i)}
-              className={`p-3 rounded-xl ${
-                selectedHp?.id === i.id
-                  ? "bg-yellow-400 text-black"
-                  : "bg-white/10"
-              }`}
+              className="p-3 bg-white/10 rounded-xl"
             >
               {i.name}
             </button>
@@ -574,11 +625,7 @@ const isCarAllowed =
             <button
               key={i.id}
               onClick={() => setSelectedTuning(i)}
-              className={`p-3 rounded-xl ${
-                selectedTuning?.id === i.id
-                  ? "bg-yellow-400 text-black"
-                  : "bg-white/10"
-              }`}
+              className="p-3 bg-white/10 rounded-xl"
             >
               {i.name}
             </button>
@@ -588,11 +635,7 @@ const isCarAllowed =
             <button
               key={i.id}
               onClick={() => setSelectedWheels(i)}
-              className={`p-3 rounded-xl ${
-                selectedWheels?.id === i.id
-                  ? "bg-yellow-400 text-black"
-                  : "bg-white/10"
-              }`}
+              className="p-3 bg-white/10 rounded-xl"
             >
               {i.name}
             </button>
@@ -602,14 +645,12 @@ const isCarAllowed =
 
       {/* MODAL */}
       {showPay && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center">
           <div className="bg-[#111] p-6 rounded-2xl w-[400px]">
-            <h2 className="text-yellow-400 mb-4 text-xl font-bold">ORDER</h2>
+            <h2 className="text-yellow-400 mb-4">ORDER</h2>
 
             {selectedConfigs.map((c, i) => (
-              <div key={i} className="mb-2">
-                {c}
-              </div>
+              <div key={i}>{c}</div>
             ))}
 
             <div className="mt-4 font-bold text-green-400">
@@ -619,7 +660,7 @@ const isCarAllowed =
             <button
               onClick={sendToTelegram}
               disabled={sending}
-              className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl font-black disabled:opacity-50"
+              className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl font-black"
             >
               {sending ? "SENDING..." : "CONFIRM"}
             </button>
