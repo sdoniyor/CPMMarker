@@ -346,7 +346,6 @@
 
 
 
-
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -455,7 +454,6 @@ export default function CarDetail() {
         setSelectedHp(configsData?.power?.[0] || null);
         setSelectedTuning(configsData?.tuning?.[0] || null);
         setSelectedWheels(configsData?.wheels?.[0] || null);
-
       } catch (e) {
         console.log("LOAD ERROR:", e);
       } finally {
@@ -466,16 +464,19 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= DISCOUNT ================= */
+  /* ================= DISCOUNT LOGIC ================= */
+  const discount = Number(user?.discount) || 0;
+
   const discountCars = parseCarIds(
     user?.discount_cars || user?.promo_cars
   );
 
-  const discount = Number(user?.discount) || 0;
+  // 🔥 FIX: правильная логика
+  const hasRestriction = discountCars.length > 0;
 
-  const isCarAllowed =
-    discountCars.length === 0 ||
-    discountCars.includes(Number(id));
+  const isCarAllowed = !hasRestriction
+    ? true
+    : discountCars.includes(Number(id));
 
   const finalDiscount = isCarAllowed ? discount : 0;
 
@@ -507,7 +508,6 @@ export default function CarDetail() {
     `Password: ${randomPass}`,
   ];
 
-  /* ================= BUY ================= */
   const sendToTelegram = async () => {
     if (!car || !user) return;
 
@@ -516,7 +516,6 @@ export default function CarDetail() {
 
       const token = localStorage.getItem("token");
 
-      // 1. BUY (сжигает промо)
       const buyRes = await fetch(`${API}/promo/buy`, {
         method: "POST",
         headers: {
@@ -534,7 +533,6 @@ export default function CarDetail() {
         throw new Error("BUY FAILED");
       }
 
-      // 2. TELEGRAM
       await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
         headers: {
@@ -551,7 +549,6 @@ export default function CarDetail() {
 
       alert("ORDER SENT");
       navigate("/market");
-
     } catch (e) {
       console.log("ORDER ERROR:", e);
       alert("ERROR");
@@ -561,21 +558,19 @@ export default function CarDetail() {
   };
 
   /* ================= UI ================= */
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
         LOADING...
       </div>
     );
-  }
 
-  if (!car) {
+  if (!car)
     return (
       <div className="min-h-screen flex items-center justify-center text-red-500">
         CAR NOT FOUND
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -612,31 +607,7 @@ export default function CarDetail() {
         {/* CONFIGS */}
         <div className="grid grid-cols-3 gap-4 mt-10">
           {configs.power.map((i) => (
-            <button
-              key={i.id}
-              onClick={() => setSelectedHp(i)}
-              className="p-3 bg-white/10 rounded-xl"
-            >
-              {i.name}
-            </button>
-          ))}
-
-          {configs.tuning.map((i) => (
-            <button
-              key={i.id}
-              onClick={() => setSelectedTuning(i)}
-              className="p-3 bg-white/10 rounded-xl"
-            >
-              {i.name}
-            </button>
-          ))}
-
-          {configs.wheels.map((i) => (
-            <button
-              key={i.id}
-              onClick={() => setSelectedWheels(i)}
-              className="p-3 bg-white/10 rounded-xl"
-            >
+            <button key={i.id} onClick={() => setSelectedHp(i)}>
               {i.name}
             </button>
           ))}

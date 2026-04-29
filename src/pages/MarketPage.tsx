@@ -232,7 +232,6 @@
 //   );
 // }
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -289,15 +288,15 @@ const parseCarIds = (input: any): number[] => {
   return [];
 };
 
-/* ================= MAIN RULE (FIXED LOGIC) ================= */
-const isAllowed = (
+/* ================= RULE ================= */
+const canUseDiscount = (
   carId: number,
   discount: number,
   discountCars: number[]
 ) => {
   if (!discount) return false;
 
-  // ✔ если список пустой → скидка на ВСЕ машины
+  // пусто = скидка на все машины
   if (discountCars.length === 0) return true;
 
   return discountCars.includes(Number(carId));
@@ -338,12 +337,13 @@ export default function MarketPage() {
   const getPrice = (car: Car) => {
     const base = Number(car.price);
 
-    const canUsePromo = isAllowed(car.id, discount, discountCars);
+    const canUse = canUseDiscount(car.id, discount, discountCars);
 
-    if (!canUsePromo) {
+    if (!canUse) {
       return {
         old: null,
         new: base,
+        promo: false,
       };
     }
 
@@ -354,6 +354,7 @@ export default function MarketPage() {
     return {
       old: base,
       new: newPrice,
+      promo: true,
     };
   };
 
@@ -408,7 +409,6 @@ export default function MarketPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filteredCars.map((car) => {
           const price = getPrice(car);
-          const hasPromo = discount > 0 && price.old !== null;
 
           return (
             <div
@@ -426,11 +426,12 @@ export default function MarketPage() {
               </h2>
 
               <div className="mt-2">
-                {price.old && (
+                {price.old !== null && (
                   <span className="line-through text-gray-400 mr-2">
                     ${price.old}
                   </span>
                 )}
+
                 <span className="text-green-400 font-bold">
                   ${price.new}
                 </span>
@@ -448,7 +449,8 @@ export default function MarketPage() {
                 </div>
               )}
 
-              {hasPromo && (
+              {/* 🔥 FIX: показываем только если реально применилось */}
+              {price.promo && (
                 <div className="text-yellow-400 text-xs mt-2">
                   🔥 -{discount}% PROMO
                 </div>
