@@ -318,56 +318,66 @@
 
 
 
-
 const express = require("express");
 const auth = require("../middleware/auth");
 const { q } = require("../db");
-const upload = require("../middleware/upload"); // cloudinary multer
 
 const router = express.Router();
 
 /* ================= GET PROFILE ================= */
 router.get("/me", auth, async (req, res) => {
   try {
-    const r = await q(
-      "SELECT * FROM users WHERE id=$1",
+    const userRes = await q(
+      `SELECT id, name, email, avatar, ref_code, telegram_username, telegram_id
+       FROM users
+       WHERE id=$1`,
       [req.userId]
     );
 
-    const user = r.rows[0];
+    const user = userRes.rows[0];
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    /* ================= REF COUNT (from referrals table) ================= */
+    /* ================= REF COUNT ================= */
     const refs = await q(
-      "SELECT COUNT(*) FROM referrals WHERE referrer_id=$1",
+      `SELECT COUNT(*) FROM referrals WHERE referrer_id=$1`,
       [req.userId]
     );
 
-    /* ================= PROMO ================= */
+    /* ================= ACTIVE PROMO ================= */
     const promoRes = await q(
-      `SELECT pc.car_ids, pc.discount
-       FROM user_promos up
-       JOIN promo_codes pc ON pc.code = up.promo_code
-       WHERE up.user_id=$1`,
+      `
+      SELECT discount, car_ids
+      FROM user_promos
+      WHERE user_id=$1 AND consumed=false
+      ORDER BY id DESC
+      LIMIT 1
+      `,
       [req.userId]
     );
 
+    const promo = promoRes.rows[0];
+
+    // безопасный парсер (ВАЖНО)
     let promoCars = [];
-    let discount = 0;
 
-    if (promoRes.rows.length > 0) {
-      promoCars = promoRes.rows
-        .flatMap(r => (r.car_ids || "").split(","))
-        .map(Number)
-        .filter(Boolean);
-
-      discount = Number(promoRes.rows[0].discount) || 0;
+    if (promo?.car_ids) {
+      try {
+        if (typeof promo.car_ids === "string") {
+          promoCars = promo.car_ids
+            .split(",")
+            .map((x) => Number(x.trim()))
+            .filter(Boolean);
+        } else if (Array.isArray(promo.car_ids)) {
+          promoCars = promo.car_ids.map(Number).filter(Boolean);
+        }
+      } catch (e) {
+        promoCars = [];
+      }
     }
 
-    /* ================= RESPONSE (ONLY ONE) ================= */
     res.json({
       id: user.id,
       name: user.name,
@@ -376,14 +386,17 @@ router.get("/me", auth, async (req, res) => {
       avatar: user.avatar || null,
 
       ref_code: user.ref_code,
-      ref_count: Number(refs.rows[0].count),
+      ref_count: Number(refs.rows?.[0]?.count || 0),
 
       telegram_username: user.telegram_username,
       telegram_id: user.telegram_id,
 
-      discount: Number(user.discount) || discount,
-
-      promo_cars: promoCars,
+      active_promo: promo
+        ? {
+            discount: Number(promo.discount || 0),
+            car_ids: promoCars,
+          }
+        : null,
     });
 
   } catch (e) {
@@ -398,7 +411,8 @@ router.post("/telegram/link", auth, async (req, res) => {
     const code = Math.random().toString(36).substring(2, 10);
 
     await q(
-      "INSERT INTO telegram_links (user_id, code, used) VALUES ($1,$2,false)",
+      `INSERT INTO telegram_links (user_id, code, used)
+       VALUES ($1,$2,false)`,
       [req.userId, code]
     );
 
@@ -415,25 +429,29 @@ router.post("/telegram/link", auth, async (req, res) => {
   }
 });
 
-/* ================= UPLOAD AVATAR (CLOUDINARY) ================= */
+/* ================= UPLOAD AVATAR ================= */
 router.post(
   "/upload-avatar",
   auth,
-  upload.single("avatar"),
+  require("../middleware/upload").single("avatar"),
   async (req, res) => {
     try {
-      const userId = req.userId;
-        console.log("FILE:", req.file); // 👈 ВОТ СЮДА
-      const imageUrl = req.file.path; // Cloudinary URL
+      const imageUrl = req.file?.path;
+
+      if (!imageUrl) {
+        return res.status(400).json({ error: "No file" });
+      }
 
       await q(
-        "UPDATE users SET avatar=$1 WHERE id=$2",
-        [imageUrl, userId]
+        `UPDATE users SET avatar=$1 WHERE id=$2`,
+        [imageUrl, req.userId]
       );
 
       const user = await q(
-        "SELECT id, name, email, avatar FROM users WHERE id=$1",
-        [userId]
+        `SELECT id, name, email, avatar
+         FROM users
+         WHERE id=$1`,
+        [req.userId]
       );
 
       res.json({
