@@ -229,47 +229,63 @@ const isExpired = (promo) => {
 const consumeUserPromo = async (userId, carId) => {
   try {
     const userRes = await q(
-      `SELECT discount, promo_cars
-       FROM users
-       WHERE id=$1`,
+      `
+      SELECT discount, promo_cars
+      FROM users
+      WHERE id=$1
+      `,
       [userId]
     );
 
     const user = userRes.rows[0];
-    if (!user || !user.discount) return false;
+
+    // нет активной скидки
+    if (!user || !user.discount) {
+      return false;
+    }
 
     const allowedCars = parseCarIds(user.promo_cars);
 
-    // если promo_cars пустой -> скидка на все машины
-    const isAllowed =
+    // если список пустой -> скидка на все машины
+    const canConsume =
       allowedCars.length === 0 ||
       allowedCars.includes(Number(carId));
 
-    if (!isAllowed) return false;
+    // машина не подходит -> не сжигаем
+    if (!canConsume) {
+      return false;
+    }
 
-await q(
-  `UPDATE user_promos
-   SET consumed=true
-   WHERE id = (
-      SELECT id
-      FROM user_promos
-      WHERE user_id=$1
-      AND consumed=false
-      ORDER BY id DESC
-      LIMIT 1
-   )`,
-  [userId]
-);
-
+    // помечаем использованным
     await q(
-      `UPDATE users
-       SET discount=NULL,
-           promo_cars=NULL
-       WHERE id=$1`,
+      `
+      UPDATE user_promos
+      SET consumed=true
+      WHERE id = (
+        SELECT id
+        FROM user_promos
+        WHERE user_id=$1
+          AND consumed=false
+        ORDER BY id DESC
+        LIMIT 1
+      )
+      `,
+      [userId]
+    );
+
+    // очищаем скидку у пользователя
+    await q(
+      `
+      UPDATE users
+      SET discount=NULL,
+          promo_cars=NULL
+      WHERE id=$1
+      `,
       [userId]
     );
 
     console.log("🔥 PROMO CONSUMED");
+
     return true;
   } catch (e) {
     console.log("CONSUME ERROR:", e);
@@ -290,7 +306,11 @@ router.post("/redeem", auth, async (req, res) => {
     }
 
     const promoRes = await q(
-      `SELECT * FROM promo_codes WHERE code=$1`,
+      `
+      SELECT *
+      FROM promo_codes
+      WHERE code=$1
+      `,
       [code]
     );
 
@@ -319,9 +339,12 @@ router.post("/redeem", auth, async (req, res) => {
 
     // уже использовал этот код
     const used = await q(
-      `SELECT id
-       FROM user_promos
-       WHERE user_id=$1 AND promo_code=$2`,
+      `
+      SELECT id
+      FROM user_promos
+      WHERE user_id=$1
+        AND promo_code=$2
+      `,
       [userId, code]
     );
 
@@ -333,9 +356,12 @@ router.post("/redeem", auth, async (req, res) => {
 
     // уже есть активный промо
     const active = await q(
-      `SELECT id
-       FROM user_promos
-       WHERE user_id=$1 AND consumed=false`,
+      `
+      SELECT id
+      FROM user_promos
+      WHERE user_id=$1
+        AND consumed=false
+      `,
       [userId]
     );
 
@@ -345,28 +371,34 @@ router.post("/redeem", auth, async (req, res) => {
       });
     }
 
-    // записываем промо
+    // записываем использование
     await q(
-      `INSERT INTO user_promos
-       (user_id, promo_code, discount, consumed)
-       VALUES ($1,$2,$3,false)`,
+      `
+      INSERT INTO user_promos
+      (user_id, promo_code, discount, consumed)
+      VALUES ($1,$2,$3,false)
+      `,
       [userId, code, promo.discount]
     );
 
     // записываем скидку пользователю
     await q(
-      `UPDATE users
-       SET discount=$1,
-           promo_cars=$2
-       WHERE id=$3`,
+      `
+      UPDATE users
+      SET discount=$1,
+          promo_cars=$2
+      WHERE id=$3
+      `,
       [promo.discount, promo.car_ids, userId]
     );
 
     // увеличиваем счётчик
     await q(
-      `UPDATE promo_codes
-       SET used_count = used_count + 1
-       WHERE id=$1`,
+      `
+      UPDATE promo_codes
+      SET used_count = used_count + 1
+      WHERE id=$1
+      `,
       [promo.id]
     );
 
@@ -377,6 +409,7 @@ router.post("/redeem", auth, async (req, res) => {
     });
   } catch (e) {
     console.log("PROMO ERROR:", e);
+
     return res.status(500).json({
       error: "Server error",
     });
@@ -397,19 +430,23 @@ router.post("/buy", auth, async (req, res) => {
 
     // сохраняем покупку
     await q(
-      `INSERT INTO user_cars (user_id, car_id)
-       VALUES ($1,$2)`,
+      `
+      INSERT INTO user_cars (user_id, car_id)
+      VALUES ($1,$2)
+      `,
       [userId, carId]
     );
 
-    // сжигаем промо (если подходит)
+    // сжигаем промо если машина подходит
     await consumeUserPromo(userId, carId);
 
-    // возвращаем обновлённого user
+    // возвращаем обновленного юзера
     const userRes = await q(
-      `SELECT id, name, discount, promo_cars
-       FROM users
-       WHERE id=$1`,
+      `
+      SELECT id, name, discount, promo_cars
+      FROM users
+      WHERE id=$1
+      `,
       [userId]
     );
 
@@ -419,6 +456,7 @@ router.post("/buy", auth, async (req, res) => {
     });
   } catch (e) {
     console.log("BUY ERROR:", e);
+
     return res.status(500).json({
       error: "Server error",
     });
