@@ -305,6 +305,7 @@
 // }
 
 
+
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
@@ -316,6 +317,7 @@ type ConfigItem = {
   id: number;
   name: string;
   price: number;
+  type?: string;
 };
 
 type Car = {
@@ -348,7 +350,6 @@ const parseCarIds = (input: any): number[] => {
   return [];
 };
 
-/* ================= COMPONENT ================= */
 export default function CarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -370,81 +371,58 @@ export default function CarDetail() {
   const [selectedTuning, setSelectedTuning] = useState<ConfigItem | null>(null);
   const [selectedWheels, setSelectedWheels] = useState<ConfigItem | null>(null);
 
-  const [loading, setLoading] = useState(true);
   const [showPay, setShowPay] = useState(false);
   const [sending, setSending] = useState(false);
-  const [randomPass, setRandomPass] = useState("");
+  const [pass, setPass] = useState("");
 
   /* ================= LOAD ================= */
   useEffect(() => {
     const load = async () => {
-      try {
-        setLoading(true);
+      const token = localStorage.getItem("token");
 
-        const token = localStorage.getItem("token");
+      const [carsRes, configsRes, userRes] = await Promise.all([
+        fetch(`${API}/market/cars`),
+        fetch(`${API}/market/configs`),
+        fetch(`${API}/profile/me`, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+        }),
+      ]);
 
-        const [carsRes, configsRes, userRes] = await Promise.all([
-          fetch(`${API}/market/cars`),
-          fetch(`${API}/market/configs`),
-          fetch(`${API}/profile/me`, {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : "",
-            },
-          }),
-        ]);
+      const cars = await carsRes.json();
+      const cfg = await configsRes.json();
+      const u = await userRes.json();
 
-        const carsData = await carsRes.json();
-        const configsData = await configsRes.json();
-        const userData = await userRes.json();
+      const found = cars.find((c: Car) => String(c.id) === String(id));
 
-        const foundCar = carsData.find(
-          (c: Car) => String(c.id) === String(id)
-        );
+      setCar(found || null);
+      setUser(u);
 
-        setCar(foundCar || null);
-        setUser(userData || null);
+      setConfigs({
+        power: cfg?.power || [],
+        tuning: cfg?.tuning || [],
+        wheels: cfg?.wheels || [],
+      });
 
-        // 🔥 SAFE CONFIGS FIX
-        const safeConfigs = {
-          power: Array.isArray(configsData?.power)
-            ? configsData.power
-            : [],
-          tuning: Array.isArray(configsData?.tuning)
-            ? configsData.tuning
-            : [],
-          wheels: Array.isArray(configsData?.wheels)
-            ? configsData.wheels
-            : [],
-        };
-
-        setConfigs(safeConfigs);
-
-        setSelectedHp(safeConfigs.power[0] || null);
-        setSelectedTuning(safeConfigs.tuning[0] || null);
-        setSelectedWheels(safeConfigs.wheels[0] || null);
-
-      } catch (e) {
-        console.log("LOAD ERROR:", e);
-      } finally {
-        setLoading(false);
-      }
+      setSelectedHp(cfg?.power?.[0] || null);
+      setSelectedTuning(cfg?.tuning?.[0] || null);
+      setSelectedWheels(cfg?.wheels?.[0] || null);
     };
 
     load();
   }, [id]);
 
   /* ================= PROMO ================= */
-  const promo = user?.active_promo ?? null;
+  const promo = user?.active_promo || null;
 
-  const discount = promo?.discount ?? 0;
+  const discount = promo?.discount || 0;
   const promoCars = parseCarIds(promo?.car_ids);
-
-  const hasRestriction = promoCars.length > 0;
 
   const canUsePromo =
     !!promo &&
     discount > 0 &&
-    (!hasRestriction || promoCars.includes(Number(id)));
+    (promoCars.length === 0 || promoCars.includes(Number(id)));
 
   const finalDiscount = canUsePromo ? discount : 0;
 
@@ -456,38 +434,81 @@ export default function CarDetail() {
     (selectedTuning?.price || 0) +
     (selectedWheels?.price || 0);
 
-  const discountedBase =
+  const finalBase =
     finalDiscount > 0
       ? Math.floor(basePrice - (basePrice * finalDiscount) / 100)
       : basePrice;
 
-  const totalPrice = discountedBase + configPrice;
+  const totalPrice = finalBase + configPrice;
 
   /* ================= ORDER ================= */
-  const handleOpenPay = () => {
-    setRandomPass(
-      Math.floor(1000 + Math.random() * 9000).toString()
-    );
+  const openPay = () => {
+    setPass(Math.floor(1000 + Math.random() * 9000).toString());
     setShowPay(true);
   };
 
   const selectedConfigs = [
-    `Engine: ${selectedHp?.name || "Stock"}`,
-    `Tuning: ${selectedTuning?.name || "None"}`,
-    `Wheels: ${selectedWheels?.name || "None"}`,
-    `Password: ${randomPass}`,
+    `Engine: ${selectedHp?.name}`,
+    `Tuning: ${selectedTuning?.name}`,
+    `Wheels: ${selectedWheels?.name}`,
+    `Pass: ${pass}`,
   ];
+
+  /* ================= BUY ================= */
+  const buy = async () => {
+    try {
+      setSending(true);
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API}/promo/buy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({ carId: car?.id }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) throw new Error();
+
+      // refresh user
+      const userRes = await fetch(`${API}/profile/me`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      const updated = await userRes.json();
+      setUser(updated);
+
+      alert("BUY SUCCESS");
+      navigate("/market");
+
+    } catch (e) {
+      console.log(e);
+      alert("ERROR BUY");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /* ================= UI ================= */
+  if (!car) return <div>CAR NOT FOUND</div>;
 
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
 
       <div className="max-w-6xl mx-auto p-6">
-        <h1 className="text-4xl font-black">
-          {car?.brand} {car?.name}
+
+        <h1 className="text-4xl font-bold">
+          {car.brand} {car.name}
         </h1>
 
-        <img src={car?.image_url} className="w-full mt-4 rounded-2xl" />
+        <img src={car.image_url} className="w-full mt-4 rounded-xl" />
 
         {/* PRICE */}
         <div className="mt-6 text-2xl font-bold">
@@ -501,67 +522,46 @@ export default function CarDetail() {
 
           {finalDiscount > 0 && (
             <div className="text-green-400 text-sm">
-              🔥 -{finalDiscount}%
+              -{finalDiscount}%
             </div>
           )}
         </div>
 
         <button
-          onClick={handleOpenPay}
-          className="mt-6 bg-yellow-400 text-black px-6 py-3 rounded-xl font-black"
+          onClick={openPay}
+          className="mt-6 bg-yellow-400 text-black px-6 py-3 rounded-xl"
         >
           BUY
         </button>
 
-        {/* ================= CONFIGS FIX ================= */}
+        {/* CONFIGS */}
         <div className="mt-10 space-y-6">
 
-          {/* POWER */}
           <div>
-            <h2 className="text-yellow-400 mb-2">POWER</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {configs.power.map((i) => (
-                <button
-                  key={i.id}
-                  onClick={() => setSelectedHp(i)}
-                  className="bg-white/10 p-2 rounded"
-                >
-                  {i.name}
-                </button>
-              ))}
-            </div>
+            <h2>POWER</h2>
+            {configs.power.map((i) => (
+              <button key={i.id} onClick={() => setSelectedHp(i)}>
+                {i.name}
+              </button>
+            ))}
           </div>
 
-          {/* TUNING */}
           <div>
-            <h2 className="text-yellow-400 mb-2">TUNING</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {configs.tuning.map((i) => (
-                <button
-                  key={i.id}
-                  onClick={() => setSelectedTuning(i)}
-                  className="bg-white/10 p-2 rounded"
-                >
-                  {i.name}
-                </button>
-              ))}
-            </div>
+            <h2>TUNING</h2>
+            {configs.tuning.map((i) => (
+              <button key={i.id} onClick={() => setSelectedTuning(i)}>
+                {i.name}
+              </button>
+            ))}
           </div>
 
-          {/* WHEELS */}
           <div>
-            <h2 className="text-yellow-400 mb-2">WHEELS</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {configs.wheels.map((i) => (
-                <button
-                  key={i.id}
-                  onClick={() => setSelectedWheels(i)}
-                  className="bg-white/10 p-2 rounded"
-                >
-                  {i.name}
-                </button>
-              ))}
-            </div>
+            <h2>WHEELS</h2>
+            {configs.wheels.map((i) => (
+              <button key={i.id} onClick={() => setSelectedWheels(i)}>
+                {i.name}
+              </button>
+            ))}
           </div>
 
         </div>
@@ -570,7 +570,9 @@ export default function CarDetail() {
       {/* MODAL */}
       {showPay && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center">
-          <div className="bg-[#111] p-6 rounded-2xl w-[400px]">
+
+          <div className="bg-[#111] p-6 rounded-xl w-[400px]">
+
             {selectedConfigs.map((c, i) => (
               <div key={i}>{c}</div>
             ))}
@@ -580,11 +582,15 @@ export default function CarDetail() {
             </div>
 
             <button
+              onClick={buy}
+              disabled={sending}
               className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl"
             >
-              CONFIRM
+              {sending ? "BUYING..." : "CONFIRM BUY"}
             </button>
+
           </div>
+
         </div>
       )}
     </div>
