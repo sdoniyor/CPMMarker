@@ -263,19 +263,53 @@ export default function CarDetail() {
           BUY
         </button>
 
-        {/* CONFIGS FIX */}
-        <div className="grid grid-cols-3 gap-4 mt-10">
-          {configs.power.length > 0 &&
-            configs.power.map((i) => (
-              <button
-                key={i.id}
-                onClick={() => setSelectedHp(i)}
-                className="bg-white/10 p-2 rounded"
-              >
-                {i.name}
-              </button>
-            ))}
-        </div>
+        {/* POWER */}
+<div className="mt-10">
+  <h2 className="text-yellow-400 mb-2">POWER</h2>
+  <div className="grid grid-cols-3 gap-4">
+    {configs.power.map((i) => (
+      <button
+        key={i.id}
+        onClick={() => setSelectedHp(i)}
+        className="bg-white/10 p-2 rounded"
+      >
+        {i.name}
+      </button>
+    ))}
+  </div>
+</div>
+
+{/* TUNING */}
+<div className="mt-6">
+  <h2 className="text-yellow-400 mb-2">TUNING</h2>
+  <div className="grid grid-cols-3 gap-4">
+    {configs.tuning.map((i) => (
+      <button
+        key={i.id}
+        onClick={() => setSelectedTuning(i)}
+        className="bg-white/10 p-2 rounded"
+      >
+        {i.name}
+      </button>
+    ))}
+  </div>
+</div>
+
+{/* WHEELS */}
+<div className="mt-6">
+  <h2 className="text-yellow-400 mb-2">WHEELS</h2>
+  <div className="grid grid-cols-3 gap-4">
+    {configs.wheels.map((i) => (
+      <button
+        key={i.id}
+        onClick={() => setSelectedWheels(i)}
+        className="bg-white/10 p-2 rounded"
+      >
+        {i.name}
+      </button>
+    ))}
+  </div>
+</div>
       </div>
 
       {/* MODAL */}
