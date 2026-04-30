@@ -247,9 +247,15 @@ type Car = {
   type: "default" | "premium" | "coin";
 };
 
+type Promo = {
+  discount: number;
+  car_ids: string | number[] | null;
+};
+
 type User = {
-  discount?: number | null;
-  promo_cars?: string | number[] | null;
+  id: number;
+  name: string;
+  active_promo?: Promo | null;
 };
 
 /* ================= FETCH ================= */
@@ -277,34 +283,31 @@ const safeFetch = async (url: string, options: any = {}) => {
 const parseCarIds = (input: any): number[] => {
   if (!input) return [];
 
-  if (Array.isArray(input)) {
-    return input.map(Number).filter(Boolean);
-  }
+  if (Array.isArray(input)) return input.map(Number).filter(Boolean);
 
   if (typeof input === "string") {
-    return input
-      .split(",")
-      .map((x) => Number(x.trim()))
-      .filter((x) => !isNaN(x));
+    return input.split(",").map(Number).filter(Boolean);
   }
 
   return [];
 };
 
-/* ================= DISCOUNT RULE ================= */
-const canUseDiscount = (
+/* ================= CHECK PROMO ================= */
+const canUsePromo = (
   carId: number,
-  discount: number,
-  promoCars: number[]
+  promo: Promo | null | undefined
 ) => {
-  // нет скидки
-  if (!discount || discount <= 0) return false;
+  if (!promo) return false;
 
-  // нет списка машин -> скидки нет
-  if (promoCars.length === 0) return false;
+  const discount = Number(promo.discount) || 0;
+  if (!discount) return false;
 
-  // есть в списке
-  return promoCars.includes(Number(carId));
+  const allowedCars = parseCarIds(promo.car_ids);
+
+  // если пусто → на все машины
+  if (allowedCars.length === 0) return true;
+
+  return allowedCars.includes(Number(carId));
 };
 
 export default function MarketPage() {
@@ -332,35 +335,31 @@ export default function MarketPage() {
     load();
   }, []);
 
-  /* ================= USER PROMO ================= */
-  const discount = Number(user?.discount) || 0;
-  const promoCars = parseCarIds(user?.promo_cars);
+  /* ================= PROMO ================= */
+  const promo = user?.active_promo || null;
 
-  /* ================= PRICE ================= */
   const getPrice = (car: Car) => {
-    const basePrice = Number(car.price);
+    const base = Number(car.price);
 
-    const promoActive = canUseDiscount(
-      car.id,
-      discount,
-      promoCars
-    );
+    const active = canUsePromo(car.id, promo);
 
-    if (!promoActive) {
+    if (!active) {
       return {
         old: null,
-        new: basePrice,
+        new: base,
         promo: false,
       };
     }
 
-    const discountedPrice = Math.floor(
-      basePrice - (basePrice * discount) / 100
+    const discount = Number(promo?.discount) || 0;
+
+    const newPrice = Math.floor(
+      base - (base * discount) / 100
     );
 
     return {
-      old: basePrice,
-      new: discountedPrice,
+      old: base,
+      new: newPrice,
       promo: true,
     };
   };
@@ -369,18 +368,16 @@ export default function MarketPage() {
   const filteredCars = cars.filter((car) => {
     const q = search.toLowerCase();
 
-    const matchesSearch =
-      car.name.toLowerCase().includes(q) ||
-      car.brand.toLowerCase().includes(q);
-
-    const matchesType =
-      filterType === "all" || car.type === filterType;
-
-    return matchesSearch && matchesType;
+    return (
+      (car.name.toLowerCase().includes(q) ||
+        car.brand.toLowerCase().includes(q)) &&
+      (filterType === "all" || car.type === filterType)
+    );
   });
 
   return (
     <div className="min-h-screen bg-[#050608] text-white p-6">
+
       {/* HEADER */}
       <div className="flex flex-col gap-4 mb-10">
         <h1 className="text-4xl font-bold">
@@ -391,20 +388,18 @@ export default function MarketPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search car..."
-          className="px-3 py-2 bg-black/40 border border-white/10 rounded outline-none"
+          className="px-3 py-2 bg-black/40 border border-white/10 rounded"
         />
 
         <div className="flex gap-2">
           {["all", "premium", "coin"].map((t) => (
             <button
               key={t}
-              onClick={() =>
-                setFilterType(t as "all" | "premium" | "coin")
-              }
-              className={`px-3 py-2 rounded transition ${
+              onClick={() => setFilterType(t as any)}
+              className={`px-3 py-2 rounded ${
                 filterType === t
                   ? "bg-yellow-400 text-black"
-                  : "bg-black/40 hover:bg-black/60"
+                  : "bg-black/40"
               }`}
             >
               {t.toUpperCase()}
@@ -426,13 +421,24 @@ export default function MarketPage() {
             >
               <img
                 src={car.image_url}
-                alt={`${car.brand} ${car.name}`}
                 className="h-40 w-full object-contain"
               />
 
-              <h2 className="mt-3 font-bold text-lg">
+              <h2 className="mt-2 font-bold">
                 {car.brand} {car.name}
               </h2>
+
+              <div className="mt-2">
+                {price.old !== null && (
+                  <span className="line-through text-gray-400 mr-2">
+                    ${price.old}
+                  </span>
+                )}
+
+                <span className="text-green-400 font-bold">
+                  ${price.new}
+                </span>
+              </div>
 
               {car.type === "premium" && (
                 <div className="text-yellow-400 text-xs mt-1">
@@ -446,21 +452,9 @@ export default function MarketPage() {
                 </div>
               )}
 
-              <div className="mt-3">
-                {price.old !== null && (
-                  <span className="line-through text-gray-400 mr-2">
-                    ${price.old}
-                  </span>
-                )}
-
-                <span className="text-green-400 font-bold">
-                  ${price.new}
-                </span>
-              </div>
-
               {price.promo && (
                 <div className="text-yellow-400 text-xs mt-2">
-                  🔥 -{discount}% PROMO
+                  🔥 PROMO ACTIVE
                 </div>
               )}
             </div>

@@ -228,9 +228,10 @@ const isExpired = (promo) => {
 /* ================= CONSUME PROMO ================= */
 const consumeUserPromo = async (userId, carId) => {
   try {
+    // получаем активную скидку пользователя
     const userRes = await q(
       `
-      SELECT discount, promo_cars
+      SELECT id, discount, promo_cars
       FROM users
       WHERE id=$1
       `,
@@ -239,41 +240,35 @@ const consumeUserPromo = async (userId, carId) => {
 
     const user = userRes.rows[0];
 
-    // нет активной скидки
+    // скидки нет
     if (!user || !user.discount) {
       return false;
     }
 
     const allowedCars = parseCarIds(user.promo_cars);
 
-    // если список пустой -> скидка на все машины
+    // если promo_cars пустой -> скидка на все машины
     const canConsume =
       allowedCars.length === 0 ||
       allowedCars.includes(Number(carId));
 
-    // машина не подходит -> не сжигаем
+    // купил машину не из списка -> промо не трогаем
     if (!canConsume) {
       return false;
     }
 
-    // помечаем использованным
+    // помечаем промо использованным
     await q(
       `
       UPDATE user_promos
       SET consumed=true
-      WHERE id = (
-        SELECT id
-        FROM user_promos
-        WHERE user_id=$1
-          AND consumed=false
-        ORDER BY id DESC
-        LIMIT 1
-      )
+      WHERE user_id=$1
+        AND consumed=false
       `,
       [userId]
     );
 
-    // очищаем скидку у пользователя
+    // убираем скидку у пользователя
     await q(
       `
       UPDATE users
@@ -305,6 +300,7 @@ router.post("/redeem", auth, async (req, res) => {
       });
     }
 
+    // ищем промокод
     const promoRes = await q(
       `
       SELECT *
@@ -322,12 +318,14 @@ router.post("/redeem", auth, async (req, res) => {
       });
     }
 
+    // срок истёк
     if (isExpired(promo)) {
       return res.status(400).json({
         error: "Promo expired",
       });
     }
 
+    // лимит исчерпан
     if (
       promo.max_uses > 0 &&
       promo.used_count >= promo.max_uses
@@ -338,7 +336,7 @@ router.post("/redeem", auth, async (req, res) => {
     }
 
     // уже использовал этот код
-    const used = await q(
+    const alreadyUsed = await q(
       `
       SELECT id
       FROM user_promos
@@ -348,14 +346,14 @@ router.post("/redeem", auth, async (req, res) => {
       [userId, code]
     );
 
-    if (used.rows.length > 0) {
+    if (alreadyUsed.rows.length > 0) {
       return res.status(400).json({
         error: "Promo already used",
       });
     }
 
     // уже есть активный промо
-    const active = await q(
+    const activePromo = await q(
       `
       SELECT id
       FROM user_promos
@@ -365,20 +363,29 @@ router.post("/redeem", auth, async (req, res) => {
       [userId]
     );
 
-    if (active.rows.length > 0) {
+    if (activePromo.rows.length > 0) {
       return res.status(400).json({
         error: "You already have active promo",
       });
     }
 
-    // записываем использование
+    // записываем использование промо
     await q(
       `
       INSERT INTO user_promos
-      (user_id, promo_code, discount, consumed)
+      (
+        user_id,
+        promo_code,
+        discount,
+        consumed
+      )
       VALUES ($1,$2,$3,false)
       `,
-      [userId, code, promo.discount]
+      [
+        userId,
+        code,
+        promo.discount,
+      ]
     );
 
     // записываем скидку пользователю
@@ -389,10 +396,14 @@ router.post("/redeem", auth, async (req, res) => {
           promo_cars=$2
       WHERE id=$3
       `,
-      [promo.discount, promo.car_ids, userId]
+      [
+        promo.discount,
+        promo.car_ids,
+        userId,
+      ]
     );
 
-    // увеличиваем счётчик
+    // увеличиваем used_count
     await q(
       `
       UPDATE promo_codes
@@ -437,13 +448,17 @@ router.post("/buy", auth, async (req, res) => {
       [userId, carId]
     );
 
-    // сжигаем промо если машина подходит
+    // сжигаем промо
     await consumeUserPromo(userId, carId);
 
     // возвращаем обновленного юзера
     const userRes = await q(
       `
-      SELECT id, name, discount, promo_cars
+      SELECT
+        id,
+        name,
+        discount,
+        promo_cars
       FROM users
       WHERE id=$1
       `,
