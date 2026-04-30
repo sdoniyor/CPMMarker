@@ -247,12 +247,19 @@ const consumeUserPromo = async (userId, carId) => {
 
     if (!isAllowed) return false;
 
-    await q(
-      `UPDATE user_promos
-       SET consumed=true
-       WHERE user_id=$1 AND consumed=false`,
-      [userId]
-    );
+await q(
+  `UPDATE user_promos
+   SET consumed=true
+   WHERE id = (
+      SELECT id
+      FROM user_promos
+      WHERE user_id=$1
+      AND consumed=false
+      ORDER BY id DESC
+      LIMIT 1
+   )`,
+  [userId]
+);
 
     await q(
       `UPDATE users
