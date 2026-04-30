@@ -690,12 +690,13 @@ type Car = {
   image_url: string;
 };
 
+type Promo = {
+  discount: number;
+  car_ids: string | number[] | null;
+};
+
 type User = {
-  id: number;
-  name: string;
-  discount?: number;
-  discount_cars?: string | number[] | null;
-  promo_cars?: string | number[] | null;
+  active_promo?: Promo | null;
 };
 
 /* ================= HELPERS ================= */
@@ -707,12 +708,16 @@ const parseCarIds = (input: any): number[] => {
   }
 
   if (typeof input === "string") {
-    return input.split(",").map(Number).filter(Boolean);
+    return input
+      .split(",")
+      .map((x) => Number(x.trim()))
+      .filter(Boolean);
   }
 
   return [];
 };
 
+/* ================= COMPONENT ================= */
 export default function CarDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -761,12 +766,14 @@ export default function CarDetail() {
         const configsData = await configsRes.json();
         const userData = await userRes.json();
 
-        const cars: Car[] = Array.isArray(carsData) ? carsData : [];
-        const foundCar = cars.find((c) => String(c.id) === String(id));
+        const foundCar = carsData.find(
+          (c: Car) => String(c.id) === String(id)
+        );
 
         setCar(foundCar || null);
-        setUser(userData || null);
+        setUser(userData);
 
+        // 🔥 FIX CONFIGS
         setConfigs({
           power: configsData?.power || [],
           tuning: configsData?.tuning || [],
@@ -776,6 +783,7 @@ export default function CarDetail() {
         setSelectedHp(configsData?.power?.[0] || null);
         setSelectedTuning(configsData?.tuning?.[0] || null);
         setSelectedWheels(configsData?.wheels?.[0] || null);
+
       } catch (e) {
         console.log("LOAD ERROR:", e);
       } finally {
@@ -786,21 +794,20 @@ export default function CarDetail() {
     load();
   }, [id]);
 
-  /* ================= DISCOUNT LOGIC ================= */
-  const discount = Number(user?.discount) || 0;
+  /* ================= PROMO ================= */
+  const promo = user?.active_promo ?? null;
 
-  const discountCars = parseCarIds(
-    user?.discount_cars || user?.promo_cars
-  );
+  const discount = promo?.discount ?? 0;
+  const promoCars = parseCarIds(promo?.car_ids);
 
-  // 🔥 FIX: empty = discount for ALL cars
-  const hasRestriction = discountCars.length > 0;
+  const hasRestriction = promoCars.length > 0;
 
-  const isCarAllowed =
+  const canUsePromo =
+    !!promo &&
     discount > 0 &&
-    (!hasRestriction || discountCars.includes(Number(id)));
+    (!hasRestriction || promoCars.includes(Number(id)));
 
-  const finalDiscount = isCarAllowed ? discount : 0;
+  const finalDiscount = canUsePromo ? discount : 0;
 
   /* ================= PRICE ================= */
   const basePrice = Number(car?.price) || 0;
@@ -810,16 +817,18 @@ export default function CarDetail() {
     (selectedTuning?.price || 0) +
     (selectedWheels?.price || 0);
 
-  const finalBasePrice =
+  const discountedBase =
     finalDiscount > 0
       ? Math.floor(basePrice - (basePrice * finalDiscount) / 100)
       : basePrice;
 
-  const totalPrice = finalBasePrice + configPrice;
+  const totalPrice = discountedBase + configPrice;
 
   /* ================= ORDER ================= */
   const handleOpenPay = () => {
-    setRandomPass(Math.floor(1000 + Math.random() * 9000).toString());
+    setRandomPass(
+      Math.floor(1000 + Math.random() * 9000).toString()
+    );
     setShowPay(true);
   };
 
@@ -832,30 +841,25 @@ export default function CarDetail() {
 
   /* ================= BUY ================= */
   const sendToTelegram = async () => {
-    if (!car || !user) return;
-
     try {
       setSending(true);
 
       const token = localStorage.getItem("token");
 
-      // 1. BUY (consume promo)
       const buyRes = await fetch(`${API}/promo/buy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({ carId: car.id }),
+        body: JSON.stringify({ carId: car?.id }),
       });
 
       const buyData = await buyRes.json();
 
-      if (!buyData.success) {
-        throw new Error("BUY FAILED");
-      }
+      if (!buyData.success) throw new Error();
 
-      // 2. refresh user (IMPORTANT FIX)
+      // refresh user
       const userRes = await fetch(`${API}/profile/me`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : "",
@@ -865,7 +869,6 @@ export default function CarDetail() {
       const updatedUser = await userRes.json();
       setUser(updatedUser);
 
-      // 3. telegram
       await fetch(`${API}/telegram/order-to-tg`, {
         method: "POST",
         headers: {
@@ -884,7 +887,7 @@ export default function CarDetail() {
       navigate("/market");
 
     } catch (e) {
-      console.log("ORDER ERROR:", e);
+      console.log(e);
       alert("ERROR");
     } finally {
       setSending(false);
@@ -892,21 +895,8 @@ export default function CarDetail() {
   };
 
   /* ================= UI ================= */
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        LOADING...
-      </div>
-    );
-  }
-
-  if (!car) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-500">
-        CAR NOT FOUND
-      </div>
-    );
-  }
+  if (loading) return <div>LOADING...</div>;
+  if (!car) return <div>CAR NOT FOUND</div>;
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -919,6 +909,7 @@ export default function CarDetail() {
 
         <img src={car.image_url} className="w-full mt-4 rounded-2xl" />
 
+        {/* PRICE */}
         <div className="mt-6 text-2xl font-bold">
           {finalDiscount > 0 && (
             <div className="line-through text-white/40">
@@ -929,8 +920,8 @@ export default function CarDetail() {
           <div className="text-yellow-400">${totalPrice}</div>
 
           {finalDiscount > 0 && (
-            <div className="text-green-400 text-sm mt-2">
-              🔥 -{finalDiscount}%
+            <div className="text-green-400 text-sm">
+              🔥 -{finalDiscount}% PROMO
             </div>
           )}
         </div>
@@ -942,13 +933,18 @@ export default function CarDetail() {
           BUY
         </button>
 
-        {/* CONFIGS */}
+        {/* CONFIGS FIX */}
         <div className="grid grid-cols-3 gap-4 mt-10">
-          {configs.power.map((i) => (
-            <button key={i.id} onClick={() => setSelectedHp(i)}>
-              {i.name}
-            </button>
-          ))}
+          {configs.power.length > 0 &&
+            configs.power.map((i) => (
+              <button
+                key={i.id}
+                onClick={() => setSelectedHp(i)}
+                className="bg-white/10 p-2 rounded"
+              >
+                {i.name}
+              </button>
+            ))}
         </div>
       </div>
 
@@ -956,29 +952,20 @@ export default function CarDetail() {
       {showPay && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center">
           <div className="bg-[#111] p-6 rounded-2xl w-[400px]">
-            <h2 className="text-yellow-400 mb-4">ORDER</h2>
-
             {selectedConfigs.map((c, i) => (
               <div key={i}>{c}</div>
             ))}
 
-            <div className="mt-4 font-bold text-green-400">
+            <div className="mt-4 text-green-400">
               TOTAL: ${totalPrice}
             </div>
 
             <button
               onClick={sendToTelegram}
               disabled={sending}
-              className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl font-black"
+              className="mt-6 w-full bg-yellow-400 text-black py-2 rounded-xl"
             >
               {sending ? "SENDING..." : "CONFIRM"}
-            </button>
-
-            <button
-              onClick={() => setShowPay(false)}
-              className="mt-2 w-full text-white/40"
-            >
-              CLOSE
             </button>
           </div>
         </div>
