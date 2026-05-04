@@ -43,11 +43,12 @@
 
 
 const express = require("express");
+const auth = require("../middleware/auth");
 const { q } = require("../db");
 
 const router = express.Router();
 
-/* ================= GET ACTIVE PROMO ================= */
+/* ================= PROMO ================= */
 const getUserPromo = async (userId) => {
   const promoRes = await q(
     `
@@ -64,161 +65,48 @@ const getUserPromo = async (userId) => {
 };
 
 /* ================= CARS ================= */
-router.get("/cars", async (req, res) => {
+router.get("/cars", auth, async (req, res) => {
   try {
-    const userId = req.userId || null;
+    const userId = req.userId;
 
     const carsRes = await q(`
-      SELECT 
-        id,
-        name,
-        brand,
-        price,
-        image_url,
-        type
+      SELECT id, name, brand, price, image_url, type
       FROM cars
       ORDER BY id DESC
     `);
 
-    const cars = carsRes.rows || [];
+    const promo = await getUserPromo(userId);
 
-    let promo = null;
-
-    if (userId) {
-      promo = await getUserPromo(userId);
-    }
-
-    let rules = promo?.rules || null;
+    let rules = promo?.rules || "";
     let discount = Number(promo?.discount || 0);
 
-    if (typeof rules !== "string") {
-      rules = String(rules || "");
-    }
+    rules = String(rules).trim();
 
-    rules = rules.trim();
-
-    const result = cars.map((car) => {
+    const cars = carsRes.rows.map((car) => {
       let finalPrice = car.price;
-      let promoActive = false;
+      let active = false;
 
       if (promo && discount > 0) {
         if (rules === "all" || rules === car.type) {
           finalPrice = Math.floor(
             car.price - (car.price * discount) / 100
           );
-          promoActive = true;
+          active = true;
         }
       }
 
       return {
         ...car,
         final_price: finalPrice,
-        promo_active: promoActive,
+        promo_active: active,
       };
     });
 
-    res.json(result);
+    res.json(cars);
 
   } catch (e) {
     console.log("CARS ERROR:", e);
     res.status(500).json({ error: "Failed to load cars" });
-  }
-});
-
-/* ================= CAR BY ID ================= */
-router.get("/cars/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const result = await q(
-      `
-      SELECT 
-        id,
-        name,
-        brand,
-        price,
-        image_url,
-        type
-      FROM cars
-      WHERE id = $1
-      `,
-      [id]
-    );
-
-    const car = result.rows[0];
-
-    if (!car) {
-      return res.status(404).json({ error: "Car not found" });
-    }
-
-    res.json(car);
-
-  } catch (e) {
-    console.log("CAR BY ID ERROR:", e);
-    res.status(500).json({ error: "Failed to load car" });
-  }
-});
-
-/* ================= CONFIGS ================= */
-router.get("/configs", async (req, res) => {
-  try {
-    const result = await q(`
-      SELECT type, data
-      FROM global_car_configs
-    `);
-
-    const rows = result.rows || [];
-
-    const grouped = rows.reduce((acc, item) => {
-      if (!acc[item.type]) acc[item.type] = [];
-      acc[item.type].push(item.data);
-      return acc;
-    }, {});
-
-    res.json({
-      power: grouped.power || [],
-      tuning: grouped.tuning || [],
-      wheels: grouped.wheels || [],
-    });
-
-  } catch (e) {
-    console.log("CONFIGS ERROR:", e);
-
-    res.status(500).json({
-      power: [],
-      tuning: [],
-      wheels: [],
-      error: "Failed to load configs",
-    });
-  }
-});
-
-/* ================= FILTER BY TYPE ================= */
-router.get("/cars/type/:type", async (req, res) => {
-  try {
-    const { type } = req.params;
-
-    const result = await q(
-      `
-      SELECT 
-        id,
-        name,
-        brand,
-        price,
-        image_url,
-        type
-      FROM cars
-      WHERE type = $1
-      ORDER BY id DESC
-      `,
-      [type]
-    );
-
-    res.json(result.rows || []);
-
-  } catch (e) {
-    console.log("FILTER CARS ERROR:", e);
-    res.status(500).json({ error: "Failed to filter cars" });
   }
 });
 
