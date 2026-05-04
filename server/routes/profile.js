@@ -192,7 +192,7 @@ router.get("/me", auth, async (req, res) => {
       `
       SELECT promo_code, rules
       FROM user_promos
-      WHERE user_id=$1
+      WHERE user_id=$1 AND consumed=false
       ORDER BY id DESC
       LIMIT 1
       `,
@@ -201,31 +201,20 @@ router.get("/me", auth, async (req, res) => {
 
     const promo = promoRes.rows[0] || null;
 
-    // безопасный JSON parse
-    let rules = {};
+    let rules = promo?.rules || null;
 
-    if (promo?.rules) {
-      try {
-        rules =
-          typeof promo.rules === "string"
-            ? JSON.parse(promo.rules)
-            : promo.rules;
-
-        if (typeof rules !== "object" || rules === null) {
-          rules = {};
-        }
-      } catch {
-        rules = {};
-      }
+    if (typeof rules !== "string") {
+      rules = String(rules || "");
     }
 
-    // проверка валидности промо
+    rules = rules.trim();
+
+    const validTypes = ["coin", "premium", "default", "all"];
+
     const isValidPromo =
       promo &&
       rules &&
-      typeof rules === "object" &&
-      rules.discount !== undefined &&
-      rules.discount !== null;
+      validTypes.includes(rules);
 
     res.json({
       id: user.id,
@@ -243,10 +232,7 @@ router.get("/me", auth, async (req, res) => {
       active_promo: isValidPromo
         ? {
             promo_code: promo.promo_code,
-            rules: {
-              discount: Number(rules.discount || 0),
-              allowed_types: rules.allowed_types || []
-            }
+            rules: rules
           }
         : null
     });
@@ -256,7 +242,6 @@ router.get("/me", auth, async (req, res) => {
     res.status(500).json({ error: "server error" });
   }
 });
-
 /* ================= TELEGRAM LINK ================= */
 router.post("/telegram/link", auth, async (req, res) => {
   try {

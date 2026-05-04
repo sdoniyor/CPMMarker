@@ -121,7 +121,6 @@
 
 
 
-
 const express = require("express");
 const auth = require("../middleware/auth");
 const { q } = require("../db");
@@ -149,25 +148,28 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(404).json({ error: "Invalid code" });
     }
 
-   let rules = promo.rules;
+    // ================= RULES (ТОЛЬКО СТРОКА) =================
+    let rules = promo.rules;
 
-if (typeof rules === "string") {
-  try {
-    rules = JSON.parse(rules);
-  } catch {
-    rules = {};
-  }
-}
+    // если вдруг пришёл JSON или мусор
+    if (typeof rules !== "string") {
+      rules = String(rules || "");
+    }
 
-if (typeof rules !== "object" || rules === null) {
-  rules = {};
-}
+    rules = rules.trim();
 
-if (rules.discount === undefined || rules.discount === null) {
-  return res.status(400).json({ error: "Invalid promo config" });
-}
+    // ================= VALIDATION =================
+    if (!rules) {
+      return res.status(400).json({ error: "Invalid promo config" });
+    }
 
-    // уже использован
+    const validTypes = ["coin", "premium", "default", "all"];
+
+    if (!validTypes.includes(rules)) {
+      return res.status(400).json({ error: "Invalid promo type" });
+    }
+
+    // ================= CHECK USED =================
     const used = await q(
       `SELECT id FROM user_promos WHERE user_id=$1 AND promo_code=$2`,
       [userId, code]
@@ -177,7 +179,7 @@ if (rules.discount === undefined || rules.discount === null) {
       return res.status(400).json({ error: "Already used" });
     }
 
-    // уже активен
+    // ================= ACTIVE PROMO =================
     const active = await q(
       `SELECT id FROM user_promos WHERE user_id=$1 AND consumed=false`,
       [userId]
@@ -187,16 +189,11 @@ if (rules.discount === undefined || rules.discount === null) {
       return res.status(400).json({ error: "Already active promo" });
     }
 
-    // SAVE PROMO
+    // ================= SAVE =================
     await q(
-      `INSERT INTO user_promos
-      (user_id, promo_code, rules, consumed)
-      VALUES ($1,$2,$3,false)`,
-      [
-        userId,
-        code,
-        JSON.stringify(rules) // 🔥 FIX
-      ]
+      `INSERT INTO user_promos (user_id, promo_code, rules, consumed)
+       VALUES ($1,$2,$3,false)`,
+      [userId, code, rules]
     );
 
     res.json({ success: true });

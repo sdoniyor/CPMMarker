@@ -118,7 +118,6 @@
 // }
 
 
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -135,29 +134,29 @@ type Car = {
 };
 
 type Promo = {
+  promo_code: string;
   discount: number;
-  rules?: {
-    discount?: number;
-    allowed_types?: string[];
-  };
+  rules: "coin" | "premium" | "default" | "all";
 };
 
 type User = {
   active_promo?: Promo | null;
 };
 
-/* ================= PARSER ================= */
+/* ================= CHECK ================= */
 const canUsePromo = (car: Car, promo?: Promo | null) => {
   if (!promo) return false;
 
-  const rules = promo.rules;
-  if (!rules?.discount) return false;
+  const rule = promo.rules;
 
-  if (!rules.allowed_types || rules.allowed_types.length === 0) {
-    return true;
-  }
+  // нет скидки
+  if (!promo.discount) return false;
 
-  return rules.allowed_types.includes(car.type);
+  // если all → всегда можно
+  if (rule === "all") return true;
+
+  // иначе строго совпадение типа
+  return rule === car.type;
 };
 
 export default function Market() {
@@ -191,7 +190,7 @@ export default function Market() {
         {cars.map((car) => {
           const active = canUsePromo(car, promo);
 
-          const discount = promo?.rules?.discount || 0;
+          const discount = promo?.discount || 0;
 
           const price = active
             ? Math.floor(car.price - (car.price * discount) / 100)
@@ -223,7 +222,7 @@ export default function Market() {
 
               {active && (
                 <div className="text-yellow-400 text-sm">
-                  🔥 PROMO ACTIVE
+                  🔥 PROMO ACTIVE ({promo?.rules})
                 </div>
               )}
             </div>
