@@ -1,3 +1,4 @@
+
 // import { useEffect, useState } from "react";
 
 // const API = "https://cpmmarker.onrender.com";
@@ -35,16 +36,16 @@
 //       });
 
 //       const data = await res.json();
-
+//       console.log("USER FROM BACKEND:", data); // 👈 ВОТ СЮДА
 //       if (!data?.id) {
-//         window.location.href = "/";
+//         window.location.href = "/auth";
 //         return;
 //       }
 
 //       setUser(data);
 //     } catch (e) {
 //       console.log("PROFILE ERROR:", e);
-//       window.location.href = "/";
+//       window.location.href = "/auth";
 //     }
 //   };
 
@@ -53,34 +54,40 @@
 //   }, []);
 
 //   /* ================= UPLOAD AVATAR ================= */
-//   const uploadAvatar = async () => {
-//     if (!file) return alert("Выбери фото");
+// const uploadAvatar = async () => {
+//   if (!file) return alert("Выбери фото");
 
-//     const form = new FormData();
-//     form.append("avatar", file);
+//   const form = new FormData();
+//   form.append("avatar", file);
 
-//     try {
-//       const res = await fetch(`${API}/profile/upload-avatar`, {
-//         method: "POST",
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//         },
-//         body: form,
-//       });
+//   try {
+//     const res = await fetch(`${API}/profile/upload-avatar`, {
+//       method: "POST",
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//       body: form,
+//     });
 
-//       const data = await res.json();
+//     const data = await res.json();
 
-//       if (data?.id) {
-//         setUser(data);
-//         setFile(null);
-//         setPreview(null);
-//       } else {
-//         alert(data?.error || "Upload error");
-//       }
-//     } catch {
-//       alert("Ошибка загрузки");
+//     if (data?.success) {
+//       // ✅ ВАЖНО: полностью обновляем пользователя
+//       setUser(data.user);
+
+//       // 🔥 сбрасываем превью
+//       setFile(null);
+//       setPreview(null);
+
+//     } else {
+//       alert(data?.error || "Upload error");
 //     }
-//   };
+
+//   } catch (e) {
+//     console.log(e);
+//     alert("Upload failed");
+//   }
+// };
 
 //   /* ================= TELEGRAM ================= */
 //   const connectTelegram = async () => {
@@ -141,9 +148,15 @@
 //   }
 
 //   const avatarUrl =
-//     preview || (user.avatar ? `${API}${user.avatar}` : null);
-
-//   const refLink = `${window.location.origin}/Auth?ref=${user.ref_code}`;
+//     preview ||
+//     (user.avatar
+//       ? user.avatar.startsWith("http")
+//         ? user.avatar
+//         : `${API}${user.avatar}`
+//       : null);
+//   console.log("DEBUG avatar:", user.avatar);
+//   console.log("DEBUG avatarUrl:", avatarUrl);
+//   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
 
 //   return (
 //     <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
@@ -193,6 +206,7 @@
 
 //           </div>
 
+//           {/* 🔥 REF COUNT */}
 //           <p className="text-white/40 text-sm mt-2">
 //             Referrals: {user.ref_count || 0}
 //           </p>
@@ -288,6 +302,9 @@
 
 
 
+
+
+
 import { useEffect, useState } from "react";
 
 const API = "https://cpmmarker.onrender.com";
@@ -296,12 +313,19 @@ type User = {
   id: number;
   name: string;
   email?: string;
-  discount?: number;
   avatar?: string;
   ref_code?: string;
   ref_count?: number;
   telegram_username?: string;
   telegram_id?: string;
+
+  active_promo?: {
+    promo_code: string;
+    rules: {
+      discount: number;
+      allowed_types?: string[];
+    };
+  } | null;
 };
 
 export default function ProfilePage() {
@@ -325,7 +349,9 @@ export default function ProfilePage() {
       });
 
       const data = await res.json();
-      console.log("USER FROM BACKEND:", data); // 👈 ВОТ СЮДА
+
+      console.log("USER FROM BACKEND:", data);
+
       if (!data?.id) {
         window.location.href = "/auth";
         return;
@@ -343,13 +369,12 @@ export default function ProfilePage() {
   }, []);
 
   /* ================= UPLOAD AVATAR ================= */
-const uploadAvatar = async () => {
-  if (!file) return alert("Выбери фото");
+  const uploadAvatar = async () => {
+    if (!file) return alert("Выбери фото");
 
-  const form = new FormData();
-  form.append("avatar", file);
+    const form = new FormData();
+    form.append("avatar", file);
 
-  try {
     const res = await fetch(`${API}/profile/upload-avatar`, {
       method: "POST",
       headers: {
@@ -361,28 +386,19 @@ const uploadAvatar = async () => {
     const data = await res.json();
 
     if (data?.success) {
-      // ✅ ВАЖНО: полностью обновляем пользователя
       setUser(data.user);
-
-      // 🔥 сбрасываем превью
       setFile(null);
       setPreview(null);
-
     } else {
       alert(data?.error || "Upload error");
     }
-
-  } catch (e) {
-    console.log(e);
-    alert("Upload failed");
-  }
-};
+  };
 
   /* ================= TELEGRAM ================= */
   const connectTelegram = async () => {
-    try {
-      setTgLoading(true);
+    setTgLoading(true);
 
+    try {
       const res = await fetch(`${API}/profile/telegram/link`, {
         method: "POST",
         headers: {
@@ -404,27 +420,23 @@ const uploadAvatar = async () => {
   const applyPromo = async () => {
     if (!promo.trim()) return alert("Введите промокод");
 
-    try {
-      const res = await fetch(`${API}/promo/redeem`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ code: promo }),
-      });
+    const res = await fetch(`${API}/promo/redeem`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code: promo }),
+    });
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (data?.success) {
-        alert("Промокод активирован!");
-        setPromo("");
-        loadUser();
-      } else {
-        alert(data?.error || "Invalid promo");
-      }
-    } catch {
-      alert("Server error");
+    if (data?.success) {
+      alert("Промокод активирован!");
+      setPromo("");
+      loadUser();
+    } else {
+      alert(data?.error || "Invalid promo");
     }
   };
 
@@ -443,16 +455,16 @@ const uploadAvatar = async () => {
         ? user.avatar
         : `${API}${user.avatar}`
       : null);
-  console.log("DEBUG avatar:", user.avatar);
-  console.log("DEBUG avatarUrl:", avatarUrl);
+
   const refLink = `${window.location.origin}/auth?ref=${user.ref_code}`;
+
+  const discount = user.active_promo?.rules?.discount || 0;
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white p-6">
-
       <div className="max-w-4xl mx-auto">
 
-        {/* ================= HEADER ================= */}
+        {/* HEADER */}
         <div className="bg-white/5 border border-white/10 rounded-3xl p-6 flex items-center gap-6">
 
           <div className="w-24 h-24 rounded-2xl bg-yellow-400 text-black flex items-center justify-center overflow-hidden font-black text-3xl">
@@ -467,19 +479,18 @@ const uploadAvatar = async () => {
             <h1 className="text-3xl font-black">{user.name}</h1>
             <p className="text-white/40">{user.email}</p>
 
+            {/* 💥 FIXED DISCOUNT */}
             <p className="text-yellow-400 text-sm mt-1">
-              Discount: {user.discount || 0}%
+              Discount: {discount}%
             </p>
           </div>
         </div>
 
-        {/* ================= REF LINK ================= */}
+        {/* REF */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-
           <h2 className="font-bold mb-3">Referral Link</h2>
 
           <div className="flex gap-2">
-
             <input
               value={refLink}
               readOnly
@@ -492,18 +503,15 @@ const uploadAvatar = async () => {
             >
               Copy
             </button>
-
           </div>
 
-          {/* 🔥 REF COUNT */}
           <p className="text-white/40 text-sm mt-2">
             Referrals: {user.ref_count || 0}
           </p>
         </div>
 
-        {/* ================= TELEGRAM ================= */}
+        {/* TELEGRAM */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-
           <h2 className="font-bold mb-3">Telegram</h2>
 
           {user.telegram_id ? (
@@ -519,16 +527,13 @@ const uploadAvatar = async () => {
               {tgLoading ? "Connecting..." : "Connect Telegram"}
             </button>
           )}
-
         </div>
 
-        {/* ================= PROMO ================= */}
+        {/* PROMO */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-
           <h2 className="font-bold mb-3">Promo Code</h2>
 
           <div className="flex gap-2">
-
             <input
               value={promo}
               onChange={(e) => setPromo(e.target.value)}
@@ -542,13 +547,11 @@ const uploadAvatar = async () => {
             >
               Apply
             </button>
-
           </div>
         </div>
 
-        {/* ================= UPLOAD AVATAR ================= */}
+        {/* AVATAR */}
         <div className="mt-6 bg-white/5 border border-white/10 p-6 rounded-2xl">
-
           <h2 className="font-bold mb-3">Upload Avatar</h2>
 
           <input
@@ -561,9 +564,7 @@ const uploadAvatar = async () => {
               setFile(f);
 
               const reader = new FileReader();
-              reader.onload = () => {
-                setPreview(reader.result as string);
-              };
+              reader.onload = () => setPreview(reader.result as string);
               reader.readAsDataURL(f);
             }}
           />
@@ -581,7 +582,6 @@ const uploadAvatar = async () => {
           >
             Save Avatar
           </button>
-
         </div>
 
       </div>
