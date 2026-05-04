@@ -159,7 +159,6 @@
 
 
 
-
 const express = require("express");
 const auth = require("../middleware/auth");
 const { q } = require("../db");
@@ -193,7 +192,7 @@ router.get("/me", auth, async (req, res) => {
       `
       SELECT promo_code, rules
       FROM user_promos
-      WHERE user_id=$1 AND consumed=false
+      WHERE user_id=$1
       ORDER BY id DESC
       LIMIT 1
       `,
@@ -202,7 +201,7 @@ router.get("/me", auth, async (req, res) => {
 
     const promo = promoRes.rows[0] || null;
 
-    // безопасный parse rules
+    // безопасный JSON parse
     let rules = {};
 
     if (promo?.rules) {
@@ -211,10 +210,22 @@ router.get("/me", auth, async (req, res) => {
           typeof promo.rules === "string"
             ? JSON.parse(promo.rules)
             : promo.rules;
-      } catch (e) {
+
+        if (typeof rules !== "object" || rules === null) {
+          rules = {};
+        }
+      } catch {
         rules = {};
       }
     }
+
+    // проверка валидности промо
+    const isValidPromo =
+      promo &&
+      rules &&
+      typeof rules === "object" &&
+      rules.discount !== undefined &&
+      rules.discount !== null;
 
     res.json({
       id: user.id,
@@ -228,11 +239,14 @@ router.get("/me", auth, async (req, res) => {
       telegram_username: user.telegram_username,
       telegram_id: user.telegram_id,
 
-      /* ================= PROMO (NEW SYSTEM) ================= */
-      active_promo: promo
+      /* ================= PROMO ================= */
+      active_promo: isValidPromo
         ? {
             promo_code: promo.promo_code,
-            rules: rules
+            rules: {
+              discount: Number(rules.discount || 0),
+              allowed_types: rules.allowed_types || []
+            }
           }
         : null
     });
