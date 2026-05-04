@@ -123,23 +123,21 @@
 
 
 const express = require("express");
+const auth = require("../middleware/auth");
+const { q } = require("../db");
+
 const router = express.Router();
 
-const { q } = require("../db");
-const auth = require("../middleware/auth");
-
-/* ================= REDEEM PROMO ================= */
+/* ================= REDEEM ================= */
 router.post("/redeem", auth, async (req, res) => {
-  console.log("REDEEM HIT");
   try {
     const { code } = req.body;
     const userId = req.userId;
 
     if (!code) {
-      return res.status(400).json({ error: "No code provided" });
+      return res.status(400).json({ error: "No code" });
     }
 
-    // promo
     const promoRes = await q(
       `SELECT * FROM promo_codes WHERE code=$1`,
       [code]
@@ -151,9 +149,21 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(404).json({ error: "Invalid code" });
     }
 
-    const rules = promo.rules || {};
+    let rules = promo.rules;
 
-    // уже использовал
+    if (typeof rules === "string") {
+      try {
+        rules = JSON.parse(rules);
+      } catch {
+        rules = {};
+      }
+    }
+
+    if (!rules.discount) {
+      return res.status(400).json({ error: "Invalid promo config" });
+    }
+
+    // уже использован
     const used = await q(
       `SELECT id FROM user_promos WHERE user_id=$1 AND promo_code=$2`,
       [userId, code]
@@ -173,94 +183,23 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(400).json({ error: "Already active promo" });
     }
 
-    // создаём промо
+    // SAVE PROMO
     await q(
-      `
-      INSERT INTO user_promos
-      (user_id, promo_code, discount, rules, consumed)
-      VALUES ($1,$2,$3,$4,false)
-      `,
+      `INSERT INTO user_promos
+      (user_id, promo_code, rules, consumed)
+      VALUES ($1,$2,$3,false)`,
       [
         userId,
         code,
-        Number(rules.discount || 0),
-        rules
+        JSON.stringify(rules) // 🔥 FIX
       ]
     );
 
-    return res.json({ success: true });
+    res.json({ success: true });
 
   } catch (e) {
-    console.log("REDEEM ERROR:", e);
-    return res.status(500).json({ error: "server error" });
-  }
-});
-
-/* ================= BUY ================= */
-router.post("/buy", auth, async (req, res) => {
-  try {
-    const { carId } = req.body;
-
-    if (!carId) {
-      return res.status(400).json({ error: "carId missing" });
-    }
-
-    const carRes = await q(
-      `SELECT * FROM cars WHERE id=$1`,
-      [carId]
-    );
-
-    const car = carRes.rows[0];
-
-    if (!car) {
-      return res.status(404).json({ error: "Car not found" });
-    }
-
-    const promoRes = await q(
-      `SELECT * FROM user_promos
-       WHERE user_id=$1 AND consumed=false
-       LIMIT 1`,
-      [req.userId]
-    );
-
-    const promo = promoRes.rows[0];
-
-    let finalPrice = car.price;
-
-    if (promo) {
-      const rules = promo.rules || {};
-
-      const discount = Number(rules.discount || 0);
-
-      const allowed = rules.allowed_types;
-
-      if (!allowed || allowed.includes(car.type)) {
-        finalPrice = Math.floor(
-          car.price - (car.price * discount) / 100
-        );
-      }
-
-      // сжигаем промо
-      await q(
-        `UPDATE user_promos SET consumed=true WHERE id=$1`,
-        [promo.id]
-      );
-    }
-
-    await q(
-      `INSERT INTO user_cars (user_id, car_id, price)
-       VALUES ($1,$2,$3)`,
-      [req.userId, carId, finalPrice]
-    );
-
-    return res.json({
-      success: true,
-      price: finalPrice
-    });
-
-  } catch (e) {
-    console.log("BUY ERROR:", e);
-    return res.status(500).json({ error: "server error" });
+    console.log("PROMO ERROR:", e);
+    res.status(500).json({ error: "server error" });
   }
 });
 
