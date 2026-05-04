@@ -1,4 +1,6 @@
 
+
+
 // const express = require("express");
 // const auth = require("../middleware/auth");
 // const { q } = require("../db");
@@ -164,7 +166,7 @@ const { q } = require("../db");
 
 const router = express.Router();
 
-/* ================= PROFILE ================= */
+/* ================= GET PROFILE ================= */
 router.get("/me", auth, async (req, res) => {
   try {
     const userRes = await q(
@@ -200,7 +202,7 @@ router.get("/me", auth, async (req, res) => {
 
     const promo = promoRes.rows[0] || null;
 
-    // безопасный JSON parse
+    // безопасный parse rules
     let rules = {};
 
     if (promo?.rules) {
@@ -209,11 +211,7 @@ router.get("/me", auth, async (req, res) => {
           typeof promo.rules === "string"
             ? JSON.parse(promo.rules)
             : promo.rules;
-
-        if (typeof rules !== "object" || rules === null) {
-          rules = {};
-        }
-      } catch {
+      } catch (e) {
         rules = {};
       }
     }
@@ -230,10 +228,11 @@ router.get("/me", auth, async (req, res) => {
       telegram_username: user.telegram_username,
       telegram_id: user.telegram_id,
 
+      /* ================= PROMO (NEW SYSTEM) ================= */
       active_promo: promo
         ? {
             promo_code: promo.promo_code,
-            rules
+            rules: rules
           }
         : null
     });

@@ -149,19 +149,23 @@ router.post("/redeem", auth, async (req, res) => {
       return res.status(404).json({ error: "Invalid code" });
     }
 
-    let rules = promo.rules;
+   let rules = promo.rules;
 
-    if (typeof rules === "string") {
-      try {
-        rules = JSON.parse(rules);
-      } catch {
-        rules = {};
-      }
-    }
+if (typeof rules === "string") {
+  try {
+    rules = JSON.parse(rules);
+  } catch {
+    rules = {};
+  }
+}
 
-    if (!rules.discount) {
-      return res.status(400).json({ error: "Invalid promo config" });
-    }
+if (typeof rules !== "object" || rules === null) {
+  rules = {};
+}
+
+if (rules.discount === undefined || rules.discount === null) {
+  return res.status(400).json({ error: "Invalid promo config" });
+}
 
     // уже использован
     const used = await q(
