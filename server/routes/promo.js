@@ -130,6 +130,7 @@ const auth = require("../middleware/auth");
 
 /* ================= REDEEM PROMO ================= */
 router.post("/redeem", auth, async (req, res) => {
+  console.log("REDEEM HIT");
   try {
     const { code } = req.body;
     const userId = req.userId;
