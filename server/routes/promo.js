@@ -127,16 +127,20 @@ const { q } = require("../db");
 
 const router = express.Router();
 
-/* ================= REDEEM ================= */
+/* ================= VALID TYPES ================= */
+const VALID_RULES = ["coin", "premium", "default", "all"];
+
+/* ================= REDEEM PROMO ================= */
 router.post("/redeem", auth, async (req, res) => {
   try {
     const { code } = req.body;
     const userId = req.userId;
 
     if (!code) {
-      return res.status(400).json({ error: "No code" });
+      return res.status(400).json({ error: "No code provided" });
     }
 
+    // ================= FIND PROMO =================
     const promoRes = await q(
       `SELECT * FROM promo_codes WHERE code=$1`,
       [code]
@@ -145,61 +149,120 @@ router.post("/redeem", auth, async (req, res) => {
     const promo = promoRes.rows[0];
 
     if (!promo) {
-      return res.status(404).json({ error: "Invalid code" });
+      return res.status(404).json({ error: "Invalid promo code" });
     }
 
-    // ================= RULES (ТОЛЬКО СТРОКА) =================
-    let rules = promo.rules;
+    const discount = Number(promo.discount || 0);
+    let rules = String(promo.rules || "").trim();
 
-    // если вдруг пришёл JSON или мусор
-    if (typeof rules !== "string") {
-      rules = String(rules || "");
-    }
-
-    rules = rules.trim();
-
-    // ================= VALIDATION =================
-    if (!rules) {
+    // ================= VALIDATE PROMO =================
+    if (!discount || !rules) {
       return res.status(400).json({ error: "Invalid promo config" });
     }
 
-    const validTypes = ["coin", "premium", "default", "all"];
-
-    if (!validTypes.includes(rules)) {
-      return res.status(400).json({ error: "Invalid promo type" });
+    if (!VALID_RULES.includes(rules)) {
+      return res.status(400).json({ error: "Invalid promo rules type" });
     }
 
-    // ================= CHECK USED =================
+    // ================= CHECK IF USED =================
     const used = await q(
       `SELECT id FROM user_promos WHERE user_id=$1 AND promo_code=$2`,
       [userId, code]
     );
 
     if (used.rows.length > 0) {
-      return res.status(400).json({ error: "Already used" });
+      return res.status(400).json({ error: "Promo already used" });
     }
 
-    // ================= ACTIVE PROMO =================
+    // ================= CHECK ACTIVE PROMO =================
     const active = await q(
       `SELECT id FROM user_promos WHERE user_id=$1 AND consumed=false`,
       [userId]
     );
 
     if (active.rows.length > 0) {
-      return res.status(400).json({ error: "Already active promo" });
+      return res.status(400).json({ error: "Already have active promo" });
     }
 
-    // ================= SAVE =================
+    // ================= SAVE PROMO =================
     await q(
-      `INSERT INTO user_promos (user_id, promo_code, rules, consumed)
-       VALUES ($1,$2,$3,false)`,
-      [userId, code, rules]
+      `
+      INSERT INTO user_promos
+      (user_id, promo_code, discount, rules, consumed)
+      VALUES ($1,$2,$3,$4,false)
+      `,
+      [userId, code, discount, rules]
+    );
+
+    res.json({
+      success: true,
+      promo: {
+        code,
+        discount,
+        rules
+      }
+    });
+
+  } catch (e) {
+    console.log("PROMO ERROR:", e);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
+/* ================= GET USER ACTIVE PROMO ================= */
+router.get("/active", auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const result = await q(
+      `
+      SELECT promo_code, discount, rules
+      FROM user_promos
+      WHERE user_id=$1 AND consumed=false
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    const promo = result.rows[0];
+
+    if (!promo) {
+      return res.json({ promo: null });
+    }
+
+    res.json({
+      promo: {
+        code: promo.promo_code,
+        discount: Number(promo.discount),
+        rules: promo.rules
+      }
+    });
+
+  } catch (e) {
+    console.log("ACTIVE PROMO ERROR:", e);
+    res.status(500).json({ error: "server error" });
+  }
+});
+
+/* ================= CONSUME PROMO ================= */
+router.post("/consume", auth, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    await q(
+      `
+      UPDATE user_promos
+      SET consumed=true
+      WHERE user_id=$1 AND consumed=false
+      `,
+      [userId]
     );
 
     res.json({ success: true });
 
   } catch (e) {
-    console.log("PROMO ERROR:", e);
+    console.log("CONSUME PROMO ERROR:", e);
     res.status(500).json({ error: "server error" });
   }
 });

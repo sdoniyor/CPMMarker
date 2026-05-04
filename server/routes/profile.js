@@ -158,7 +158,6 @@
 
 
 
-
 const express = require("express");
 const auth = require("../middleware/auth");
 const { q } = require("../db");
@@ -190,7 +189,7 @@ router.get("/me", auth, async (req, res) => {
     /* ================= ACTIVE PROMO ================= */
     const promoRes = await q(
       `
-      SELECT promo_code, rules
+      SELECT promo_code, discount, rules
       FROM user_promos
       WHERE user_id=$1 AND consumed=false
       ORDER BY id DESC
@@ -201,7 +200,8 @@ router.get("/me", auth, async (req, res) => {
 
     const promo = promoRes.rows[0] || null;
 
-    let rules = promo?.rules || null;
+    // ================= SAFE PARSE =================
+    let rules = promo?.rules;
 
     if (typeof rules !== "string") {
       rules = String(rules || "");
@@ -213,7 +213,8 @@ router.get("/me", auth, async (req, res) => {
 
     const isValidPromo =
       promo &&
-      rules &&
+      promo.discount !== null &&
+      promo.discount !== undefined &&
       validTypes.includes(rules);
 
     res.json({
@@ -232,6 +233,7 @@ router.get("/me", auth, async (req, res) => {
       active_promo: isValidPromo
         ? {
             promo_code: promo.promo_code,
+            discount: Number(promo.discount),
             rules: rules
           }
         : null
@@ -242,6 +244,7 @@ router.get("/me", auth, async (req, res) => {
     res.status(500).json({ error: "server error" });
   }
 });
+
 /* ================= TELEGRAM LINK ================= */
 router.post("/telegram/link", auth, async (req, res) => {
   try {
