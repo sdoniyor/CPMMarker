@@ -3,84 +3,86 @@
 // const auth = require("../middleware/auth");
 // const { q } = require("../db");
 
-// const multer = require("multer");
-// const path = require("path");
-// const fs = require("fs");
-
 // const router = express.Router();
-
-// /* ================= UPLOAD DIR (Render safe) ================= */
-// const uploadDir = path.join(process.cwd(), "server/uploads");
-
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-//   console.log("📁 uploads folder created:", uploadDir);
-// }
-
-// /* ================= MULTER ================= */
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, uploadDir);
-//   },
-//   filename: (req, file, cb) => {
-//     const ext = path.extname(file.originalname);
-//     cb(null, `avatar-${Date.now()}${ext}`);
-//   },
-// });
-
-// const upload = multer({
-//   storage,
-//   limits: { fileSize: 5 * 1024 * 1024 },
-// });
 
 // /* ================= GET PROFILE ================= */
 // router.get("/me", auth, async (req, res) => {
 //   try {
-//     const r = await q("SELECT * FROM users WHERE id=$1", [req.userId]);
-//     const user = r.rows[0];
+//     const userRes = await q(
+//       `SELECT id, name, email, avatar, ref_code, telegram_username, telegram_id
+//        FROM users
+//        WHERE id=$1`,
+//       [req.userId]
+//     );
+
+//     const user = userRes.rows[0];
 
 //     if (!user) {
 //       return res.status(404).json({ error: "User not found" });
 //     }
 
+//     /* ================= REF COUNT ================= */
 //     const refs = await q(
-//       "SELECT COUNT(*) FROM users WHERE referred_by=$1",
+//       `SELECT COUNT(*) FROM referrals WHERE referrer_id=$1`,
 //       [req.userId]
 //     );
 
-//     let discountCars = [];
+//     /* ================= ACTIVE PROMO ================= */
+//     const promoRes = await q(
+//       `
+//       SELECT discount, car_ids
+//       FROM user_promos
+//       WHERE user_id=$1 AND consumed=false
+//       ORDER BY id DESC
+//       LIMIT 1
+//       `,
+//       [req.userId]
+//     );
 
-//     try {
-//       if (Array.isArray(user.discount_cars)) {
-//         discountCars = user.discount_cars;
-//       } else if (typeof user.discount_cars === "string") {
-//         discountCars = user.discount_cars
-//           .split(",")
-//           .map((x) => Number(x.trim()))
-//           .filter(Boolean);
+//     const promo = promoRes.rows[0];
+
+//     // безопасный парсер (ВАЖНО)
+//     let promoCars = [];
+
+//     if (promo?.car_ids) {
+//       try {
+//         if (typeof promo.car_ids === "string") {
+//           promoCars = promo.car_ids
+//             .split(",")
+//             .map((x) => Number(x.trim()))
+//             .filter(Boolean);
+//         } else if (Array.isArray(promo.car_ids)) {
+//           promoCars = promo.car_ids.map(Number).filter(Boolean);
+//         }
+//       } catch (e) {
+//         promoCars = [];
 //       }
-//     } catch {
-//       discountCars = [];
 //     }
 
 //     res.json({
 //       id: user.id,
 //       name: user.name,
-//       email: user.email || null,
+//       email: user.email,
+
 //       avatar: user.avatar || null,
 
-//       discount: Number(user.discount) || 0,
-//       discount_cars: discountCars,
-
-//       telegram_username: user.telegram_username || null,
-//       telegram_id: user.telegram_id || null,
-
-//       ref_code: user.ref_code || null,
+//       ref_code: user.ref_code,
 //       ref_count: Number(refs.rows?.[0]?.count || 0),
+
+//       telegram_username: user.telegram_username,
+//       telegram_id: user.telegram_id,
+
+//       active_promo: promo
+//         ? {
+//             discount: Number(promo.discount || 0),
+//             car_ids: promoCars,
+//           }
+//         : null,
 //     });
+
 //   } catch (e) {
 //     console.log("PROFILE ERROR:", e);
-//     res.status(500).json({ error: "Server error" });
+//     res.status(500).json({ error: "server error" });
 //   }
 // });
 
@@ -90,7 +92,8 @@
 //     const code = Math.random().toString(36).substring(2, 10);
 
 //     await q(
-//       "INSERT INTO telegram_links (user_id, code, used) VALUES ($1,$2,false)",
+//       `INSERT INTO telegram_links (user_id, code, used)
+//        VALUES ($1,$2,false)`,
 //       [req.userId, code]
 //     );
 
@@ -100,6 +103,7 @@
 //       link: `https://t.me/${bot}?start=${code}`,
 //       code,
 //     });
+
 //   } catch (e) {
 //     console.log("TG LINK ERROR:", e);
 //     res.status(500).json({ error: "Failed to create link" });
@@ -110,192 +114,25 @@
 // router.post(
 //   "/upload-avatar",
 //   auth,
-//   upload.single("avatar"),
+//   require("../middleware/upload").single("avatar"),
 //   async (req, res) => {
 //     try {
-//       if (!req.file) {
-//         return res.status(400).json({ error: "No file uploaded" });
+//       const imageUrl = req.file?.path;
+
+//       if (!imageUrl) {
+//         return res.status(400).json({ error: "No file" });
 //       }
 
-//       const filePath = `/uploads/${req.file.filename}`;
-
-//       const r = await q(
-//         `UPDATE users 
-//          SET avatar=$1 
-//          WHERE id=$2 
-//          RETURNING id, name, email, avatar`,
-//         [filePath, req.userId]
-//       );
-
-//       res.json(r.rows[0]);
-//     } catch (e) {
-//       console.log("UPLOAD ERROR:", e);
-//       res.status(500).json({ error: "Upload failed" });
-//     }
-//   }
-// );
-
-// module.exports = router;
-
-
-
-// const express = require("express");
-// const auth = require("../middleware/auth");
-// const { q } = require("../db");
-
-// const multer = require("multer");
-// const path = require("path");
-// const fs = require("fs");
-
-// const router = express.Router();
-
-// /* ================= UPLOAD DIR ================= */
-// const uploadDir = path.join(__dirname, "../uploads");
-
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-//   console.log("📁 uploads ready:", uploadDir);
-// }
-
-// /* ================= MULTER ================= */
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, uploadDir);
-//   },
-//   filename: (req, file, cb) => {
-//     const ext = path.extname(file.originalname);
-//     cb(null, `avatar-${Date.now()}${ext}`);
-//   },
-// });
-
-// const upload = multer({ storage });
-
-// /* ================= PARSE CAR IDS ================= */
-// const parseCarIds = (car_ids) => {
-//   if (!car_ids) return [];
-
-//   if (Array.isArray(car_ids)) return car_ids.map(Number);
-
-//   if (typeof car_ids === "string") {
-//     return car_ids
-//       .split(",")
-//       .map((x) => Number(x.trim()))
-//       .filter((x) => !isNaN(x));
-//   }
-
-//   return [];
-// };
-
-// /* ================= GET PROFILE ================= */
-// router.get("/me", auth, async (req, res) => {
-//   try {
-//     const r = await q("SELECT * FROM users WHERE id=$1", [req.userId]);
-//     const user = r.rows[0];
-
-//     if (!user) {
-//       return res.status(404).json({ error: "User not found" });
-//     }
-
-//     /* ================= REF COUNT ================= */
-//     const refs = await q(
-//       "SELECT COUNT(*) FROM users WHERE referred_by=$1",
-//       [req.userId]
-//     );
-
-//     /* ================= PROMO CARS FROM DB ================= */
-//     const promoRes = await q(
-//   `SELECT pc.car_ids, pc.discount
-//    FROM user_promos up
-//    JOIN promo_codes pc ON pc.code = up.promo_code
-//    WHERE up.user_id=$1`,
-//   [req.userId]
-// );
-
-// let promoCars = [];
-// let discount = 0;
-
-// if (promoRes.rows.length > 0) {
-//   promoCars = promoRes.rows
-//     .flatMap(r => (r.car_ids || "").split(","))
-//     .map(Number)
-//     .filter(Boolean);
-
-//   discount = Number(promoRes.rows[0].discount) || 0;
-// }
-
-// res.json({
-//   ...user,
-//   discount,
-//   promo_cars: promoCars
-// });
-
-//     /* ================= RESPONSE ================= */
-//     res.json({
-//       id: user.id,
-//       name: user.name,
-//       email: user.email,
-//       avatar: user.avatar || null,
-
-//       discount: Number(user.discount) || 0,
-
-//       ref_code: user.ref_code,
-//       ref_count: Number(refs.rows[0].count),
-
-//       telegram_username: user.telegram_username,
-//       telegram_id: user.telegram_id,
-
-//       // 🔥 ВАЖНО ДЛЯ МАРКЕТА
-//       promo_cars: promoCars,
-//     });
-
-//   } catch (e) {
-//     console.log("PROFILE ERROR:", e);
-//     res.status(500).json({ error: "server error" });
-//   }
-// });
-
-
-// /* ================= TELEGRAM LINK ================= */
-// router.post("/telegram/link", auth, async (req, res) => {
-//   try {
-//     const code = Math.random().toString(36).substring(2, 10);
-
-//     await q(
-//       "INSERT INTO telegram_links (user_id, code, used) VALUES ($1,$2,false)",
-//       [req.userId, code]
-//     );
-
-//     const bot = process.env.BOT_USERNAME || "CPMMarket_bot";
-
-//     res.json({
-//       link: `https://t.me/${bot}?start=${code}`,
-//       code,
-//     });
-//   } catch (e) {
-//     console.log("TG LINK ERROR:", e);
-//     res.status(500).json({ error: "Failed to create link" });
-//   }
-// });
-
-
-// /* ================= UPLOAD AVATAR ================= */
-// router.post(
-//   "/upload-avatar",
-//   upload.single("avatar"),
-//   async (req, res) => {
-//     try {
-//       const userId = req.user.id;
-
-//       const imageUrl = req.file.path; // 🔥 Cloudinary URL
-
 //       await q(
-//         "UPDATE users SET avatar=$1 WHERE id=$2",
-//         [imageUrl, userId]
+//         `UPDATE users SET avatar=$1 WHERE id=$2`,
+//         [imageUrl, req.userId]
 //       );
 
 //       const user = await q(
-//         "SELECT id, name, email, avatar FROM users WHERE id=$1",
-//         [userId]
+//         `SELECT id, name, email, avatar
+//          FROM users
+//          WHERE id=$1`,
+//         [req.userId]
 //       );
 
 //       res.json({
@@ -304,13 +141,16 @@
 //       });
 
 //     } catch (e) {
-//       console.log(e);
+//       console.log("UPLOAD ERROR:", e);
 //       res.status(500).json({ error: "upload failed" });
 //     }
 //   }
 // );
 
 // module.exports = router;
+
+
+
 
 
 
@@ -349,7 +189,7 @@ router.get("/me", auth, async (req, res) => {
     /* ================= ACTIVE PROMO ================= */
     const promoRes = await q(
       `
-      SELECT discount, car_ids
+      SELECT promo_code, rules
       FROM user_promos
       WHERE user_id=$1 AND consumed=false
       ORDER BY id DESC
@@ -358,23 +198,19 @@ router.get("/me", auth, async (req, res) => {
       [req.userId]
     );
 
-    const promo = promoRes.rows[0];
+    const promo = promoRes.rows[0] || null;
 
-    // безопасный парсер (ВАЖНО)
-    let promoCars = [];
+    // безопасный parse rules
+    let rules = {};
 
-    if (promo?.car_ids) {
+    if (promo?.rules) {
       try {
-        if (typeof promo.car_ids === "string") {
-          promoCars = promo.car_ids
-            .split(",")
-            .map((x) => Number(x.trim()))
-            .filter(Boolean);
-        } else if (Array.isArray(promo.car_ids)) {
-          promoCars = promo.car_ids.map(Number).filter(Boolean);
-        }
+        rules =
+          typeof promo.rules === "string"
+            ? JSON.parse(promo.rules)
+            : promo.rules;
       } catch (e) {
-        promoCars = [];
+        rules = {};
       }
     }
 
@@ -382,7 +218,6 @@ router.get("/me", auth, async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-
       avatar: user.avatar || null,
 
       ref_code: user.ref_code,
@@ -391,12 +226,13 @@ router.get("/me", auth, async (req, res) => {
       telegram_username: user.telegram_username,
       telegram_id: user.telegram_id,
 
+      /* ================= PROMO (NEW SYSTEM) ================= */
       active_promo: promo
         ? {
-            discount: Number(promo.discount || 0),
-            car_ids: promoCars,
+            promo_code: promo.promo_code,
+            rules: rules
           }
-        : null,
+        : null
     });
 
   } catch (e) {
